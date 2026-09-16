@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <title>Pixelverkstan</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖥️</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Jersey+10&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Butiksgolvet -->
+    <section id="shop" class="screen hidden">
+      <canvas id="floor"></canvas>
+      <header id="hud"></header>
+      <aside id="orders"></aside>
+    </section>
+
+    <!-- Byggvyn -->
+    <section id="build" class="screen hidden">
+      <header class="build-top">
+        <button id="build-back" class="btn">← Butiken</button>
+        <div id="build-title"></div>
+        <button id="build-boot" class="btn btn-go" disabled>⏻ Starta datorn</button>
+      </header>
+      <div class="build-body">
+        <aside id="build-sheet"></aside>
+        <div id="build-stage"><canvas id="board"></canvas><div id="build-guide"></div></div>
+      </div>
+      <footer id="build-tray"></footer>
+    </section>
+
+    <!-- Startmeny -->
+    <section id="menu" class="screen"></section>
+
+    <div id="modal" class="hidden"></div>
+    <div id="toasts"></div>
+    <div id="drag-ghost" class="hidden"></div>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+<!doctype html><html><body style="margin:0;background:#efe9df">
+<canvas id="c" style="image-rendering:pixelated"></canvas><div id="icons" style="display:flex;flex-wrap:wrap;gap:4px;padding:6px"></div>
+<script type="module">
+import { Raster } from '../js/core/raster.js';
+import { VIEW } from '../js/shops/dator/geom.js';
+import { drawPart, drawMat, iconCanvas } from '../js/shops/dator/art.js';
+import { PART, PARTS } from '../js/shops/dator/catalog.js';
+const q = new URLSearchParams(location.search);
+const ids = (q.get('b') || 'o11-evo,rog-x670e-e,r9-7950x,nh-d15,tridentz5-64-ddr5,990pro-2tb,rtx-4090,dark-power-13,barracuda-1tb').split(',');
+const R = new Raster(VIEW.w, VIEW.h); Object.assign(R, { k: VIEW.k, hz: VIEW.hz, ox: VIEW.ox, oy: VIEW.oy });
+R.clear(0xefe9df); drawMat(R, 1);
+const order = ['case','mb','cpu','cooler','ram','storage','gpu','psu'];
+const parts = ids.map(i => PART[i]).sort((a,b)=>order.indexOf(a.cat)-order.indexOf(b.cat));
+for (const p of parts) drawPart(R, p, { ids: {}, id: 2, spin: 0.3, paste: false });
+const c = document.getElementById('c'); const S = 3; c.width = VIEW.w*S; c.height = VIEW.h*S;
+const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(R.flush(), 0, 0, c.width, c.height);
+for (const p of PARTS) { const ic = iconCanvas(p); ic.style.cssText='width:128px;height:108px;image-rendering:pixelated;background:#fff;border:2px solid #222'; document.getElementById('icons').append(ic); }
+window.done = true;
+</script></body></html>
