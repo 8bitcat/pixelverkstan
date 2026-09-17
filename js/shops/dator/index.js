@@ -47,6 +47,8 @@ export default {
   ],
   levels: catalog.LEVELS,
   specLine: catalog.specLine,
+  // extra uppgift som alltid visas i byggaren (grafikkortets videominne)
+  partTag: (p) => (p.cat === 'gpu' && p.vram ? `${catalog.sizeText(p.vram)} videominne` : ''),
   retail: catalog.retail,
   icon: iconCanvas,
   layout,

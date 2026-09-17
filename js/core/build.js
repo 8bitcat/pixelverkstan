@@ -173,7 +173,8 @@ export class BuildView {
       if (kind === 'slot') {
         if (!sim.placed[id] && !b.placed[id]) continue;
         const entry = tray.find((e) => L.slotsFor(e.part).some((s) => s.id === id));
-        out.push({ key, kind, id, label: (b.placed[id] || sim.placed[id]).name, done: !!b.placed[id], ready: !!entry && !L.missingReq(L.SLOT[id].requires, b), entryKey: entry?.key });
+        const lp = b.placed[id] || sim.placed[id], ltag = this.shop.partTag?.(lp);
+        out.push({ key, kind, id, label: lp.name + (ltag ? ` (${ltag})` : ''), done: !!b.placed[id], ready: !!entry && !L.missingReq(L.SLOT[id].requires, b), entryKey: entry?.key });
       } else if (kind === 'act') {
         const a = L.ACTION[id];
         if (!a.requires.filter((r) => !r.startsWith('act:')).every((r) => sim.placed[r])) continue;
@@ -684,7 +685,8 @@ export class BuildView {
     if (this.labelW && this.cam.zoom <= this.fit.zoom * 1.15) {
       const labels = this.L.SLOTS.filter((s) => this.b.placed[s.id] && s.cat !== 'case').map((s) => {
         const p = this.b.placed[s.id], pt = D.proj(this, ...s.anchor);
-        return { title: this.shop.cats[p.cat].name, text: p.name, pt, side: pt[0] < this.cw / 2 ? 'left' : 'right' };
+        const tag = this.shop.partTag?.(p);
+        return { title: this.shop.cats[p.cat].name + (tag ? ` · ${tag}` : ''), text: p.name, pt, side: pt[0] < this.cw / 2 ? 'left' : 'right' };
       });
       D.drawLabels(ctx, this, labels, this.cw, this.ch);
     }

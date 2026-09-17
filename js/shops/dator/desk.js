@@ -11,6 +11,7 @@ import { drawInternals, drawScreen, drawRear, switchRect, plugIcon, drawPlugHead
 
 const DV = { w: 840, h: 612, k: 18, hz: 14, ox: 256, oy: 200 };
 const CASE_AT = [20, 2.5, 6];
+const ID_CASE = 7, ID_MONITOR = 8;   // i klickbufferten: sladdar göms bakom datorn och skärmen
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 export class Desk {
@@ -331,7 +332,7 @@ export class Desk {
     if (this.dynKey !== dynKey || (st.powered && this.redraw <= 0)) {
       const R = this.R;
       R.clear();
-      const o = { id: 0, t, spin: st.powered ? t * 14 : 0.3, powered: st.powered, lit: { ...st.lit, power: st.powered } };
+      const o = { id: ID_CASE, t, spin: st.powered ? t * 14 : 0.3, powered: st.powered, lit: { ...st.lit, power: st.powered } };
       this.drawDynamic(R);
       drawCaseStanding(R, b.placed.case, o, CASE_AT);
       R.flush();
@@ -398,6 +399,7 @@ export class Desk {
         `MINNE: ${ramText} ${p.ram.type} OK`.toUpperCase(),
         `LAGRING: ${st ? st.name : 'SAKNAS'}`.toUpperCase().slice(0, 38),
         `GRAFIK: ${p.gpu ? p.gpu.name.replace(/^(NVIDIA|AMD|ASUS|MSI|PowerColor) /, '') : 'INBYGGD'}`.toUpperCase().slice(0, 38),
+        ...(p.gpu?.vram ? [`VIDEOMINNE: ${this.view.shop.partTag(p.gpu).replace(' videominne', '')}`.toUpperCase()] : []),
         `NÄTAGG: ${p.psu.watt} W`,
       ],
     };
@@ -432,7 +434,9 @@ export class Desk {
       return 0xf0ece4;
     });
     R.box(2.4, 2.6, 10.0, 10.4, 6.3, 6.9, () => 0xe6e2da);
+    R.defaultId = ID_MONITOR;
     drawMonitor(R, this.era, { monPower: !!this.d.plugs.mon_power, powered: this.state.powered });
+    R.defaultId = 0;
     drawDeskDecor(R, this.era, this.t, this.view.order?.template);
   }
   drawDynamic(R) {
@@ -453,18 +457,74 @@ export class Desk {
     if (this.era.mouse) drawMouse(R, this.era, st.powered && !!d.plugs.mouse, t);
   }
 
+  // Sladdar på skrivbordet: pixlade i scenens egen upplösning, hänger mot bordet och
+  // försvinner bakom datorn och skärmen. Stickkontakterna sitter i grenuttagets uttag.
   drawDeskCables(ctx) {
-    const d = this.d, s = this.s;
+    const d = this.d, era = this.era || {};
+    const key = JSON.stringify([d.plugs, era.monitor, era.keyboard, era.videoType, this.dims, this.dynKey, this.staticKey]);
+    if (this.cableKey !== key) { this.cableKey = key; this.renderCables(); }
     ctx.save();
-    ctx.lineCap = 'round';
-    const line = (a, b, col, w) => { ctx.strokeStyle = col; ctx.lineWidth = Math.max(2, w * s); ctx.beginPath(); ctx.moveTo(...a); ctx.quadraticCurveTo((a[0] + b[0]) / 2, Math.max(a[1], b[1]) + 12 * s, ...b); ctx.stroke(); };
-    const caseBack = this.proj(CASE_AT[0] + 0.2, CASE_AT[1] + 2.5, CASE_AT[2] + 3);
-    if (d.plugs.kb) line(this.proj(8.5, 6, 6.2), caseBack, '#151515', 1.2);
-    if (d.plugs.mouse) line(this.proj(16.9, 7.2, 6.3), caseBack, '#151515', 1.2);
-    if (d.plugs.video) line(this.proj(9, this.era?.monitor?.startsWith('lcd') ? 2 : 0.6, 9), caseBack, this.era?.videoType === 'vga' ? '#1a2a6a' : '#151515', 1.6);
-    if (d.plugs.mon_power) { const [px, py] = this.proj(...this.STRIP); line(this.proj(10, 2, 7), [px, py], '#e0e0dc', 1.4); ctx.fillStyle = '#e9e9e6'; ctx.fillRect(px - 4 * s, py - 4 * s, 8 * s, 6 * s); }
-    if (d.plugs.pc_power) { const [px, py] = this.proj(this.STRIP[0] + 1.7, this.STRIP[1], this.STRIP[2]); line(caseBack, [px, py], '#111', 1.8); ctx.fillStyle = '#111'; ctx.fillRect(px - 4 * s, py - 4 * s, 8 * s, 6 * s); }
+    ctx.imageSmoothingEnabled = this.s * this.view.dpr < 1;
+    ctx.drawImage(this.cableCv, this.ox, this.oy, DV.w * this.s, DV.h * this.s);
     ctx.restore();
+  }
+  // uttag nr i på grenuttaget (0–3) i världskoordinater
+  stripSocket(i) { const [su, sv] = this.STRIP; return [su - 4 + 1.9 + i * 1.7, sv - 0.5 + 0.55, 6.4]; }
+  renderCables() {
+    if (!this.cableCv) { this.cableCv = document.createElement('canvas'); this.cableCv.width = DV.w; this.cableCv.height = DV.h; }
+    const x = this.cableCv.getContext('2d');
+    x.clearRect(0, 0, DV.w, DV.h);
+    const d = this.d, era = this.era || {}, S = this.dims;
+    const P = (u, v, z) => { const [px, py] = this.R.proj(u, v, z); return [Math.round(px), Math.round(py)]; };
+    const idsDyn = this.R.ids, idsStat = this.Rs?.ids;
+    const hidden = (px, py) => px < 0 || py < 0 || px >= DV.w || py >= DV.h || idsDyn[py * DV.w + px] === ID_CASE || (idsStat && idsStat[py * DV.w + px] === ID_MONITOR);
+    const rect = (px, py, w, h, c) => { x.fillStyle = c; x.fillRect(px, py, w, h); };
+    const retro = ['pc-83', 'model-m', 'beige-104'].includes(era.keyboard);
+    const PAL = {
+      black: ['#26262b', '#0b0b0d', '#50505a'],
+      beige: ['#d8d0b6', '#857c64', '#f1ebd8'],
+      white: ['#e6e4de', '#8f8c84', '#fbfaf6'],
+      grey:  ['#9a9ea6', '#4a4d54', '#c8ccd2'],
+    };
+    // sladd från a till b som hänger ner (sag px) – w pixlar tjock
+    const cable = (a, b, pal, w, sag) => {
+      const [ax, ay] = a, [bx, by] = b;
+      const cx = (ax + bx) / 2, cy = Math.max(ay, by) + sag;
+      const n = Math.ceil((Math.hypot(bx - ax, by - ay) + sag * 2) * 1.6);
+      const pts = [];
+      let lx = null, ly = null;
+      for (let i = 0; i <= n; i++) {
+        const t = i / n, it = 1 - t;
+        const px = Math.round(it * it * ax + 2 * it * t * cx + t * t * bx), py = Math.round(it * it * ay + 2 * it * t * cy + t * t * by);
+        if (px === lx && py === ly) continue;
+        lx = px; ly = py; pts.push([px, py]);
+      }
+      const h = w >> 1;
+      for (const [px, py] of pts) if (!hidden(px, py)) rect(px - h - 1, py - h - 1, w + 2, w + 2, pal[1]);
+      for (const [px, py] of pts) if (!hidden(px, py)) rect(px - h, py - h, w, w, pal[0]);
+      for (const [px, py] of pts) if (!hidden(px, py)) rect(px - h, py - h, 1, 1, pal[2]);
+    };
+    // stickkontakt i ett uttag på grenuttaget (sedd uppifrån, sladden går uppåt)
+    const plug = (sock, pal) => {
+      const [px, py] = P(...sock);
+      rect(px - 5, py - 5, 11, 9, pal[1]);                 // kontur
+      rect(px - 4, py - 4, 9, 7, pal[0]);                  // kropp
+      rect(px - 4, py - 4, 9, 1, pal[2]); rect(px - 4, py - 4, 1, 7, pal[2]);
+      rect(px - 4, py + 2, 9, 1, pal[1]);                  // skugga
+      for (const gx of [-2, 0, 2]) rect(px + gx, py - 2, 1, 3, pal[1]);   // grepprillor
+      rect(px - 2, py - 9, 5, 5, pal[1]); rect(px - 1, py - 8, 3, 4, pal[0]); rect(px - 1, py - 8, 1, 4, pal[2]); // dragavlastning
+      return [px, py - 9];
+    };
+    // var sladdarna börjar
+    const face = monitorFace(era), crt = !String(era.monitor).startsWith('lcd');
+    const mu = (face[0][0] + face[1][0]) / 2, mvBack = face[0][1] - (crt ? 5.2 : 0.7), mz = face[2][2];
+    const caseIn = (dv, dz) => P(CASE_AT[0] + 0.5, CASE_AT[1] + S.W * dv, CASE_AT[2] + dz);
+    const periph = retro ? PAL.beige : PAL.black;
+    if (d.plugs.kb) cable(P(8.5, 6.05, 6.35), caseIn(0.35, 1.2), periph, 2, 16);
+    if (d.plugs.mouse) cable(P(16.9, 7.15, 6.45), caseIn(0.55, 1.1), periph, 2, 12);
+    if (d.plugs.video) cable(P(mu - 1, mvBack, mz + 0.6), caseIn(0.45, 2.2), era.year < 2005 ? PAL.beige : PAL.black, 3, 14);
+    if (d.plugs.mon_power) { const top = plug(this.stripSocket(1), crt ? PAL.beige : PAL.white); cable(P(mu + 1.2, mvBack, mz + 0.4), top, crt ? PAL.beige : PAL.white, 3, 20); }
+    if (d.plugs.pc_power) { const top = plug(this.stripSocket(2), PAL.black); cable(caseIn(0.7, 1.4), top, PAL.black, 3, 18); }
   }
 
   drawInset(ctx) {

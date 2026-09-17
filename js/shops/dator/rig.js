@@ -410,7 +410,10 @@ export const FACTS = {
   media: (p) => p.iface === 'floppy'
     ? `Diskettstationen läser ${p.kind === 'floppy525' ? '5,25-tums disketter (upp till 1,2 MB)' : '3,5-tums disketter (1,44 MB)'}. Här startade man program och sparade sitt arbete.`
     : 'Den optiska enheten läser skivor med en laser – CD-ROM rymmer 650 MB, lika mycket som 450 disketter!',
-  gpu: (p) => p.std && p.std !== '3D' ? `${p.name} är ett ${p.std}-grafikkort. Det gör om datorns bilddata till en signal som skärmen kan visa.` : `Grafikkortet har tusentals små kärnor som räknar samtidigt (parallellt). ${p.name} drar ${p.watt} W${p.pwr ? ' och behöver egen strömkabel' : ''}.`,
+  gpu: (p) => {
+    const mem = p.vram >= 1024 ? `${+(p.vram / 1024).toFixed(1)} GB` : p.vram >= 1 ? `${Math.round(p.vram)} MB` : `${Math.round(p.vram * 1024)} KB`;
+    return p.std && p.std !== '3D' ? `${p.name} är ett ${p.std}-grafikkort med ${mem} videominne. Det gör om datorns bilddata till en signal som skärmen kan visa.` : `Grafikkortet har tusentals små kärnor som räknar samtidigt (parallellt). ${p.name} har ${mem} videominne och drar ${p.watt} W${p.pwr ? ' – den behöver egen strömkabel' : ''}.`;
+  },
   sound: (p) => `${p.name} ger datorn riktigt ljud – förr kunde en PC bara pipa med den inbyggda högtalaren!`,
   psu: (p) => p.form === 'AT' ? `AT-nätagget har en stor strömbrytare och två kontakter till moderkortet: P8 och P9. ${p.watt} W räckte gott på den tiden.` : `Nätaggregatet gör om 230 V från väggen till 12 V, 5 V och 3,3 V. ${p.watt} W – räkna CPU + grafikkort + marginal.`,
   fans: (p) => `Fläktarna flyttar varm luft ut ur datorn.${p.rgb ? ' De har RGB och behöver en egen RGB-kabel.' : ''}`,

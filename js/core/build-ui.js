@@ -41,7 +41,8 @@ export function renderTray(view) {
     const isHint = hint && hint.entryKey === e.key;
     el.className = 'tray-item' + (e.choice ? ' choice' : '') + (e.kind !== 'part' ? ' cable' : '') + (view.selected === e.key ? ' sel' : '') + (isHint ? ' hint' : '');
     el.append(view.entryIcon(e, 64, 54));
-    const sub = e.kind === 'part' ? (e.choice ? `i lager: ${e.count}` : view.shop.cats[e.part.cat].name) : (e.sub || '');
+    const tag = e.kind === 'part' ? view.shop.partTag?.(e.part) : '';
+    const sub = e.kind === 'part' ? (e.choice ? `i lager: ${e.count}` : tag || view.shop.cats[e.part.cat].name) : (e.sub || '');
     el.insertAdjacentHTML('beforeend', `<div class="nm">${esc(e.name)}</div><div class="ct">${esc(sub)}</div>`);
     el.addEventListener('pointerdown', (ev) => view.onTrayDown(ev, e));
     tray.append(el);
@@ -59,7 +60,8 @@ export function renderSheet(view) {
   h += `<div class="sheet-h">Beställning</div><div class="who" style="margin-bottom:6px"><span id="sheet-face"></span><div><b>${esc(o.name)}</b><br><small>${esc(o.title)}</small><br><small>${b.help ? '🧑‍🔧 Med hjälp' : '😎 Utan hjälp'}</small></div></div>`;
   h += `<div class="sheet-h">Delar</div>`;
   o.items.forEach((it, i) => {
-    const name = it.part ? view.shop.part[it.part].name : (o.chosen[it.cat] ? view.shop.part[o.chosen[it.cat]].name + ' (ditt val)' : `Valfri: ${view.shop.cats[it.cat].name.toLowerCase()}`);
+    const pp = it.part ? view.shop.part[it.part] : null, tag = pp ? view.shop.partTag?.(pp) : '';
+    const name = pp ? pp.name + (tag ? ` · ${tag}` : '') : (o.chosen[it.cat] ? view.shop.part[o.chosen[it.cat]].name + ' (ditt val)' : `Valfri: ${view.shop.cats[it.cat].name.toLowerCase()}`);
     h += step(placed[i], false, esc(name));
   });
   if (b.help) {

@@ -79,7 +79,8 @@ export class Raster {
   // Ritar en låda. tex(face, sx, sy, W, H) → färg eller -1. sx/sy i enheter på ytan.
   // Ytor: top (sx längs u, sy längs v), left (v=v1-ytan: sx längs u, sy nedåt från topp),
   // right (u=u1-ytan: sx längs v, sy nedåt från topp).
-  box(u0, u1, v0, v1, z0, z1, tex, id = 0, opt = {}) {
+  // id = objektets nummer i klickbufferten (defaultId om inget anges)
+  box(u0, u1, v0, v1, z0, z1, tex, id = this.defaultId || 0, opt = {}) {
     const { k, hz, ox, oy } = this;
     const H = z1 - z0;
     const alpha = opt.alpha ?? 1;
