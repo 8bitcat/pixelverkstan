@@ -1,19 +1,19 @@
-<!doctype html><html><body style="margin:0;background:#efe9df">
+<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#efe9df">
 <canvas id="c" style="image-rendering:pixelated"></canvas><div id="icons" style="display:flex;flex-wrap:wrap;gap:4px;padding:6px"></div>
 <script type="module">
 import { Raster } from '../js/core/raster.js';
 import { VIEW } from '../js/shops/dator/geom.js';
-import { drawPart, drawMat, iconCanvas } from '../js/shops/dator/art.js';
-import { PART, PARTS } from '../js/shops/dator/catalog.js';
+import { drawPart, drawMat, drawScrews, iconCanvas } from '../js/shops/dator/art.js';
+import { PART, PARTS, CAT_ORDER } from '../js/shops/dator/catalog.js';
 const q = new URLSearchParams(location.search);
-const ids = (q.get('b') || 'o11-evo,rog-x670e-e,r9-7950x,nh-d15,tridentz5-64-ddr5,990pro-2tb,rtx-4090,dark-power-13,barracuda-1tb').split(',');
+const ids = (q.get('b') || '4000x-rgb,x870e-hero,r9-9950x3d,hyper-212-rgb,tridentz5-64-ddr5,990pro-2tb,astral-5080,dark-power-13,barracuda-1tb').split(',');
 const R = new Raster(VIEW.w, VIEW.h); Object.assign(R, { k: VIEW.k, hz: VIEW.hz, ox: VIEW.ox, oy: VIEW.oy });
 R.clear(0xefe9df); drawMat(R, 1);
-const order = ['case','mb','cpu','cooler','ram','storage','gpu','psu'];
-const parts = ids.map(i => PART[i]).sort((a,b)=>order.indexOf(a.cat)-order.indexOf(b.cat));
-for (const p of parts) drawPart(R, p, { ids: {}, id: 2, spin: 0.3, paste: false });
-const c = document.getElementById('c'); const S = 3; c.width = VIEW.w*S; c.height = VIEW.h*S;
+const parts = ids.map(i => PART[i]).sort((a,b)=>CAT_ORDER.indexOf(a.cat)-CAT_ORDER.indexOf(b.cat));
+const o = { ids: {}, id: 2, spin: 0.3, paste: true, leverClosed: q.get('lever') !== '0', powered: q.get('on') === '1', lit: { case: 1, cooler: 1, ram: 1, gpu: 1, mb: 1, fans: 1 }, t: 1, placed: Object.fromEntries(parts.map(p=>[p.cat,p])) };
+for (const p of parts) { drawPart(R, p, o); if (p.cat === 'mb') drawScrews(R, 'mb', 6, 2); if (p.cat === 'gpu') drawScrews(R, 'gpu', 1, 2); if (p.cat === 'psu') drawScrews(R, 'psu', 2, 2); if (p.kind === 'nvme') drawScrews(R, 'm2', 1, 2); }
+const c = document.getElementById('c'); const S = +(q.get('s') || 3); c.width = VIEW.w*S; c.height = VIEW.h*S;
 const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(R.flush(), 0, 0, c.width, c.height);
-for (const p of PARTS) { const ic = iconCanvas(p); ic.style.cssText='width:128px;height:108px;image-rendering:pixelated;background:#fff;border:2px solid #222'; document.getElementById('icons').append(ic); }
+if (q.get('icons') !== '0') for (const p of PARTS) { const ic = iconCanvas(p, 96, 80); ic.style.cssText='width:192px;height:160px;image-rendering:pixelated;background:#fff;border:2px solid #222'; ic.title = p.id; document.getElementById('icons').append(ic); }
 window.done = true;
 </script></body></html>

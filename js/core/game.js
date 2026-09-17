@@ -47,7 +47,8 @@ export class Game {
     try {
       const d = JSON.parse(localStorage.getItem(this.saveKey) || 'null');
       if (!d || d.v !== 1) return false;
-      Object.assign(this, { money: d.money, xp: d.xp, stock: d.stock, stats: d.stats, tutorialStep: d.tutorialStep });
+      const stock = Object.fromEntries(Object.entries(d.stock || {}).filter(([id]) => this.shop.part[id]));
+      Object.assign(this, { money: d.money, xp: d.xp, stock, stats: d.stats, tutorialStep: d.tutorialStep });
       return true;
     } catch { return false; }
   }
@@ -182,7 +183,8 @@ export class Game {
     const c = this.customers.find((x) => x.id === o.customerId);
     const price = this.shop.priceFor(o, o.chosen);
     const tip = result.stars >= 3 ? Math.round(this.shop.feeFor(o) * 0.5 / 10) * 10 : result.stars === 2 ? Math.round(this.shop.feeFor(o) * 0.2 / 10) * 10 : 0;
-    o.payout = { price, tip, total: price + tip, xp: this.shop.xpFor(o) + result.stars * 2, stars: result.stars };
+    const bonus = result.help === false ? Math.round(price * 0.15 / 10) * 10 : 0;
+    o.payout = { price, tip, bonus, total: price + tip + bonus, xp: this.shop.xpFor(o) + result.stars * 2 + (bonus ? 5 : 0), stars: result.stars };
     this.orders = this.orders.filter((x) => x !== o);
     if (c) { c.phase = 'ready'; c.payout = o.payout; c.patience = Infinity; }
     else this.pay(o.payout);

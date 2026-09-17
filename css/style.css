@@ -126,6 +126,9 @@ canvas { image-rendering: pixelated; display: block; }
 .tray-item.sel { background: #fff4c7; outline: 3px solid var(--gold); }
 .tray-item.choice { border-style: dashed; }
 .tray-item.hint { animation: hint 0.9s infinite; }
+.tray-item.cable { background: #f3f6fa; }
+.guide.good { border-color: var(--green); box-shadow: 4px 4px 0 var(--green); background: #effbef; }
+.guide .btn { margin-left: 6px; vertical-align: middle; }
 @keyframes hint { 50% { background: #fff4c7; transform: translateY(-4px); } }
 #sheet-face canvas { width: 40px; height: 48px; border: 2px solid var(--ink); display: block; }
 .tray-empty { color: var(--muted); align-self: center; padding: 0 10px; font-size: 19px; }

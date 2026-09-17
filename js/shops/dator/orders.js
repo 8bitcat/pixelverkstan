@@ -9,13 +9,13 @@ const TEMPLATES = [
     msgs: ['Jag börjar gymnasiet och behöver en dator att plugga på.', 'Jag ska lära mig programmera!'] },
   { id: 'minecraft', name: 'Minecraft-dator', lvl: 2, gpu: true, tier: [1, 2], fee: 600, xp: 18,
     msgs: ['Jag vill spela Minecraft med shaders!', 'Kan du bygga en dator till Roblox och Minecraft?'] },
-  { id: 'gaming', name: 'Gamingdator', lvl: 2, gpu: true, tier: [2, 3], fee: 750, xp: 22,
+  { id: 'gaming', name: 'Gamingdator', lvl: 2, gpu: true, tier: [2, 3], fee: 750, xp: 22, fans: 0.4, rgb: true,
     msgs: ['Fortnite i hög fps, tack!', 'Jag vill spela nya spel med kompisarna.'] },
-  { id: 'stream', name: 'Streamingdator', lvl: 3, gpu: true, tier: [3, 4], ramMin: 32, fee: 950, xp: 28,
+  { id: 'stream', name: 'Streamingdator', lvl: 3, gpu: true, tier: [3, 4], ramMin: 32, fee: 950, xp: 28, fans: 0.7, rgb: true,
     msgs: ['Jag ska börja streama! Den måste klara spel och sändning samtidigt.'] },
-  { id: 'ai', name: '3D- & AI-arbetsstation', lvl: 4, gpu: true, tier: [4, 5], ramMin: 32, fee: 1200, xp: 34,
+  { id: 'ai', name: '3D- & AI-arbetsstation', lvl: 4, gpu: true, tier: [4, 5], ramMin: 32, fee: 1200, xp: 34, fans: 0.6,
     msgs: ['Jag renderar 3D-filmer och tränar AI-modeller.', 'Min forskargrupp behöver en riktig räknemaskin.'] },
-  { id: 'drom', name: 'Drömdatorn', lvl: 5, gpu: true, tier: [5, 5], ramMin: 64, fee: 1600, xp: 40,
+  { id: 'drom', name: 'Drömdatorn', lvl: 5, gpu: true, tier: [5, 5], ramMin: 64, fee: 1600, xp: 40, fans: 0.9, rgb: true,
     msgs: ['Pengar spelar ingen roll. Jag vill ha det bästa som finns!'] },
 ];
 export const TEMPLATE = Object.fromEntries(TEMPLATES.map((t) => [t.id, t]));
@@ -26,8 +26,8 @@ const TUTORIAL = [
     msg: 'Hej! Jag vill ha en enkel dator för att betala räkningar och ringa videosamtal med barnbarnen.',
     parts: ['pop-mini-air', 'prime-h610m-e', 'i3-12100', 'freezer-7x', 'fury-8-ddr4', 'nv2-500', 'cv550'] },
   { template: 'skola', name: 'Oscar', guided: false,
-    msg: 'Tjena! Jag börjar plugga och behöver plats för massor av filer. Gärna AMD!',
-    parts: ['pop-mini-air', 'b550m-pro-vdh', 'r5-5600g', 'freezer-7x', 'lpx-16-ddr4', 'barracuda-1tb', 'cv550'] },
+    msg: 'Tjena! Jag börjar plugga och behöver plats för massor av filer. Gärna AMD – och tyst!',
+    parts: ['pop-mini-silent', 'b550m-pro-vdh', 'r5-5600g', 'freezer-7x', 'lpx-16-ddr4', 'barracuda-1tb', 'cv550'] },
   { template: 'minecraft', name: 'Wilma', guided: false,
     msg: 'Jag vill spela Minecraft med shaders! Då behövs ett riktigt grafikkort, va?',
     parts: ['pop-mini-air', 'prime-h610m-e', 'i3-12100', 'freezer-7x', 'fury-8-ddr4', 'nv2-500', 'gtx-1650', 'cv550'] },
@@ -36,7 +36,7 @@ const TUTORIAL = [
 export const START = {
   money: 2000,
   stock: {
-    'pop-mini-air': 3, 'prime-h610m-e': 2, 'b550m-pro-vdh': 1, 'i3-12100': 2, 'r5-5600g': 1,
+    'pop-mini-air': 2, 'pop-mini-silent': 1, 'prime-h610m-e': 2, 'b550m-pro-vdh': 1, 'i3-12100': 2, 'r5-5600g': 1,
     'freezer-7x': 3, 'fury-8-ddr4': 2, 'lpx-16-ddr4': 1, 'nv2-500': 2, 'barracuda-1tb': 1, 'cv550': 3,
   },
 };
@@ -56,6 +56,7 @@ function randomBuild(t, maxLvl) {
   const ok = (p) => p.lvl <= maxLvl && p.tier >= t.tier[0] - 1 && p.tier <= t.tier[1];
   const of = (cat, f = () => true) => {
     let c = PARTS.filter((p) => p.cat === cat && ok(p) && f(p));
+    if (t.rgb && Math.random() < 0.6) { const rgbC = c.filter((p) => p.rgb); if (rgbC.length) c = rgbC; }
     if (!c.length) c = PARTS.filter((p) => p.cat === cat && p.lvl <= maxLvl && f(p));
     return c.length ? rnd(c) : null;
   };
@@ -70,7 +71,8 @@ function randomBuild(t, maxLvl) {
   const psu = of('psu', (p) => p.watt >= need);
   const cs = of('case', (p) => p.fits.includes(mb.size));
   const st = of('storage');
-  const all = [cs, mb, cpu, cooler, ram, st, gpu, psu].filter(Boolean);
+  const fans = cooler?.look.type !== 'aio' && Math.random() < (t.fans || 0) ? of('fans', (p) => !t.rgb || p.rgb) : null;
+  const all = [cs, mb, cpu, cooler, ram, st, gpu, psu, fans].filter(Boolean);
   if (!ram || !cooler || !psu || !cs || !st || (t.gpu && !gpu)) return null;
   return all;
 }
@@ -97,7 +99,7 @@ export function generateOrder(game, names) {
     const pick = Object.fromEntries(best.map((p) => [p.cat, p]));
     const need = pick.cpu.watt + (pick.gpu?.watt || 0) + 150;
     const fits = { case: (p) => p.fits.includes(pick.mb.size), psu: (p) => p.watt >= need, cooler: (p) => p.maxW >= pick.cpu.watt };
-    const choosable = ['case', 'psu', 'cooler'].filter((c) => PARTS.some((p) => p.cat === c && game.stockFree(p.id) > 0 && fits[c](p)));
+    const choosable = ['case', 'psu', 'cooler'].filter((c) => !(c === 'cooler' && pick.fans) && PARTS.some((p) => p.cat === c && game.stockFree(p.id) > 0 && fits[c](p)));
     for (const c of choosable) if (Math.random() < 0.5) { const it = items.find((x) => x.cat === c); if (it) { it.part = null; it.choice = true; } }
   }
   items.sort((a, b) => CAT_ORDER.indexOf(a.cat) - CAT_ORDER.indexOf(b.cat));

@@ -152,9 +152,11 @@ export function showResult(order, payout, result, onClose) {
     <div class="plist">
       <div class="prow" style="grid-template-columns:1fr auto"><span>Delar + montering</span><b>${fmt(payout.price)} kr</b></div>
       <div class="prow" style="grid-template-columns:1fr auto"><span>Dricks ${payout.stars >= 3 ? '(snabbt och felfritt!)' : payout.stars === 2 ? '(bra jobbat)' : ''}</span><b>${fmt(payout.tip)} kr</b></div>
+      ${payout.bonus ? `<div class="prow" style="grid-template-columns:1fr auto"><span>😎 Proffsbonus (utan hjälp)</span><b>${fmt(payout.bonus)} kr</b></div>` : ''}
       <div class="prow" style="grid-template-columns:1fr auto"><span>Erfarenhet</span><b>+${payout.xp} XP</b></div>
     </div>
-    <p class="sp" style="color:var(--muted);margin-top:10px">Byggtid ${Math.round(result.time)} s · ${result.errors} misstag</p>`;
+    ${result.warnings?.length ? `<p class="sp" style="color:var(--red2);margin-top:10px">⚠️ ${result.warnings.map(esc).join(' ')}</p>` : ''}
+    <p class="sp" style="color:var(--muted);margin-top:10px">Byggtid ${Math.round(result.time)} s · ${result.errors} misstag · ${result.help ? 'med hjälp' : 'utan hjälp'}</p>`;
   openModal('🎉 Datorn fungerar!', body, [{ label: 'Till butiken', cls: 'btn-go', onClick: () => { closeModal(); onClose?.(); } }]);
 }
 

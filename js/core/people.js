@@ -1,12 +1,17 @@
-// Procedurgenererade pixelpersoner. Ritas med fillRect på heltalskoordinater
-// (skarpt när canvasen skalas upp). Figuren är 10×20 pixlar, fötterna vid (x, y).
+// Procedurgenererade pixelpersoner (~16×32 px). Varje figur ritas pixel för pixel
+// i en liten sprite (24×40) med skuggning och mörk kontur, och cachas per
+// utseende + riktning + bildruta. Fötterna står vid (x, y).
+//
+// frame: 0 stå · 1/2 gångsteg · 3 mellansteg (kroppen upp 1 px) · 4 andas in · 5 sitter
 
-const SKIN = ['#f5d3b5', '#eabf98', '#d19a6c', '#a86e45', '#7a4a2a', '#5b3620'];
-const HAIR = ['#1f1a17', '#4a2f1d', '#7b4a24', '#c58b3c', '#e3c16f', '#b3b0aa', '#a5352a', '#3b3b8a', '#d06aa8'];
-const SHIRT = ['#d9433b', '#3a7bd5', '#46a35a', '#f0b429', '#8e5bd1', '#2f3440', '#e8e3d6', '#e07a2e', '#2aa39a', '#b83d7a'];
-const PANTS = ['#2d3a5c', '#3b3b3b', '#5a4632', '#6f7c8a', '#1f2a44', '#7a2e2e'];
-const SHOES = ['#1c1c1c', '#f2f2f2', '#6b3e1e', '#c23b3b'];
-const STYLES = ['short', 'short', 'long', 'bun', 'spiky', 'bald', 'cap', 'long', 'mohawk', 'curly'];
+const SKIN = ['#f6d7bf', '#eec3a0', '#e0a97f', '#c68a5c', '#a06a43', '#744a2d', '#553522'];
+const HAIR = ['#1d1714', '#1d1714', '#3b2619', '#3b2619', '#6b4226', '#a5692f', '#d9a95c', '#ecd489', '#b9b3ab', '#e6e2da', '#b7392b', '#3f4fa8', '#c65fa0', '#2f8f6f'];
+const SHIRT = ['#d9433b', '#3a7bd5', '#46a35a', '#f0b429', '#8e5bd1', '#2f3440', '#e8e3d6', '#e07a2e', '#2aa39a', '#b83d7a', '#5f7f99', '#f4f1ea', '#7a2e3e', '#26605a'];
+const PANTS = ['#3f5f8f', '#2d3a5c', '#2b2b30', '#9a8560', '#6f7c8a', '#5a4632', '#556b3a', '#7a2e2e'];
+const SHOES = ['#1c1c1c', '#f2f2f2', '#6b3e1e', '#c23b3b', '#3a6bc2', '#e0b24a', '#2f2f36'];
+const STYLES = ['short', 'short', 'side', 'long', 'long', 'ponytail', 'bun', 'curly', 'afro', 'spiky', 'bald', 'mohawk', 'bob', 'buzz'];
+const TOPS = ['tee', 'tee', 'stripes', 'hoodie', 'hoodie', 'jacket', 'sweater'];
+const BOTTOMS = ['jeans', 'jeans', 'pants', 'pants', 'shorts', 'skirt'];
 
 export const FIRST_NAMES = ['Alva', 'Elsa', 'Maja', 'Ella', 'Wilma', 'Saga', 'Nora', 'Vera', 'Liv', 'Stina', 'Ines', 'Greta',
   'Oscar', 'Liam', 'Noah', 'Hugo', 'William', 'Elias', 'Ludvig', 'Sixten', 'Vincent', 'Frans', 'Kalle', 'Bosse',
@@ -15,97 +20,33 @@ export const FIRST_NAMES = ['Alva', 'Elsa', 'Maja', 'Ella', 'Wilma', 'Saga', 'No
 const pick = (rng, a) => a[Math.floor(rng() * a.length)];
 
 export function makeLook(rng = Math.random) {
-  return {
-    skin: pick(rng, SKIN), hair: pick(rng, HAIR), style: pick(rng, STYLES),
-    shirt: pick(rng, SHIRT), pants: pick(rng, PANTS), shoes: pick(rng, SHOES),
-    cap: pick(rng, SHIRT), glasses: rng() < 0.28, beard: rng() < 0.15, phones: rng() < 0.12,
-    kid: rng() < 0.18,
+  const kid = rng() < 0.18;
+  const style = pick(rng, STYLES);
+  const r = rng();
+  const hat = r < 0.14 ? 'cap' : r < 0.22 ? 'beanie' : null;
+  const bag = rng() < (kid ? 0.45 : 0.22) ? 'backpack' : rng() < 0.15 ? 'shoulder' : null;
+  const gl = rng();
+  const look = {
+    skin: pick(rng, SKIN), hair: pick(rng, HAIR), style,
+    top: pick(rng, TOPS), shirt: pick(rng, SHIRT), accent: pick(rng, SHIRT),
+    bottom: pick(rng, BOTTOMS), pants: pick(rng, PANTS), shoes: pick(rng, SHOES),
+    hat, cap: pick(rng, SHIRT),
+    glasses: gl < 0.16 ? 'square' : gl < 0.24 ? 'round' : gl < 0.28 ? 'sun' : false,
+    beard: !kid && rng() < 0.2 ? pick(rng, ['full', 'full', 'mustache', 'stubble']) : false,
+    phones: rng() < 0.12, phoneColor: pick(rng, ['#e8e8e8', '#222228', '#c9323a', '#3a7bd5']),
+    bag, bagColor: pick(rng, ['#2f3440', '#c9323a', '#3a7bd5', '#46a35a', '#e0a02a', '#6b4a33', '#8e5bd1']),
+    build: kid ? 4 : pick(rng, [4, 5, 5, 6]),
+    blush: rng() < 0.35,
+    kid,
   };
+  return look;
 }
 
 export const SHOPKEEPER = {
-  skin: '#eabf98', hair: '#4a2f1d', style: 'cap', cap: '#c9323a', shirt: '#c9323a', pants: '#2d3a5c',
-  shoes: '#1c1c1c', glasses: false, beard: false, phones: false, kid: false, apron: true,
+  skin: '#eabf98', hair: '#4a2f1d', style: 'short', hat: 'cap', cap: '#c9323a', top: 'tee', shirt: '#c9323a', accent: '#f4f1ea',
+  bottom: 'pants', pants: '#2d3a5c', shoes: '#1c1c1c', glasses: false, beard: false, phones: false, kid: false,
+  apron: true, build: 5, bag: null,
 };
-
-// dir: 'down' | 'up' | 'left' | 'right'; frame: 0 stå, 1/2 gång
-export function drawPerson(ctx, fx, fy, L, dir = 'down', frame = 0) {
-  const kid = L.kid ? 3 : 0;
-  const x0 = Math.round(fx) - 5, y0 = Math.round(fy) - 20 + kid;
-  const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x0 + x, y0 + y, w, h); };
-  const side = dir === 'left' || dir === 'right';
-  const flip = dir === 'left';
-  const S = (x, y, w, h, c) => R(flip ? 10 - x - w : x, y, w, h, c); // spegling för sidovy
-  const legLen = 5 - (L.kid ? 2 : 0);
-  const ty = 8, tyEnd = 14 - (L.kid ? 2 : 0) + 0; // torso
-  const legY = tyEnd;
-
-  // skugga
-  ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(x0 + 1, Math.round(fy) - 1, 8, 2);
-
-  // ben
-  const lf = frame === 1 ? 1 : 0, rf = frame === 2 ? 1 : 0;
-  if (!side) {
-    R(2, legY, 3, legLen - lf, L.pants); R(5, legY, 3, legLen - rf, L.pants);
-    R(2, legY + legLen - lf, 3, 1, L.shoes); R(5, legY + legLen - rf, 3, 1, L.shoes);
-  } else {
-    const a = frame === 1 ? -1 : frame === 2 ? 1 : 0;
-    S(4 + a, legY, 3, legLen, L.pants); S(4 - a, legY, 3, legLen, L.pants);
-    S(4 + a, legY + legLen, 4, 1, L.shoes); S(4 - a, legY + legLen, 4, 1, L.shoes);
-  }
-  // kropp
-  if (!side) {
-    R(2, ty, 6, tyEnd - ty, L.shirt);
-    const swing = frame === 1 ? 1 : frame === 2 ? -1 : 0;
-    R(1, ty, 1, 4 + swing, L.shirt); R(8, ty, 1, 4 - swing, L.shirt);
-    R(1, ty + 4 + swing, 1, 1, L.skin); R(8, ty + 4 - swing, 1, 1, L.skin);
-    if (L.apron && dir === 'down') { R(3, ty + 2, 4, tyEnd - ty - 2, '#f2eee4'); R(3, ty + 1, 1, 1, '#f2eee4'); R(6, ty + 1, 1, 1, '#f2eee4'); }
-  } else {
-    S(3, ty, 5, tyEnd - ty, L.shirt);
-    const sw = frame === 1 ? 1 : frame === 2 ? -1 : 0;
-    S(5 + sw, ty + 1, 2, 4, shadeHex(L.shirt, 0.8)); S(5 + sw, ty + 5, 2, 1, L.skin);
-  }
-  // hals + huvud
-  R(4, 7, 2, 1, L.skin);
-  if (!side) R(2, 1, 6, 6, L.skin); else S(3, 1, 5, 6, L.skin);
-
-  const H = L.hair;
-  if (dir === 'up') {
-    // bakifrån: mest hår
-    if (L.style !== 'bald') R(2, 0, 6, L.style === 'long' ? 9 : 5, H);
-    else R(2, 3, 6, 2, H);
-    if (L.style === 'cap') R(2, 0, 6, 3, L.cap);
-    if (L.style === 'bun') R(4, -2, 2, 2, H);
-    if (L.phones) { R(1, 2, 1, 3, '#222'); R(8, 2, 1, 3, '#222'); R(2, 0, 6, 1, '#222'); }
-    return;
-  }
-  // hår framifrån/sidan
-  const hx = side ? 3 : 2, hw = side ? 5 : 6;
-  const H2 = (x, y, w, h, c) => side ? S(x, y, w, h, c) : R(x, y, w, h, c);
-  switch (L.style) {
-    case 'short': H2(hx, 0, hw, 2, H); H2(hx, 2, 1, 1, H); if (!side) R(7, 2, 1, 1, H); else S(3, 2, 2, 2, H); break;
-    case 'long': H2(hx, 0, hw, 2, H); if (!side) { R(1, 1, 1, 8, H); R(8, 1, 1, 8, H); R(2, 2, 1, 1, H); R(7, 2, 1, 1, H); } else S(2, 1, 2, 8, H); break;
-    case 'bun': H2(hx, 0, hw, 2, H); H2(4, -2, 2, 2, H); break;
-    case 'spiky': H2(hx, 0, hw, 2, H); for (let i = 0; i < hw; i += 2) H2(hx + i, -1, 1, 1, H); break;
-    case 'bald': H2(hx, 2, 1, 2, H); if (!side) R(7, 2, 1, 2, H); break;
-    case 'mohawk': H2(4, -2, 2, 3, H); break;
-    case 'curly': H2(hx - 1, -1, hw + 2, 3, H); H2(hx - 1, 2, 1, 2, H); if (!side) R(8, 2, 1, 2, H); break;
-    case 'cap': H2(hx, 0, hw, 2, L.cap); if (!side) R(2, 2, 6, 1, shadeHex(L.cap, 0.75)); else S(6, 2, 3, 1, shadeHex(L.cap, 0.75)); H2(hx, 2, 1, 1, H); break;
-  }
-  // ansikte
-  const eye = '#1b1b1b';
-  if (!side) {
-    if (L.glasses) { R(2, 3, 6, 1, '#222'); R(3, 4, 1, 1, eye); R(6, 4, 1, 1, eye); R(2, 4, 1, 1, '#222'); R(7, 4, 1, 1, '#222'); R(4, 4, 2, 1, '#222'); }
-    else { R(3, 4, 1, 1, eye); R(6, 4, 1, 1, eye); }
-    R(4, 6, 2, 1, shadeHex(L.skin, 0.72));
-    if (L.beard) R(2, 5, 6, 2, H);
-  } else {
-    S(6, 4, 1, 1, eye); if (L.glasses) S(5, 3, 3, 1, '#222');
-    S(8, 5, 1, 1, L.skin);
-    if (L.beard) S(4, 5, 4, 2, H);
-  }
-  if (L.phones) { if (!side) { R(1, 3, 1, 3, '#222'); R(8, 3, 1, 3, '#222'); R(2, -1, 6, 1, '#222'); } else { S(4, 3, 2, 3, '#222'); S(4, -1, 3, 1, '#222'); } }
-}
 
 export function shadeHex(h, f) {
   const n = parseInt(h.slice(1), 16);
@@ -113,15 +54,501 @@ export function shadeHex(h, f) {
   return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
 }
 
-// Porträtt (för dialoger/kort) – 20×24 canvas, visas uppskalad via CSS
+// ---------- färgverktyg (heltal 0xRRGGBB) ----------
+const toInt = (h, fb = 0x888888) => (typeof h === 'string' && /^#[0-9a-f]{6}$/i.test(h) ? parseInt(h.slice(1), 16) : fb);
+function mul(c, f) {
+  const r = Math.min(255, ((c >> 16) & 255) * f) | 0, g = Math.min(255, ((c >> 8) & 255) * f) | 0, b = Math.min(255, (c & 255) * f) | 0;
+  return (r << 16) | (g << 8) | b;
+}
+function mix(a, b, t) {
+  const ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
+  return (((ar + (((b >> 16) & 255) - ar) * t) | 0) << 16) | (((ag + (((b >> 8) & 255) - ag) * t) | 0) << 8) | ((ab + ((b & 255) - ab) * t) | 0);
+}
+// ljus/bas/skugga/djup – ljusare toner drar lite mot varmt vitt, skuggor mot blålila
+const ramp = (c) => ({ hi: mix(mul(c, 1.12), 0xfff4e0, 0.12), base: c, lo: mix(mul(c, 0.74), 0x2a1f3a, 0.12), dk: mix(mul(c, 0.5), 0x1a1426, 0.2) });
+
+function norm(L = {}) {
+  const n = { ...L };
+  if (n.style === 'cap') { n.hat = 'cap'; n.style = 'short'; }
+  n.style = n.style || 'short';
+  if (n.glasses === true) n.glasses = 'square';
+  if (n.beard === true) n.beard = 'full';
+  n.top = n.top || 'tee';
+  n.bottom = n.bottom || 'pants';
+  n.build = n.kid ? 4 : (n.build || 5);
+  return n;
+}
+
+// ---------- spriten ----------
+const SW = 24, SH = 40;
+const CACHE = new WeakMap();
+
+function render(L0, dir, frame) {
+  const L = norm(L0);
+  const cv = document.createElement('canvas'); cv.width = SW; cv.height = SH;
+  const cx = cv.getContext('2d');
+  const img = cx.createImageData(SW, SH), d = img.data;
+  const flip = dir === 'left';
+  const side = dir === 'left' || dir === 'right';
+  const back = dir === 'up';
+  const put = (x, y, c) => {
+    if (flip) x = SW - 1 - x;
+    if (x < 0 || y < 0 || x >= SW || y >= SH) return;
+    const i = (y * SW + x) * 4;
+    d[i] = (c >> 16) & 255; d[i + 1] = (c >> 8) & 255; d[i + 2] = c & 255; d[i + 3] = 255;
+  };
+  const rect = (x, y, w, h, c) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) put(x + i, y + j, c); };
+  const has = (x, y) => { if (flip) x = SW - 1 - x; return x >= 0 && y >= 0 && x < SW && y < SH && d[(y * SW + x) * 4 + 3] > 0; };
+
+  const K = !!L.kid;
+  const skin = ramp(toInt(L.skin, 0xeabf98)), hair = ramp(toInt(L.hair, 0x3b2619));
+  const shirt = ramp(toInt(L.shirt, 0x3a7bd5)), acc = ramp(toInt(L.accent, 0xf4f1ea));
+  const pants = ramp(toInt(L.pants, 0x2d3a5c)), shoe = ramp(toInt(L.shoes, 0x1c1c1c));
+  const capc = ramp(toInt(L.cap, 0xc9323a)), bagc = ramp(toInt(L.bagColor, 0x2f3440));
+  const sole = (toInt(L.shoes, 0) === 0xf2f2f2 || L.bottom === 'shorts') ? 0xd9d6cc : 0xe9e6dc;
+
+  const walkA = frame === 1, walkB = frame === 2, sit = frame === 5;
+  const bob = sit ? 1 : (frame === 3 || frame === 4) ? -1 : 0;
+
+  // proportioner
+  const shoeTop = 37, legLen = K ? 5 : 8, hipH = K ? 1 : 2, torsoH = K ? 6 : 9, headH = K ? 11 : 12;
+  const legTop = shoeTop - legLen, hipTop = legTop - hipH;
+  const torsoTop = hipTop - torsoH + bob, headTop = hipTop - torsoH - headH + bob;
+  const tw = L.build, lw = K ? 3 : 4;
+  const eyeRow = headTop + (K ? 6 : 7);
+  const armLen = K ? 5 : 8;
+  const longSleeve = L.top === 'hoodie' || L.top === 'jacket' || L.top === 'sweater';
+
+  if (!side) {
+    // ---------- ben (fram/bak) ----------
+    const leg = (x0, lift, left) => {
+      if (sit) {
+        const top = hipTop + bob + hipH;
+        const skinLap = L.bottom === 'shorts';
+        const lap = skinLap ? skin : pants;
+        rect(x0 - (left ? 1 : 0), top, lw + 1, 3, lap.base);
+        rect(x0 - (left ? 1 : 0), top, lw + 1, 1, lap.hi);
+        rect(x0 - (left ? 1 : 0), top + 2, lw + 1, 1, lap.lo);
+        if (L.bottom === 'skirt') rect(x0 - (left ? 1 : 0), top, lw + 1, 2, pants.base);
+        const shin = shoeTop - (top + 3);
+        const skinLeg = L.bottom === 'shorts' || L.bottom === 'skirt';
+        rect(x0, top + 3, lw, shin, skinLeg ? skin.base : pants.base);
+        rect(left ? x0 : x0 + lw - 1, top + 3, 1, shin, skinLeg ? skin.lo : pants.lo);
+      } else {
+        const len = legLen - lift;
+        const shorts = L.bottom === 'shorts', skirt = L.bottom === 'skirt';
+        for (let j = 0; j < len; j++) {
+          const y = legTop + j;
+          const bare = (shorts && j >= 3) || (skirt && j >= 3);
+          const base = bare ? (skirt ? mix(skin.base, 0x2a2430, 0.15) : skin.base) : pants.base;
+          const lo = bare ? skin.lo : pants.lo, hi = bare ? skin.hi : pants.hi;
+          rect(x0, y, lw, 1, base);
+          put(left ? x0 : x0 + lw - 1, y, left ? hi : lo);
+          put(left ? x0 + lw - 1 : x0, y, lo);
+          if (L.bottom === 'jeans' && j === 4 && !bare) put(x0 + 1, y, hi);
+        }
+      }
+      // sko
+      const sy = shoeTop - (sit ? 0 : lift);
+      const sx = left ? x0 - 1 : x0;
+      rect(sx, sy, lw + 1, 1, shoe.base);
+      put(left ? sx + 1 : sx + lw - 1, sy, shoe.hi);
+      rect(sx, sy + 1, lw + 1, 1, L.shoes === '#1c1c1c' || L.shoes === '#2f2f36' ? shoe.lo : sole);
+      if (back) rect(sx + 1, sy, lw - 1, 1, shoe.lo);
+    };
+    leg(12 - lw, walkB ? 2 : 0, true);
+    leg(12, walkA ? 2 : 0, false);
+
+    // ---------- höfter / kjol ----------
+    const hy = hipTop + (sit ? bob : 0);
+    rect(12 - tw, hy, tw * 2, hipH, pants.base);
+    if (L.bottom === 'skirt') {
+      for (let j = 0; j < (K ? 3 : 5); j++) {
+        const w = tw + Math.min(2, (j + 1) >> 1);
+        rect(12 - w, hy + j, w * 2, 1, pants.base);
+        put(12 - w, hy + j, pants.hi); put(11 + w, hy + j, pants.lo);
+        if (j === (K ? 2 : 4)) rect(12 - w, hy + j, w * 2, 1, pants.lo);
+      }
+    } else if (!K) {
+      rect(12 - tw, hy, tw * 2, 1, mix(pants.dk, 0x1c1814, 0.4)); // bälte
+      if (!back) rect(11, hy, 2, 1, 0xc9b27a);
+    }
+    if (!sit) put(11, legTop, pants.dk), put(12, legTop, pants.dk);
+
+    // ---------- bål ----------
+    const ty0 = torsoTop, ty1 = hipTop + (sit ? bob : 0); // [ty0, ty1)
+    const topCol = L.apron && !back ? shirt : shirt;
+    for (let y = ty0; y < ty1; y++) {
+      const inset = y === ty0 ? 1 : 0;
+      rect(12 - tw + inset, y, tw * 2 - inset * 2, 1, topCol.base);
+      put(12 - tw + inset, y, topCol.hi);
+      put(11 + tw - inset, y, topCol.lo); put(10 + tw - inset, y, y > ty0 + 1 ? topCol.lo : topCol.base);
+    }
+    rect(12 - tw + 1, ty1 - 1, tw * 2 - 2, 1, topCol.lo); // nedre veck
+    if (L.top === 'stripes') for (let y = ty0 + 2; y < ty1 - 1; y += 2) { rect(13 - tw, y, tw * 2 - 3, 1, acc.base); put(10 + tw, y, acc.lo); }
+    if (L.top === 'hoodie') {
+      if (!back) {
+        rect(12 - tw + 1, ty0, tw * 2 - 2, 1, shirt.lo);
+        put(10, ty0 + 1, 0xf2f0ea); put(10, ty0 + 2, 0xf2f0ea); put(13, ty0 + 1, 0xf2f0ea); put(13, ty0 + 3, 0xf2f0ea);
+        rect(12 - tw + 2, ty1 - 3, tw * 2 - 4, 1, shirt.lo); // magficka
+      } else {
+        rect(9, ty0, 6, 3, shirt.lo); rect(10, ty0, 4, 2, shirt.base); put(10, ty0, shirt.hi);
+      }
+    }
+    if (L.top === 'jacket' && !back) {
+      rect(11, ty0, 2, ty1 - ty0, acc.base); put(11, ty0 + 1, acc.hi);
+      put(10, ty0, shirt.hi); put(13, ty0, shirt.hi); put(10, ty0 + 1, shirt.lo); put(13, ty0 + 1, shirt.lo);
+    }
+    if (!back && (L.top === 'tee' || L.top === 'stripes')) { rect(11, ty0, 2, 1, skin.lo); if (!K) put(11, ty0 + 1, skin.lo), put(12, ty0 + 1, skin.lo); }
+    if (!back && L.top === 'sweater') { rect(10, ty0, 4, 1, shirt.lo); rect(11, ty0, 2, 1, skin.lo); }
+    if (!back && L.top === 'tee' && !L.apron && !K) { rect(13, ty0 + 3, 2, 2, acc.base); put(13, ty0 + 3, acc.hi); }
+    if (L.apron) {
+      if (!back) {
+        rect(12 - tw + 1, ty0 + 2, tw * 2 - 2, legTop + 3 - (ty0 + 2), 0xf2eee4);
+        for (let y = ty0 + 2; y < legTop + 3; y++) put(10 + tw, y, 0xcfc8b8);
+        rect(12 - tw + 1, legTop + 2, tw * 2 - 2, 1, 0xd8d1c1);
+        put(10, ty0, 0xf2eee4); put(10, ty0 + 1, 0xf2eee4); put(13, ty0, 0xf2eee4); put(13, ty0 + 1, 0xf2eee4);
+        rect(10, ty0 + 6, 4, 1, 0xd8d1c1); // ficka
+        rect(9, ty0 + 3, 2, 1, 0xe8b230); // namnbricka
+      } else {
+        for (let i = 0; i < 4; i++) { put(9 + i, ty0 + 1 + i, 0xf2eee4); put(14 - i, ty0 + 1 + i, 0xf2eee4); }
+        rect(11, hipTop - 1, 2, 2, 0xf2eee4); put(10, hipTop, 0xe6e0d2); put(13, hipTop, 0xe6e0d2);
+      }
+    }
+    // väskor
+    if (L.bag === 'backpack') {
+      if (back) {
+        rect(12 - tw + 1, ty0 + 1, tw * 2 - 2, (K ? 6 : 9), bagc.base);
+        rect(12 - tw + 1, ty0 + 1, tw * 2 - 2, 1, bagc.hi);
+        put(12 - tw + 1, ty0 + 2, bagc.hi);
+        for (let y = ty0 + 2; y < ty0 + (K ? 7 : 10); y++) put(10 + tw, y, bagc.lo);
+        rect(12 - tw + 2, ty0 + (K ? 4 : 5), tw * 2 - 4, 1, bagc.dk);
+        rect(11, ty0, 2, 1, bagc.lo);
+      } else {
+        for (let y = ty0; y < ty0 + (K ? 4 : 6); y++) { put(12 - tw + 1, y, bagc.lo); put(10 + tw, y, bagc.lo); }
+      }
+    }
+    if (L.bag === 'shoulder') {
+      const n = ty1 - ty0;
+      for (let i = 0; i < n; i++) put(back ? 10 + tw - Math.round(i * (tw * 2 - 3) / n) : 13 - tw + Math.round(i * (tw * 2 - 3) / n), ty0 + i, bagc.dk);
+      const bx = back ? 12 - tw - 3 : 11 + tw;
+      rect(bx, ty1 - 3, 4, 4, bagc.base); rect(bx, ty1 - 3, 4, 1, bagc.hi); put(bx + 3, ty1, bagc.lo);
+    }
+
+    // ---------- armar ----------
+    const arm = (left, swing) => {
+      const x0 = left ? 12 - tw - 2 : 12 + tw;
+      const len = sit ? armLen : armLen + swing;
+      const sleeve = longSleeve ? len - 2 : Math.min(3, len - 2);
+      for (let j = 0; j < len; j++) {
+        const y = torsoTop + 1 + j;
+        const isHand = j >= len - 2;
+        const cloth = j < sleeve;
+        const c = isHand ? skin : cloth ? (L.top === 'stripes' && j % 2 === 1 ? acc : shirt) : skin;
+        put(x0, y, left ? c.hi : c.base); put(x0 + 1, y, left ? c.base : c.lo);
+        if (isHand && j === len - 1) { put(x0, y, c.base); put(x0 + 1, y, c.lo); }
+      }
+      put(left ? x0 + 1 : x0, torsoTop, shirt.base); // axel
+      if (sit) { put(left ? x0 + 2 : x0 - 1, torsoTop + len, skin.base); put(left ? x0 + 3 : x0 - 2, torsoTop + len, skin.lo); }
+    };
+    const sw = walkA ? 1 : walkB ? -1 : 0;
+    arm(true, sw); arm(false, -sw);
+
+    // ---------- huvud ----------
+    const h0 = headTop;
+    for (let j = 0; j < headH; j++) {
+      const y = h0 + j;
+      let x0 = 7, x1 = 16;
+      if (j === 0) { x0 = 8; x1 = 15; }
+      if (j === headH - 2) { x0 = 8; x1 = 15; }
+      if (j === headH - 1) { x0 = 9; x1 = 14; }
+      rect(x0, y, x1 - x0 + 1, 1, skin.base);
+      put(x1, y, skin.lo);
+    }
+    rect(9, h0 + headH - 1, 6, 1, skin.lo); // haka-skugga
+    // öron
+    rect(6, eyeRow - 1, 1, 3, skin.base); put(6, eyeRow, skin.lo);
+    rect(17, eyeRow - 1, 1, 3, skin.lo);
+
+    if (!back) {
+      // ansikte
+      const eye = 0x2a1d1a;
+      if (K) { rect(8, eyeRow - 1, 2, 2, eye); rect(14, eyeRow - 1, 2, 2, eye); put(8, eyeRow - 1, 0xffffff); put(14, eyeRow - 1, 0xffffff); }
+      else { rect(9, eyeRow - 1, 1, 2, eye); rect(14, eyeRow - 1, 1, 2, eye); }
+      if (!K) { rect(8, eyeRow - 3, 3, 1, hair.lo); rect(13, eyeRow - 3, 3, 1, hair.lo); }
+      put(12, eyeRow + 2, skin.lo); // näsa
+      const lip = mix(skin.lo, 0xa0303a, 0.35);
+      rect(11, eyeRow + (K ? 3 : 4), 2, 1, lip);
+      if (L.blush || K) { put(8, eyeRow + 2, mix(skin.base, 0xe06070, 0.35)); put(15, eyeRow + 2, mix(skin.lo, 0xe06070, 0.35)); }
+      if (L.beard === 'full') { for (let y = eyeRow + 2; y < h0 + headH; y++) { const e = y >= h0 + headH - 1 ? 9 : y >= h0 + headH - 2 ? 8 : 7; rect(e, y, 24 - e * 2, 1, hair.base); } rect(11, eyeRow + 4, 2, 1, lip); put(12, eyeRow + 2, skin.lo); rect(8, eyeRow + 2, 8, 1, hair.lo); rect(10, eyeRow + 2, 4, 1, skin.base); }
+      if (L.beard === 'mustache') rect(10, eyeRow + 3, 4, 1, hair.base);
+      if (L.beard === 'stubble') for (let y = eyeRow + 3; y < h0 + headH; y++) for (let x = 8; x < 16; x++) if ((x + y) % 2 === 0 && x !== 11 && x !== 12) put(x, y, mix(skin.base, hair.base, 0.35));
+      // glasögon
+      if (L.glasses === 'sun') { rect(8, eyeRow - 1, 3, 2, 0x16161c); rect(13, eyeRow - 1, 3, 2, 0x16161c); rect(11, eyeRow - 1, 2, 1, 0x16161c); put(8, eyeRow - 1, 0x8fa0b8); put(13, eyeRow - 1, 0x8fa0b8); }
+      else if (L.glasses) {
+        const fc = L.glasses === 'round' ? 0x6b3e1e : 0x1f1f26;
+        const lens = mix(skin.base, 0xd8f0ff, 0.45);
+        for (const lx of [8, 13]) { rect(lx, eyeRow - 1, 3, 2, lens); put(lx + 1, eyeRow - 1, 0x2a1d1a); put(lx + 1, eyeRow, 0x2a1d1a); }
+        rect(8, eyeRow - 2, 3, 1, fc); rect(13, eyeRow - 2, 3, 1, fc); rect(11, eyeRow - 1, 2, 1, fc);
+        rect(8, eyeRow + 1, 3, 1, mix(fc, skin.base, 0.45)); rect(13, eyeRow + 1, 3, 1, mix(fc, skin.base, 0.45));
+        put(7, eyeRow - 1, fc); put(16, eyeRow - 1, fc);
+      }
+    }
+
+    // ---------- hår ----------
+    const H = hair;
+    const cap = (rows) => { // hårkalott
+      rect(8, h0 - 1, 8, 1, H.base); rect(7, h0, 10, rows, H.base);
+      rect(9, h0 - 1, 3, 1, H.hi); rect(8, h0, 2, 1, H.hi);
+      for (let j = 0; j < rows; j++) put(16, h0 + j, H.lo);
+    };
+    const st = L.style;
+    if (!back) {
+      switch (st) {
+        case 'short': cap(3); rect(7, h0 + 3, 1, 3, H.base); rect(16, h0 + 3, 1, 3, H.lo); rect(8, h0 + 3, 3, 1, H.base); break;
+        case 'side': cap(3); rect(7, h0 + 3, 1, 3, H.base); rect(16, h0 + 3, 1, 4, H.lo); rect(11, h0 + 3, 5, 1, H.base); put(15, h0 + 4, H.lo); put(10, h0, H.lo); break;
+        case 'long': cap(3); rect(8, h0 + 3, 3, 1, H.base); rect(13, h0 + 3, 3, 1, H.base);
+          rect(6, h0 + 1, 2, headH + 3, H.base); rect(16, h0 + 1, 2, headH + 3, H.lo); put(6, h0 + 2, H.hi); put(6, h0 + 3, H.hi); break;
+        case 'ponytail': cap(3); rect(8, h0 + 3, 4, 1, H.base); rect(7, h0 + 3, 1, 4, H.base); rect(16, h0 + 3, 1, 4, H.lo); rect(17, h0 + 4, 1, 5, H.lo); break;
+        case 'bun': cap(3); rect(10, h0 - 3, 4, 2, H.base); rect(11, h0 - 4, 2, 1, H.base); put(10, h0 - 3, H.hi); put(13, h0 - 2, H.lo); rect(7, h0 + 3, 1, 3, H.base); rect(16, h0 + 3, 1, 3, H.lo); rect(12, h0 + 3, 3, 1, H.base); break;
+        case 'curly': rect(7, h0 - 2, 10, 5, H.base); rect(6, h0 - 1, 12, 4, H.base); rect(6, h0 + 3, 2, 4, H.base); rect(16, h0 + 3, 2, 4, H.lo);
+          for (let y = h0 - 2; y < h0 + 7; y++) for (let x = 6; x < 18; x++) if (has(x, y) && (x * 3 + y * 5) % 4 === 0) put(x, y, (x + y) % 3 ? H.hi : H.lo);
+          rect(8, h0 + 3, 8, 1, H.base); break;
+        case 'afro': for (let y = h0 - 5; y < h0 + 7; y++) { const dy = (y - (h0 + 0.5)) / 6.5; const hw = Math.round(Math.sqrt(Math.max(0, 1 - dy * dy)) * 8); if (y >= h0 + 3 && hw) { rect(12 - hw, y, hw - 5 + 1, 1, H.base); rect(16, y, hw - 4, 1, H.lo); } else if (hw) rect(12 - hw, y, hw * 2, 1, H.base); }
+          for (let y = h0 - 5; y < h0 + 7; y++) for (let x = 3; x < 21; x++) if (has(x, y) && (x * 7 + y * 3) % 5 === 0 && (y < h0 + 3 || x < 7 || x > 16)) put(x, y, (x + y) % 2 ? H.hi : H.lo);
+          break;
+        case 'spiky': cap(3); for (let i = 0; i < 4; i++) { put(8 + i * 2, h0 - 2, H.base); } put(9, h0 - 3, H.hi); put(13, h0 - 3, H.base); rect(7, h0 + 3, 1, 2, H.base); rect(16, h0 + 3, 1, 2, H.lo); put(9, h0 + 3, H.base); put(13, h0 + 3, H.base); break;
+        case 'bald': rect(7, eyeRow - 2, 1, 3, H.base); rect(16, eyeRow - 2, 1, 3, H.lo); put(9, h0 + 1, skin.hi); put(10, h0 + 1, skin.hi); break;
+        case 'mohawk': rect(10, h0 - 3, 4, 5, H.base); put(10, h0 - 3, H.hi); put(11, h0 - 2, H.hi); rect(7, h0 + 1, 1, 4, skin.lo); break;
+        case 'bob': cap(4); rect(6, h0 + 1, 2, eyeRow + 3 - h0, H.base); rect(16, h0 + 1, 2, eyeRow + 3 - h0, H.lo); rect(8, h0 + 4, 8, 1, H.lo); break;
+        case 'buzz': rect(8, h0, 8, 1, H.lo); rect(7, h0 + 1, 10, 2, mix(H.base, skin.base, 0.3)); rect(7, h0 + 3, 1, 2, H.lo); rect(16, h0 + 3, 1, 2, H.lo); break;
+        default: cap(3);
+      }
+    } else {
+      switch (st) {
+        case 'bald': rect(7, eyeRow - 1, 10, 2, mix(H.base, skin.base, 0.35)); rect(8, eyeRow + 1, 8, 1, mix(H.lo, skin.lo, 0.4)); put(9, h0 + 1, skin.hi); put(10, h0 + 1, skin.hi); break;
+        case 'mohawk': rect(10, h0 - 3, 4, headH - 1, H.base); put(10, h0 - 3, H.hi); break;
+        case 'buzz': rect(8, h0, 8, 1, H.lo); rect(7, h0 + 1, 10, headH - 4, mix(H.base, skin.base, 0.3)); break;
+        case 'afro': for (let y = h0 - 5; y < h0 + 9; y++) { const dy = (y - (h0 + 1)) / 7.5; const hw = Math.round(Math.sqrt(Math.max(0, 1 - dy * dy)) * 8); if (hw) rect(12 - hw, y, hw * 2, 1, H.base); }
+          for (let y = h0 - 5; y < h0 + 9; y++) for (let x = 3; x < 21; x++) if (has(x, y) && (x * 7 + y * 3) % 5 === 0) put(x, y, (x + y) % 2 ? H.hi : H.lo);
+          break;
+        case 'curly': rect(7, h0 - 2, 10, 2, H.base); rect(6, h0, 12, headH - 2, H.base);
+          for (let y = h0 - 2; y < h0 + headH - 2; y++) for (let x = 6; x < 18; x++) if (has(x, y) && (x * 3 + y * 5) % 4 === 0) put(x, y, (x + y) % 3 ? H.hi : H.lo);
+          break;
+        default: {
+          const long = st === 'long' || st === 'bob';
+          const bottom = st === 'long' ? h0 + headH + 3 : st === 'bob' ? eyeRow + 3 : h0 + headH - 3;
+          rect(8, h0 - 1, 8, 1, H.base); rect(7, h0, 10, bottom - h0, H.base);
+          if (long) rect(6, h0 + 1, 12, bottom - h0 - 1, H.base);
+          rect(9, h0 - 1, 3, 1, H.hi); rect(8, h0, 3, 1, H.hi); put(8, h0 + 1, H.hi);
+          for (let y = h0; y < bottom; y++) put(long ? 17 : 16, y, H.lo);
+          rect(long ? 7 : 8, bottom - 1, long ? 10 : 8, 1, H.lo);
+          if (st === 'ponytail') { rect(11, bottom, 2, K ? 5 : 7, H.base); put(12, bottom + 1, H.lo); rect(11, bottom - 1, 2, 1, 0xc9323a); }
+          if (st === 'bun') { rect(10, h0 - 3, 4, 3, H.base); rect(11, h0 - 4, 2, 1, H.base); put(10, h0 - 3, H.hi); }
+          if (st === 'spiky') for (let i = 0; i < 4; i++) put(8 + i * 2, h0 - 2, H.base);
+        }
+      }
+    }
+
+    // ---------- huvudbonader + hörlurar ----------
+    if (L.hat === 'cap') {
+      rect(8, h0 - 2, 8, 1, capc.base); rect(7, h0 - 1, 10, 3, capc.base);
+      rect(8, h0 - 2, 3, 1, capc.hi); rect(7, h0 - 1, 2, 2, capc.hi);
+      for (let y = h0 - 1; y < h0 + 2; y++) put(16, y, capc.lo);
+      if (!back) { rect(6, h0 + 2, 12, 1, capc.lo); rect(7, h0 + 3, 10, 1, mix(skin.lo, 0x201818, 0.25)); rect(11, h0, 2, 1, 0xf4f1ea); }
+      else { rect(7, h0 + 2, 10, 1, capc.lo); rect(11, h0 + 2, 2, 1, hair.base); }
+    }
+    if (L.hat === 'beanie') {
+      rect(9, h0 - 3, 6, 1, capc.base); rect(8, h0 - 2, 8, 1, capc.base); rect(7, h0 - 1, 10, 3, capc.base);
+      rect(7, h0 + 1, 10, 2, capc.lo); for (let x = 7; x < 17; x += 2) put(x, h0 + 1, capc.dk);
+      rect(9, h0 - 3, 3, 1, capc.hi); put(8, h0 - 2, capc.hi);
+      rect(11, h0 - 5, 2, 2, 0xf4f1ea); put(12, h0 - 4, 0xd8d4c8);
+    }
+    if (L.phones) {
+      const pc = ramp(toInt(L.phoneColor, 0x222228));
+      rect(9, h0 - 3, 6, 1, 0x2a2a30); put(8, h0 - 2, 0x2a2a30); put(15, h0 - 2, 0x2a2a30); put(7, h0 - 1, 0x2a2a30); put(16, h0 - 1, 0x2a2a30);
+      rect(5, eyeRow - 2, 2, 4, pc.base); put(5, eyeRow - 2, pc.hi);
+      rect(17, eyeRow - 2, 2, 4, pc.lo);
+    }
+  } else {
+    // ================= SIDOVY (höger; vänster speglas) =================
+    const legSw = walkA ? 3 : walkB ? -3 : 0;
+    const legX = 11; // närmaste benets vänsterkant
+    const drawLeg = (swing, far) => {
+      const top = legTop, len = legLen;
+      const P = far ? { hi: pants.lo, base: pants.lo, lo: pants.dk } : pants;
+      const Sk = far ? { hi: skin.lo, base: skin.lo, lo: skin.dk } : skin;
+      const lift = swing < 0 ? 1 : 0;
+      let lastX = legX;
+      for (let j = 0; j < len - lift; j++) {
+        const t = (j + 1) / len;
+        const x = legX + Math.round(swing * t) - (far && !swing ? 1 : 0);
+        const bare = (L.bottom === 'shorts' || L.bottom === 'skirt') && j >= 3;
+        const c = bare ? Sk : P;
+        rect(x, top + j, 3, 1, c.base); put(x, top + j, c.lo); put(x + 2, top + j, c.hi);
+        lastX = x;
+      }
+      const sy = shoeTop - lift;
+      const S = far ? { base: shoe.lo, hi: shoe.lo, lo: shoe.dk } : shoe;
+      rect(lastX - 1, sy, 5, 1, S.base); put(lastX + 3, sy, S.hi);
+      rect(lastX - 1, sy + 1, 5, 1, L.shoes === '#1c1c1c' ? shoe.lo : far ? mix(sole, 0x000000, 0.25) : sole);
+    };
+    drawLeg(-legSw, true);
+    // bortre arm (syns när den svänger)
+    const armSw = walkA ? -3 : walkB ? 3 : 0;
+    const drawArm = (swing, far) => {
+      const C = far ? { hi: shirt.lo, base: shirt.lo, lo: shirt.dk } : shirt;
+      const Sk = far ? { hi: skin.lo, base: skin.lo, lo: skin.dk } : skin;
+      const len = sit ? armLen - 2 : armLen;
+      const sleeve = longSleeve ? len - 2 : 3;
+      for (let j = 0; j < len; j++) {
+        const t = (j + 1) / len;
+        const x = 11 + Math.round(swing * t * t) + (sit ? Math.round(t * 3) : 0);
+        const c = j >= len - 2 ? Sk : j < sleeve ? C : Sk;
+        rect(x, torsoTop + 1 + j, 3, 1, c.base); put(x, torsoTop + 1 + j, c.lo); put(x + 2, torsoTop + 1 + j, c.hi);
+      }
+    };
+    if (armSw) drawArm(-armSw, true);
+    drawLeg(legSw, false);
+    // höft
+    const hy = hipTop + (sit ? bob : 0);
+    rect(9, hy, 7, hipH, pants.base); put(15, hy, pants.hi);
+    if (L.bottom === 'skirt') for (let j = 0; j < (K ? 3 : 5); j++) { const w = Math.min(2, (j + 1) >> 1); rect(9 - w, hy + j, 7 + w * 2, 1, pants.base); put(8 + w * 0 - w, hy + j, pants.lo); }
+    else if (!K) rect(9, hy, 7, 1, mix(pants.dk, 0x1c1814, 0.4));
+    // ryggsäck bakom ryggen
+    if (L.bag === 'backpack') {
+      rect(5, torsoTop + 1, 4, K ? 6 : 8, bagc.base); rect(5, torsoTop + 1, 4, 1, bagc.hi); put(5, torsoTop + 2, bagc.lo);
+      rect(6, torsoTop + (K ? 4 : 5), 3, 1, bagc.dk);
+    }
+    // bål
+    for (let y = torsoTop; y < hipTop + (sit ? bob : 0); y++) {
+      const inset = y === torsoTop ? 1 : 0;
+      rect(9 + inset, y, 7 - inset, 1, shirt.base); put(9 + inset, y, shirt.lo); put(15 - inset * 0, y, shirt.hi);
+      if (L.top === 'stripes' && (y - torsoTop) % 2 === 0 && y > torsoTop) rect(10, y, 5, 1, acc.base);
+    }
+    if (L.top === 'hoodie') { rect(8, torsoTop, 3, 3, shirt.lo); put(9, torsoTop, shirt.base); }
+    if (L.top === 'jacket') { rect(15, torsoTop, 1, hipTop - torsoTop, acc.base); }
+    if (L.apron) { rect(14, torsoTop + 2, 3, legTop + 3 - torsoTop - 2, 0xf2eee4); for (let y = torsoTop + 2; y < legTop + 3; y++) put(14, y, 0xcfc8b8); put(12, torsoTop + 1, 0xf2eee4); put(13, torsoTop + 2, 0xf2eee4); }
+    if (L.bag === 'backpack') { rect(10, torsoTop, 1, 5, bagc.dk); }
+    if (L.bag === 'shoulder') { for (let i = 0; i < 7; i++) put(10 + (i >> 1), torsoTop + i, bagc.dk); rect(13, hipTop - 3, 4, 4, bagc.base); rect(13, hipTop - 3, 4, 1, bagc.hi); }
+    // närmaste arm
+    drawArm(armSw, false);
+
+    // huvud
+    const h0 = headTop;
+    for (let j = 0; j < headH; j++) {
+      const y = h0 + j;
+      let x0 = 8, x1 = 16;
+      if (j === 0) { x0 = 9; x1 = 15; }
+      if (j >= headH - 2) { x0 = 10; x1 = j === headH - 1 ? 15 : 16; }
+      rect(x0, y, x1 - x0 + 1, 1, skin.base);
+      put(x0, y, skin.lo);
+    }
+    put(17, eyeRow + 1, skin.base); put(17, eyeRow + 2, skin.lo); // näsa
+    const eye = 0x2a1d1a;
+    if (K) { rect(14, eyeRow - 1, 2, 2, eye); put(15, eyeRow - 1, 0xffffff); } else rect(15, eyeRow - 1, 1, 2, eye);
+    if (!K) rect(14, eyeRow - 3, 3, 1, hair.lo);
+    put(16, eyeRow + (K ? 3 : 4), mix(skin.lo, 0xa0303a, 0.35));
+    if (L.blush || K) put(14, eyeRow + 2, mix(skin.base, 0xe06070, 0.35));
+    rect(11, eyeRow - 1, 2, 3, skin.base); put(11, eyeRow, skin.lo); put(12, eyeRow, skin.dk); // öra
+    if (L.beard === 'full') { rect(11, eyeRow + 2, 6, h0 + headH - eyeRow - 2, hair.base); put(16, eyeRow + 4, mix(skin.lo, 0xa0303a, 0.35)); rect(11, eyeRow + 2, 1, 2, hair.lo); }
+    if (L.beard === 'mustache') rect(15, eyeRow + 3, 3, 1, hair.base);
+    if (L.beard === 'stubble') for (let y = eyeRow + 3; y < h0 + headH; y++) for (let x = 11; x < 17; x++) if ((x + y) % 2 === 0) put(x, y, mix(skin.base, hair.base, 0.35));
+    if (L.glasses === 'sun') { rect(14, eyeRow - 1, 3, 2, 0x16161c); rect(11, eyeRow - 1, 3, 1, 0x16161c); put(15, eyeRow - 1, 0x8fa0b8); }
+    else if (L.glasses) { const fc = L.glasses === 'round' ? 0x6b3e1e : 0x1f1f26; rect(12, eyeRow - 2, 5, 1, fc); put(16, eyeRow - 1, mix(fc, 0xd8f0ff, 0.3)); put(16, eyeRow, fc); put(14, eyeRow + 1, mix(fc, skin.base, 0.5)); put(15, eyeRow + 1, mix(fc, skin.base, 0.5)); }
+
+    const H = hair, st = L.style;
+    const top = (rows) => { rect(9, h0 - 1, 7, 1, H.base); rect(8, h0, 9, rows, H.base); rect(10, h0 - 1, 3, 1, H.hi); put(9, h0, H.hi); };
+    switch (st) {
+      case 'bald': rect(8, eyeRow - 1, 2, 3, mix(H.base, skin.base, 0.35)); put(13, h0 + 1, skin.hi); break;
+      case 'buzz': rect(9, h0, 7, 1, H.lo); rect(8, h0 + 1, 8, 2, mix(H.base, skin.base, 0.3)); rect(8, h0 + 3, 3, 4, mix(H.base, skin.base, 0.3)); break;
+      case 'mohawk': rect(9, h0 - 3, 7, 3, H.base); rect(8, h0, 5, 2, H.base); put(10, h0 - 3, H.hi); break;
+      case 'afro': for (let y = h0 - 5; y < h0 + 8; y++) { const dy = (y - (h0 + 0.5)) / 7; const hw = Math.round(Math.sqrt(Math.max(0, 1 - dy * dy)) * 7.5); if (hw) rect(11 - hw, y, y >= h0 + 3 ? Math.max(0, hw + 1) : hw * 2, 1, H.base); }
+        for (let y = h0 - 5; y < h0 + 8; y++) for (let x = 3; x < 20; x++) if (has(x, y) && (x * 7 + y * 3) % 5 === 0 && (y < h0 + 3 || x < 11)) put(x, y, (x + y) % 2 ? H.hi : H.lo);
+        break;
+      case 'curly': rect(8, h0 - 2, 9, 5, H.base); rect(6, h0, 5, 8, H.base);
+        for (let y = h0 - 2; y < h0 + 8; y++) for (let x = 6; x < 18; x++) if (has(x, y) && (x * 3 + y * 5) % 4 === 0 && (y < h0 + 3 || x < 11)) put(x, y, (x + y) % 3 ? H.hi : H.lo);
+        break;
+      default: {
+        top(3);
+        rect(8, h0 + 3, 3, st === 'long' || st === 'bob' ? 0 : 4, H.base);
+        rect(16, h0 + 3, 1, 1, H.base); put(15, h0 + 3, H.base);
+        if (st === 'side') { rect(13, h0 + 3, 4, 1, H.base); put(16, h0 + 4, H.base); }
+        if (st === 'long') { rect(7, h0 + 1, 4, headH + 3, H.base); for (let y = h0 + 1; y < h0 + headH + 4; y++) put(7, y, H.lo); }
+        if (st === 'bob') { rect(7, h0 + 1, 4, eyeRow + 3 - h0, H.base); put(7, eyeRow + 2, H.lo); rect(14, h0 + 3, 3, 1, H.base); }
+        if (st === 'ponytail') { rect(8, h0 + 3, 3, 3, H.base); rect(5, eyeRow - 2, 3, 2, H.base); rect(5, eyeRow, 2, K ? 4 : 6, H.base); put(5, eyeRow + 1, H.lo); put(7, eyeRow - 2, 0xc9323a); }
+        if (st === 'bun') { rect(6, h0 - 2, 4, 4, H.base); put(6, h0 - 2, H.hi); }
+        if (st === 'spiky') { put(10, h0 - 2, H.base); put(12, h0 - 2, H.base); put(14, h0 - 2, H.base); put(11, h0 - 3, H.hi); }
+      }
+    }
+    if (L.hat === 'cap') { rect(9, h0 - 2, 7, 1, capc.base); rect(8, h0 - 1, 9, 3, capc.base); rect(9, h0 - 2, 3, 1, capc.hi); rect(16, h0 + 2, 4, 1, capc.lo); rect(8, h0 + 2, 9, 1, capc.lo); }
+    if (L.hat === 'beanie') { rect(10, h0 - 3, 5, 1, capc.base); rect(9, h0 - 2, 7, 1, capc.base); rect(8, h0 - 1, 9, 2, capc.base); rect(8, h0 + 1, 9, 2, capc.lo); rect(11, h0 - 5, 2, 2, 0xf4f1ea); }
+    if (L.phones) { const pc = ramp(toInt(L.phoneColor, 0x222228)); rect(11, h0 - 2, 2, eyeRow - h0, 0x2a2a30); rect(10, eyeRow - 2, 3, 4, pc.base); put(10, eyeRow - 2, pc.hi); }
+  }
+
+  // ---------- kontur ----------
+  const src = new Uint8ClampedArray(d);
+  for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) {
+    const i = (y * SW + x) * 4;
+    if (src[i + 3]) continue;
+    let best = -1;
+    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      const xx = x + dx, yy = y + dy;
+      if (xx < 0 || yy < 0 || xx >= SW || yy >= SH) continue;
+      const j = (yy * SW + xx) * 4;
+      if (src[j + 3]) { best = j; if (dy === -1) break; }
+    }
+    if (best < 0) continue;
+    d[i] = src[best] * 0.28 + 14; d[i + 1] = src[best + 1] * 0.24 + 10; d[i + 2] = src[best + 2] * 0.3 + 20; d[i + 3] = 255;
+  }
+  cx.putImageData(img, 0, 0);
+  return cv;
+}
+
+function spriteFor(look, dir, frame) {
+  const L = look && typeof look === 'object' ? look : {};
+  let m = CACHE.get(L);
+  if (!m) { m = new Map(); CACHE.set(L, m); }
+  const key = dir + frame;
+  let s = m.get(key);
+  if (!s) { s = render(L, dir, frame); m.set(key, s); }
+  return s;
+}
+
+// dir: 'down' | 'up' | 'left' | 'right'; frame: se överst
+export function drawPerson(ctx, fx, fy, L, dir = 'down', frame = 0) {
+  if (!['down', 'up', 'left', 'right'].includes(dir)) dir = 'down';
+  frame = frame | 0;
+  if (frame < 0 || frame > 5) frame = 0;
+  const x = Math.round(fx), y = Math.round(fy);
+  // skugga
+  ctx.fillStyle = 'rgba(20,12,30,.28)';
+  const kid = L && L.kid;
+  ctx.fillRect(x - (kid ? 4 : 5), y - 1, kid ? 8 : 10, 2);
+  ctx.fillRect(x - (kid ? 3 : 4), y + 1, kid ? 6 : 8, 1);
+  ctx.drawImage(spriteFor(L, dir, frame), x - 12, y - 39);
+}
+
+// Porträtt (för dialoger/kort) – 80×96 canvas (5:6), bysten ur spriten i 4× skala
 export function portrait(L, bg = '#d8cdb8') {
+  const look = L && typeof L === 'object' ? L : {};
   const c = document.createElement('canvas');
-  c.width = 20; c.height = 24;
+  c.width = 80; c.height = 96;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, 20, 24);
-  ctx.save();
-  ctx.scale(2, 2);
-  drawPerson(ctx, 5, L.kid ? 19 : 22, L, 'down', 0);
-  ctx.restore();
+  ctx.imageSmoothingEnabled = false;
+  const base = toInt(bg, 0xd8cdb8);
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, 80, 96);
+  // mjuk ljusfläck bakom huvudet + rutmönster
+  const light = '#' + mix(base, 0xffffff, 0.28).toString(16).padStart(6, '0');
+  const dark = '#' + mul(base, 0.92).toString(16).padStart(6, '0');
+  for (let y = 0; y < 96; y += 4) for (let x = 0; x < 80; x += 4) if (((x + y) / 4) % 2 === 0) { ctx.fillStyle = dark; ctx.fillRect(x, y, 4, 4); }
+  ctx.fillStyle = light;
+  for (let y = 0; y < 24; y++) for (let x = 0; x < 20; x++) {
+    const dd = Math.hypot((x - 9.5) / 8, (y - 9) / 9);
+    if (dd < 1 && ((x + y) % 2 === 0 || dd < 0.7)) ctx.fillRect(x * 4, y * 4, 4, 4);
+  }
+  const s = spriteFor(look, 'down', 0);
+  const top = look.kid ? 9 : 1;
+  ctx.drawImage(s, 2, top, 20, 24, 0, 0, 80, 96);
   return c;
 }

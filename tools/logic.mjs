@@ -22,26 +22,41 @@ const res = await page.evaluate(async () => {
       templates[o.template] = (templates[o.template] || 0) + 1;
       if (o.items.some((x) => x.choice)) choice++;
       missingSum += o.items.filter((x) => x.part && !stock[x.part]).length;
-      // bygg i slot-ordning; valfria delar: välj första kompatibla
-      const b = { placed: {}, acts: new Set(['paste']), cables: new Set() };
+      // bygg i slot-ordning; valfria delar: välj första kompatibla i lagret
+      const b = { placed: {}, acts: new Map(), cables: new Map() };
+      for (const a of L.ACTIONS) b.acts.set(a.id, new Set(a.points.map((_, i) => i)));
       const parts = o.items.map((it) => it.part ? shop.part[it.part] : null);
+      const used = new Set();
       let fail = null;
+      const need = () => { const cpu = o.items.find((x) => x.cat === 'cpu'), gpu = o.items.find((x) => x.cat === 'gpu'); return shop.part[cpu.part].watt + (gpu ? shop.part[gpu.part].watt : 0) + 150; };
       for (const slot of L.SLOTS) {
-        const idx = o.items.findIndex((it, j) => !parts[j]?.__used && (parts[j] ? L.slotsFor(parts[j]).includes(slot) : it.cat === slot.cat && slot.id !== 'bay'));
+        const idx = o.items.findIndex((it, j) => !used.has(j) && (parts[j] ? L.slotsFor(parts[j]).includes(slot) : it.cat === slot.cat && slot.id !== 'bay'));
         if (idx < 0) continue;
         let part = parts[idx];
         if (!part) {
-          part = shop.parts.find((p) => p.cat === slot.cat && L.canPlace(slot, p, b).ok && (slot.cat !== 'case' || p.fits.includes(shop.part[o.items.find((x) => x.cat === 'mb').part].size)) && stock[p.id] && (slot.cat !== 'psu' || p.watt >= (shop.part[o.items.find((x) => x.cat === 'cpu').part].watt + (o.items.find((x) => x.cat === 'gpu') ? shop.part[o.items.find((x) => x.cat === 'gpu').part].watt : 0) + 150)) && (slot.cat !== 'cooler' || p.maxW >= (b.placed.cpu?.watt || 0)));
+          const mbSize = shop.part[o.items.find((x) => x.cat === 'mb').part].size;
+          const cpuW = shop.part[o.items.find((x) => x.cat === 'cpu').part].watt;
+          part = shop.parts.find((p) => p.cat === slot.cat && stock[p.id] && L.canPlace(slot, p, b).ok && (slot.cat !== 'case' || p.fits.includes(mbSize)) && (slot.cat !== 'psu' || p.watt >= need()) && (slot.cat !== 'cooler' || p.maxW >= cpuW));
           if (!part) { fail = `inget valbart för ${slot.id}`; break; }
         }
         const r = L.canPlace(slot, part, b);
         if (!r.ok) { fail = `${slot.id}: ${r.msg}`; break; }
-        b.placed[slot.id] = part;
-        parts[idx] = { ...part, __used: true };
+        b.placed[slot.id] = part; used.add(idx);
       }
+      // alla kablar ska gå att koppla till ett rätt uttag
+      if (!fail) for (const c of L.CABLES) {
+        if (!L.cableReady(c, b)) continue;
+        const port = c.wants.find((w) => L.availablePorts(b).includes(w) && !L.portBusy(w, b));
+        if (!port) { fail = `inget ledigt uttag för ${c.id}`; break; }
+        const r = L.canConnect(c, port, b, true);
+        if (!r.ok) { fail = `${c.id}: ${r.msg}`; break; }
+        b.cables.set(c.id, port);
+      }
+      if (!fail && L.wattNeed(b) > b.placed.psu.watt) fail = `för svagt nätagg ${b.placed.psu.watt} < ${L.wattNeed(b)}`;
+      if (!fail && b.placed.cooler.maxW < b.placed.cpu.watt) fail = 'för svag kylare';
+      if (!fail && !b.placed.cpu.igpu && !b.placed.gpu) fail = 'ingen grafik';
       const placedCount = Object.keys(b.placed).length;
       if (!fail && placedCount !== o.items.length) fail = `placerade ${placedCount}/${o.items.length}`;
-      if (!fail) { const boot = L.bootCheck(b); if (boot.length) fail = boot.join(' '); }
       if (fail) { if (out.problems.length < 12) out.problems.push(`nivå ${level} ${o.template}: ${fail}`); }
       else ok++;
     }

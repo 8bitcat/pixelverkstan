@@ -1,14 +1,20 @@
-// Butiksgolvet: ritar butiken i 256×192 pixlar och flyttar kunderna mellan
-// dörr → kö → väntplats → utlämning → dörr.
-import { drawPerson, SHOPKEEPER } from './people.js';
-import { drawText, textWidth } from './pixfont.js';
+// Butiksgolvet: ritar butiken i 512×384 logiska pixlar (skarpt uppskalat) och
+// flyttar kunderna: trottoaren → glasdörren → kön vid BESTÄLL → väntplats (soffa
+// eller glasmonter) → UTLÄMNING → ut genom dörren.
+//
+// Koordinater: kundens (x, y) = fötterna i den logiska scenen. Skärmposition:
+//   rect.left + offX + x*scale, rect.top + offY + y*scale. Bröstet ligger ca 12–20 px
+//   ovanför fötterna (y-12 träffar kunden).
+import { drawPerson, SHOPKEEPER, makeLook } from './people.js';
+import { Pix, hex, mix, mul, hsl, bayer, SMALL, BIG, textW, ctxText, eachTextPixel, css } from './floor-pix.js';
+import * as LY from './floor-layout.js';
+import * as SC from './floor-scene.js';
+import * as PR from './floor-props.js';
 
-export const FW = 256, FH = 192;
-const DOOR_IN = [236, 172], OUTSIDE = [272, 172];
-const QUEUE = [[128, 100], [128, 124], [128, 148]];
-const PICKUP = [184, 100];
-const SEATS = [[24, 150], [44, 150], [64, 150], [24, 178], [44, 178]];
-const SPEED = 40;
+export const FW = LY.FW, FH = LY.FH;
+const SPEED = 58, OUT_SPEED = 66;
+const WALK_SEQ = [1, 3, 2, 3];
+const OVERFLOW = [[268, 210], [290, 236], [262, 186], [300, 330]];
 
 export class Floor {
   constructor(canvas, game) {
@@ -18,64 +24,240 @@ export class Floor {
     this.particles = [];
     this.onCustomerClick = null;
     this.t = 0;
-    canvas.addEventListener('pointerdown', (e) => this.click(e));
-    canvas.addEventListener('pointermove', (e) => { const c = this.hit(e); canvas.style.cursor = c && this.clickable(c) ? 'pointer' : 'default'; });
+    this.offX = 0; this.offY = 0; this.scale = 1; this.dpr = 1;
+    this.icons = new Map();
+    this.door = 0;
+    this.keeper = { x: LY.KEEPER_HOME[0], y: LY.KEEPER_HOME[1], dir: 'down', walk: 0, moving: false, lookT: 3, look: 'down' };
+    this.cars = []; this.carT = 1.5;
+    this.walkers = []; this.walkerT = 4;
+    this.sig = null; this.sigT = 0;
+    this.build();
+    if (canvas._floorOff) canvas._floorOff();
+    const down = (e) => this.click(e);
+    const move = (e) => { const c = this.hit(e); canvas.style.cursor = c && this.clickable(c) ? 'pointer' : 'default'; };
+    canvas.addEventListener('pointerdown', down);
+    canvas.addEventListener('pointermove', move);
+    canvas._floorOff = () => { canvas.removeEventListener('pointerdown', down); canvas.removeEventListener('pointermove', move); };
+  }
+
+  icon(part, w, h) {
+    const key = part.id + ':' + w + 'x' + h;
+    let c = this.icons.get(key);
+    if (!c) {
+      try { c = this.shop.icon(part, w, h); } catch { c = null; }
+      if (!c) { c = document.createElement('canvas'); c.width = w; c.height = h; }
+      this.icons.set(key, c);
+    }
+    return c;
+  }
+
+  // ---------- Förberedelse (statiska lager) ----------
+  build() {
+    const shop = this.shop, th = shop.theme || {};
+    this.street = SC.paintStreet();
+    this.clouds = SC.paintClouds();
+    // stjärnobjektet
+    const gpus = shop.parts.filter((p) => p.cat === 'gpu');
+    const byCost = (a, b) => (b.cost || 0) - (a.cost || 0);
+    this.heroPart = shop.part?.[shop.hero] || [...gpus].sort(byCost)[0] || [...shop.parts].sort(byCost)[0];
+    const [title, sub] = heroTitle(this.heroPart ? this.heroPart.name : '');
+    const hero = PR.makeHero(title, sub);
+    this.heroUnder = hero.under; this.heroOver = hero.over;
+    this.heroIcon = this.heroPart ? this.icon(this.heroPart, 78, 52) : null;
+    this.heroTitle = title;
+    this.ropeBack = PR.makeRope(LY.ROPE.back, [LY.ROPE.x0, LY.ROPE.x1]);
+    this.ropeFront = PR.makeRope(LY.ROPE.front, [LY.ROPE.x0, LY.HERO.cx, LY.ROPE.x1], true);
+    // rummet
+    const room = SC.paintRoom(th);
+    const neon = hex(th.neon, 0x7ee8fa);
+    this.room = room.flush();
+    const rc = this.room.getContext('2d');
+    rc.imageSmoothingEnabled = false;
+    if (this.heroPart) {
+      const [x0, y0, x1] = SC.POSTER, ic = this.icon(this.heroPart, 26, 20);
+      rc.drawImage(ic, Math.round((x0 + x1 - 26) / 2), y0 + 5);
+    }
+    this.neon = neonSign(shop.sign || '', neon, 2, 4);
+    this.open = neonSign('ÖPPET', 0xff4d6d, 1, 3);
+    this.counter = PR.makeCounter(th);
+    this.back = PR.makeBackCabinet();
+    this.furniture = [this.back, PR.makeSofa(), PR.makeArmchair(), PR.makeTable(), ...LY.PLANTS.map(([x, y]) => PR.makePlant(x, y)), ...LY.GATES.map((x) => PR.makeGate(x))];
+    // glasmontrar
+    this.vits = (shop.showcases || []).slice(0, LY.VITRINES.length).map((sc, i) => {
+      const v = LY.VITRINES[i], cat = shop.cats?.[sc.cat];
+      const velvet = mix(mul(hex(cat?.color, 0x7a2e3e), 0.5), 0x1a1030, 0.35);
+      return { sc, v, frame: PR.makeVitrine(v.x1 - v.x0, (sc.title || cat?.name || sc.cat).toUpperCase(), velvet), img: null };
+    });
+    this.shelfImg = null;
+    this.cars = [];
+    this.carImgs = [0xc9323a, 0x2c6fb7, 0xf0f0ea, 0x2a2d33, 0xe8b230, 0x46a35a].map((c, i) => PR.makeCar(c, i === 4 ? 1 : 0));
+    this.beams = makeBeams();
   }
 
   // ---------- Logik ----------
-  target(c) {
-    const g = this.game;
-    if (c.phase === 'arriving' || c.phase === 'queue') {
-      const i = Math.min(g.queue().indexOf(c), QUEUE.length - 1);
-      return QUEUE[Math.max(0, i)];
-    }
-    if (c.phase === 'waiting') {
-      const w = g.customers.filter((x) => x.phase === 'waiting');
-      return SEATS[Math.min(w.indexOf(c), SEATS.length - 1)];
-    }
-    if (c.phase === 'ready') return PICKUP;
-    return OUTSIDE;
-  }
-
   update(dt) {
     this.t += dt;
     const g = this.game;
-    for (const c of [...g.customers]) {
-      let [tx, ty] = this.target(c);
-      // gå via dörren när man är utanför eller på väg ut
-      const outside = c.x > 240;
-      if ((outside && tx < 240) || (c.phase === 'leaving' && c.x < 230)) {
-        if (Math.hypot(c.x - DOOR_IN[0], c.y - DOOR_IN[1]) > 3) [tx, ty] = DOOR_IN;
+    for (const c of g.customers) {
+      if (c._fl) continue;
+      c._fl = true; c._path = null; c._tkey = '';
+      if (c.phase === 'arriving') {
+        const left = Math.random() < 0.65;
+        c.x = left ? LY.SPAWN_X[0] : LY.SPAWN_X[1]; c.y = LY.SIDEWALK_Y; c.dir = left ? 'right' : 'left';
       }
-      const dx = tx - c.x, dy = ty - c.y, d = Math.hypot(dx, dy);
-      if (d > 0.8) {
-        const s = Math.min(d, SPEED * dt);
-        c.x += dx / d * s; c.y += dy / d * s;
-        c.walk += dt * 8;
-        c.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
-        c.moving = true;
-      } else {
-        c.moving = false;
-        if (c.phase === 'arriving') c.phase = 'queue';
-        if (c.phase === 'queue') c.dir = 'up';
-        if (c.phase === 'waiting') c.dir = 'down';
-        if (c.phase === 'ready' && c.payout) {
-          c.dir = 'up';
-          const p = c.payout; c.payout = null;
-          this.coins(c.x, c.y - 22, Math.min(14, 4 + Math.floor(p.total / 1500)));
-          g.pay(p, c);
-          c.phase = 'leaving'; c.mood = 'happy'; c.bubbleT = 3;
-        }
-        if (c.phase === 'leaving' && c.x > 265) g.customers.splice(g.customers.indexOf(c), 1);
-      }
-      if (c.bubbleT > 0) c.bubbleT -= dt;
     }
-    for (const p of this.particles) { p.vy += 260 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
+    for (const c of [...g.customers]) this.moveCustomer(c, dt);
+    this.updateKeeper(dt);
+    this.updateStreet(dt);
+    // automatdörren
+    const near = [...g.customers, ...this.walkers.filter((w) => w.enter)].some((c) => Math.abs(c.x - LY.DOOR.cx) < 24 && c.y > LY.SIDEWALK_Y - 4 && c.y < LY.WALL_Y + 20);
+    this.door = Math.max(0, Math.min(1, this.door + (near ? 3.2 : -1.6) * dt));
+    for (const p of this.particles) { p.vy += 520 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
     this.particles = this.particles.filter((p) => p.life > 0);
   }
 
+  pickSpot(c) {
+    const g = this.game;
+    const used = new Set(g.customers.filter((x) => x !== c && x.phase === 'waiting' && x._spot >= 0).map((x) => x._spot));
+    const kid = c.look && c.look.kid;
+    const cand = [];
+    LY.SPOTS.forEach((s, i) => {
+      if (used.has(i) || i === c._spot) return;
+      if (s.kind === 'case' && !this.vits[s.vit]) return;
+      const w = s.kind === 'seat' ? (kid ? 0.6 : 1.2) : s.kind === 'hero' ? (kid ? 3 : 1.2) : 1;
+      cand.push([i, w]);
+    });
+    if (!cand.length) return used.has(c._spot) || c._spot === undefined ? -1 : c._spot;
+    let r = Math.random() * cand.reduce((s, x) => s + x[1], 0);
+    for (const [i, w] of cand) { r -= w; if (r <= 0) return i; }
+    return cand[cand.length - 1][0];
+  }
+
+  targetFor(c) {
+    const g = this.game;
+    if (c.phase === 'arriving' || c.phase === 'queue') {
+      const i = Math.min(Math.max(0, g.queue().indexOf(c)), LY.QUEUE.length - 1);
+      return { x: LY.QUEUE[i][0], y: LY.QUEUE[i][1], dir: 'up', key: 'q' + i };
+    }
+    if (c.phase === 'waiting') {
+      if (c._spot === undefined || c._spot === null) { c._spot = this.pickSpot(c); c._stay = 12 + Math.random() * 14; }
+      if (c._spot < 0) { const o = OVERFLOW[c.id % OVERFLOW.length]; return { x: o[0], y: o[1], dir: 'down', key: 'o' + c.id }; }
+      const s = LY.SPOTS[c._spot];
+      return { x: s.x, y: s.y, dir: s.dir, sit: !!s.sit, via: s.via, key: 's' + c._spot };
+    }
+    c._spot = null;
+    if (c.phase === 'ready') {
+      const i = Math.min(g.customers.filter((x) => x.phase === 'ready').indexOf(c), LY.PICKUP.length - 1);
+      return { x: LY.PICKUP[i][0], y: LY.PICKUP[i][1], dir: 'up', key: 'p' + i };
+    }
+    if (c._exitX === undefined) c._exitX = LY.SPAWN_X[Math.random() < 0.5 ? 0 : 1];
+    return { x: c._exitX, y: LY.SIDEWALK_Y, out: true, key: 'out' };
+  }
+
+  plan(c, T) {
+    const D = LY.DOOR, pts = [];
+    let sx = c.x, sy = c.y;
+    const outside = c.y < LY.WALL_Y;
+    const inQueue = c.phase === 'arriving' || c.phase === 'queue';
+    const lane = inQueue ? [] : LY.queueLane(this.game.queue().filter((x) => x.y >= LY.WALL_Y).length);
+    if (c._seat && c._seat.via) { pts.push(c._seat.via); [sx, sy] = c._seat.via; }
+    c._seat = null;
+    if (T.out) {
+      if (!outside) { pts.push(...LY.route(sx, sy, D.cx, D.inY, lane)); pts.push([D.cx, LY.SIDEWALK_Y]); }
+      pts.push([T.x, T.y]);
+      return pts;
+    }
+    if (outside) { pts.push([D.cx, LY.SIDEWALK_Y], [D.cx, D.inY]); sx = D.cx; sy = D.inY; }
+    const goal = T.via || [T.x, T.y];
+    pts.push(...LY.route(sx, sy, goal[0], goal[1], lane));
+    if (T.via) pts.push([T.x, T.y]);
+    return pts;
+  }
+
+  moveCustomer(c, dt) {
+    const g = this.game;
+    if (c.bubbleT > 0) c.bubbleT -= dt;
+    if (c.phase === 'waiting' && !c.moving && c._spot >= 0) {
+      c._stay = (c._stay ?? 15) - dt;
+      if (c._stay <= 0) {
+        c._stay = 12 + Math.random() * 16;
+        if (Math.random() < 0.55) { const n = this.pickSpot(c); if (n >= 0) c._spot = n; }
+      }
+    }
+    const T = this.targetFor(c);
+    if (c._tkey !== T.key || !c._path) { c._path = this.plan(c, T); c._tkey = T.key; }
+    const path = c._path;
+    if (path.length) {
+      const [tx, ty] = path[0];
+      const dx = tx - c.x, dy = ty - c.y, d = Math.hypot(dx, dy);
+      const sp = (c.y < LY.WALL_Y ? OUT_SPEED : SPEED) * (c.look && c.look.kid ? 1.08 : 1) * dt;
+      if (d > 0.01) c.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
+      if (d <= sp) { c.x = tx; c.y = ty; path.shift(); } else { c.x += dx / d * sp; c.y += dy / d * sp; }
+      c.moving = true; c._sit = false;
+      c.walk = (c.walk || 0) + dt * 8.5;
+      return;
+    }
+    // framme
+    c.moving = false;
+    if (T.dir) c.dir = T.dir;
+    c._sit = !!T.sit;
+    if (T.sit && c._spot >= 0) c._seat = LY.SPOTS[c._spot];
+    if (c.phase === 'arriving' && T.key.startsWith('q')) c.phase = 'queue';
+    if (c.phase === 'ready' && T.key === 'p0') {
+      if (c.payout) {
+        const p = c.payout; c.payout = null;
+        this.coins(c.x, c.y - 42, Math.min(18, 5 + Math.floor(p.total / 1500)));
+        g.pay(p, c);
+      }
+      c.phase = 'leaving'; c.mood = c.mood === 'angry' ? c.mood : 'happy'; c.bubbleT = 3;
+    }
+    if (c.phase === 'leaving' && T.out && c.y < LY.WALL_Y) {
+      const i = g.customers.indexOf(c);
+      if (i >= 0) g.customers.splice(i, 1);
+    }
+  }
+
+  updateKeeper(dt) {
+    const k = this.keeper, g = this.game;
+    const ready = g.customers.some((c) => c.phase === 'ready' && c.y > LY.WALL_Y && Math.hypot(c.x - LY.PICKUP[0][0], c.y - LY.PICKUP[0][1]) < 110);
+    const tx = ready ? LY.KEEPER_PICKUP[0] : LY.KEEPER_HOME[0];
+    const dx = tx - k.x;
+    if (Math.abs(dx) > 0.5) {
+      k.x += Math.sign(dx) * Math.min(Math.abs(dx), 46 * dt);
+      k.dir = dx < 0 ? 'left' : 'right'; k.moving = true; k.walk += dt * 8;
+      return;
+    }
+    k.moving = false;
+    const front = g.queue()[0];
+    k.lookT -= dt;
+    if (k.lookT <= 0) {
+      k.look = ['down', 'down', 'left', 'right', 'up'][Math.floor(Math.random() * 5)];
+      k.lookT = k.look === 'down' ? 3 + Math.random() * 4 : 1.2 + Math.random();
+    }
+    k.dir = (front && front.phase === 'queue') || ready ? 'down' : k.look;
+  }
+
+  updateStreet(dt) {
+    this.carT -= dt;
+    if (this.carT <= 0) {
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      this.cars.push({ x: dir > 0 ? -34 : SC.STREET_W + 4, dir, img: this.carImgs[Math.floor(Math.random() * this.carImgs.length)], v: 55 + Math.random() * 35 });
+      this.carT = 2.5 + Math.random() * 6;
+    }
+    for (const c of this.cars) c.x += c.dir * c.v * dt;
+    this.cars = this.cars.filter((c) => c.x > -40 && c.x < SC.STREET_W + 10);
+    this.walkerT -= dt;
+    if (this.walkerT <= 0 && this.walkers.length < 2) {
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      this.walkers.push({ x: dir > 0 ? -16 : SC.STREET_W + 14, y: LY.SIDEWALK_Y - 3, dir, look: makeLook(), v: 30 + Math.random() * 14, walk: 0 });
+      this.walkerT = 7 + Math.random() * 14;
+    }
+    for (const w of this.walkers) { w.x += w.dir * w.v * dt; w.walk += dt * 7; }
+    this.walkers = this.walkers.filter((w) => w.x > -20 && w.x < SC.STREET_W + 20);
+  }
+
   coins(x, y, n) {
-    for (let i = 0; i < n; i++) this.particles.push({ x, y, vx: (Math.random() - 0.5) * 70, vy: -90 - Math.random() * 70, life: 0.9 + Math.random() * 0.4 });
+    for (let i = 0; i < n; i++) this.particles.push({ x, y, vx: (Math.random() - 0.5) * 140, vy: -180 - Math.random() * 140, life: 0.9 + Math.random() * 0.4 });
   }
 
   // ---------- Input ----------
@@ -85,9 +267,15 @@ export class Floor {
   }
   hit(e) {
     const [x, y] = this.toLocal(e);
-    let best = null;
+    let best = null, bestScore = -1;
     for (const c of this.game.customers) {
-      if (x > c.x - 7 && x < c.x + 7 && y > c.y - 30 && y < c.y + 2) if (!best || c.y > best.y) best = c;
+      if (c.y < LY.WALL_Y) continue;
+      const cl = this.clickable(c), kid = c.look && c.look.kid;
+      const hw = cl ? 14 : 9, top = c.y - (kid ? 30 : 39) - (cl ? 18 : 0);
+      if (x > c.x - hw && x < c.x + hw && y > top && y < c.y + 4) {
+        const score = (cl ? 1000 : 0) + c.y;
+        if (score > bestScore) { best = c; bestScore = score; }
+      }
     }
     return best;
   }
@@ -97,167 +285,435 @@ export class Floor {
     if (c && this.onCustomerClick) this.onCustomerClick(c);
   }
 
-  // ---------- Rendering ----------
+  // ---------- Skalning ----------
   resize() {
     const dpr = window.devicePixelRatio || 1;
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
     this.canvas.width = Math.round(w * dpr); this.canvas.height = Math.round(h * dpr);
-    const top = 52, bottom = w < 760 ? Math.min(h * 0.36, 230) : 10;
-    const sc = Math.min(w / FW, (h - top - bottom) / FH);
-    this.scale = sc >= 2 ? Math.floor(sc * 2) / 2 : sc;
-    this.offX = Math.round((w - FW * this.scale) / 2);
-    this.offY = Math.round(top + (h - top - bottom - FH * this.scale) / 2);
-    if (w >= 760) this.offX = Math.max(10, Math.min(this.offX, w - 310 - FW * this.scale));
+    const wide = w >= 760;
+    const hud = document.getElementById('hud');
+    const top = Math.max(52, hud && hud.offsetHeight ? hud.offsetHeight + 4 : 52), bottom = wide ? 10 : Math.min(h * 0.36, 230);
+    const availW = wide ? w - 330 : w - 8, availH = h - top - bottom;
+    let sc = Math.max(0.2, Math.min(availW / FW, availH / FH));
+    if (sc >= 2) sc = Math.floor(sc * 2) / 2;
+    else if (sc >= 1 && dpr >= 2) sc = Math.floor(sc * dpr) / dpr;
+    this.scale = sc;
+    this.offX = Math.round((w - FW * sc) / 2);
+    this.offY = Math.round(top + Math.max(0, availH - FH * sc) / 2);
+    if (wide) this.offX = Math.max(10, Math.min(this.offX, w - 320 - FW * sc));
     this.dpr = dpr;
   }
 
+  // ---------- Rendering ----------
   draw() {
-    const ctx = this.ctx, g = this.game, th = this.shop.theme;
-    this.drawRoom(ctx, th);
-    // y-sorterade figurer + möbler
-    const sprites = [];
-    sprites.push({ y: 69, draw: () => drawPerson(ctx, 128, 69, SHOPKEEPER, 'down', Math.floor(this.t * 1.5) % 8 === 0 ? 1 : 0) });
-    sprites.push({ y: 84, draw: () => this.drawCounter(ctx, th) });
-    for (const [sx, sy] of SEATS) sprites.push({ y: sy - 3, draw: () => this.drawChair(ctx, sx, sy) });
-    sprites.push({ y: 186, draw: () => this.drawShowcase(ctx) });
-    for (const [px, py] of [[12, 60], [244, 60], [86, 150]]) sprites.push({ y: py, draw: () => this.drawPlant(ctx, px, py) });
-    for (const c of g.customers) sprites.push({ y: c.y, draw: () => this.drawCustomer(ctx, c) });
-    sprites.sort((a, b) => a.y - b.y);
-    for (const s of sprites) s.draw();
-    // ovanpå: bubblor
-    for (const c of g.customers) this.drawBubble(ctx, c);
-    ctx.fillStyle = '#f5c542';
-    for (const p of this.particles) { ctx.fillRect(p.x | 0, p.y | 0, 3, 3); ctx.fillStyle = '#b8860b'; ctx.fillRect((p.x | 0) + 2, (p.y | 0) + 2, 1, 1); ctx.fillStyle = '#f5c542'; }
+    const ctx = this.ctx, g = this.game, t = this.t;
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    this.refreshStock();
 
+    // gatan bakom fönstren
+    ctx.drawImage(this.street, 0, 0);
+    const cx = -((t * 2.5) % SC.STREET_W);
+    ctx.drawImage(this.clouds, Math.round(cx), 6); ctx.drawImage(this.clouds, Math.round(cx) + SC.STREET_W, 6);
+    for (const car of this.cars) {
+      const y = car.dir > 0 ? 52 : 46;
+      if (car.dir > 0) ctx.drawImage(car.img, Math.round(car.x), y);
+      else { ctx.save(); ctx.translate(Math.round(car.x) + 30, y); ctx.scale(-1, 1); ctx.drawImage(car.img, 0, 0); ctx.restore(); }
+    }
+    ctx.drawImage(this.street, 0, 66, SC.STREET_W, LY.WALL_Y - 66, 0, 66, SC.STREET_W, LY.WALL_Y - 66);
+    const outside = [
+      ...this.walkers.map((w) => ({ y: w.y, x: w.x, look: w.look, dir: w.dir > 0 ? 'right' : 'left', f: WALK_SEQ[Math.floor(w.walk) % 4] })),
+      ...g.customers.filter((c) => c.y < LY.WALL_Y).map((c) => ({ y: c.y, x: c.x, look: c.look, dir: c.dir, f: c.moving ? WALK_SEQ[Math.floor(c.walk) % 4] : 0 })),
+    ].sort((a, b) => a.y - b.y);
+    for (const p of outside) drawPerson(ctx, p.x, p.y, p.look, p.dir, p.f);
+
+    // rummet
+    ctx.drawImage(this.room, 0, 0);
+    this.drawWallLife(ctx);
+    this.drawDoor(ctx);
+
+    // y-sorterade möbler och personer
+    const S = [];
+    for (const f of this.furniture) S.push([f.sort, () => ctx.drawImage(f.img, f.x, f.y)]);
+    const k = this.keeper;
+    S.push([k.y, () => drawPerson(ctx, k.x, k.y, SHOPKEEPER, k.dir, k.moving ? WALK_SEQ[Math.floor(k.walk) % 4] : (Math.sin(t * 2.1) > 0.7 ? 4 : 0))]);
+    S.push([LY.COUNTER.base, () => this.drawCounter(ctx)]);
+    this.vits.forEach((vt) => S.push([vt.v.base, () => ctx.drawImage(vt.img, vt.v.x0, vt.v.base - PR.VIT.H + 1)]));
+    S.push([LY.ROPE.back, () => ctx.drawImage(this.ropeBack.img, this.ropeBack.x, this.ropeBack.y)]);
+    S.push([LY.HERO.base, () => this.drawHero(ctx)]);
+    S.push([LY.ROPE.front, () => ctx.drawImage(this.ropeFront.img, this.ropeFront.x, this.ropeFront.y)]);
+    for (const c of g.customers) {
+      if (c.y < LY.WALL_Y) continue;
+      const frame = c.moving ? WALK_SEQ[Math.floor(c.walk) % 4] : c._sit ? 5 : (Math.sin(t * 1.9 + c.id * 1.7) > 0.72 ? 4 : 0);
+      S.push([c._sit ? c.y + 2 : c.y, () => drawPerson(ctx, c.x, c.y, c.look, c._sit ? 'down' : c.dir, frame)]);
+    }
+    S.sort((a, b) => a[0] - b[0]);
+    for (const s of S) s[1]();
+
+    // ljuskäglor
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.85 + 0.15 * Math.sin(t * 0.7);
+    ctx.drawImage(this.beams, 0, 0);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+
+    for (const c of g.customers) if (c.y >= LY.WALL_Y) this.drawBubble(ctx, c);
+    for (const p of this.particles) {
+      const x = p.x | 0, y = p.y | 0, spin = Math.floor((p.life * 10) % 3);
+      ctx.fillStyle = '#8a5a0b'; ctx.fillRect(x - 1, y - 1, spin === 1 ? 3 : 6, 6);
+      ctx.fillStyle = '#f5c542'; ctx.fillRect(x, y, spin === 1 ? 1 : 4, 4);
+      ctx.fillStyle = '#fff4b0'; ctx.fillRect(x, y, 1, 1);
+    }
+
+    // ut till skärmen
     const out = this.canvas.getContext('2d');
     out.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     out.fillStyle = '#2a2433'; out.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    const W = FW * this.scale, H = FH * this.scale;
+    out.fillStyle = 'rgba(0,0,0,.35)'; out.fillRect(this.offX + 6, this.offY + 6, W, H);
+    out.fillStyle = '#17151a'; out.fillRect(this.offX - 3, this.offY - 3, W + 6, H + 6);
     out.imageSmoothingEnabled = false;
-    out.drawImage(this.buf, this.offX, this.offY, FW * this.scale, FH * this.scale);
+    out.drawImage(this.buf, this.offX, this.offY, W, H);
   }
 
-  drawRoom(ctx, th) {
-    // golv
-    for (let y = 46; y < FH; y += 12) for (let x = 0; x < FW; x += 16) {
-      ctx.fillStyle = ((x / 16 + (y - 46) / 12) & 1) ? th.floorA : th.floorB;
-      ctx.fillRect(x, y, 16, 12);
-    }
-    // bakvägg
-    ctx.fillStyle = th.wall; ctx.fillRect(0, 0, FW, 46);
-    ctx.fillStyle = th.wallDark; ctx.fillRect(0, 42, FW, 4);
-    for (let x = 0; x < FW; x += 8) { ctx.fillStyle = 'rgba(255,255,255,.04)'; ctx.fillRect(x, 0, 1, 42); }
-    // sidoväggar + entrédörr
-    ctx.fillStyle = th.wallDark; ctx.fillRect(0, 46, 4, FH - 46); ctx.fillRect(FW - 4, 46, 4, FH - 46);
-    ctx.fillStyle = '#9fd8ef'; ctx.fillRect(FW - 4, 152, 4, 36);
-    ctx.fillStyle = '#c8b27a'; ctx.fillRect(222, 186, 30, 6); // dörrmatta
-    // matta vid kön
-    ctx.fillStyle = '#7a1d24'; ctx.fillRect(110, 88, 36, 68); ctx.fillStyle = '#9e1b22'; ctx.fillRect(112, 90, 32, 64);
-    ctx.fillStyle = '#e8b230'; for (let y = 94; y < 152; y += 8) ctx.fillRect(126, y, 4, 2);
-    // neonskylt
-    const sign = this.shop.sign, sw = textWidth(sign, 2);
-    const sx = Math.round((FW - sw) / 2);
-    ctx.fillStyle = '#1b1f2a'; ctx.fillRect(sx - 6, 3, sw + 12, 16);
-    const glow = 0.75 + 0.25 * Math.sin(this.t * 3);
-    ctx.globalAlpha = 0.35 * glow; drawText(ctx, sign, sx + 1, 7, th.neon, 2); ctx.globalAlpha = 1;
-    drawText(ctx, sign, sx, 6, th.neon, 2);
-    // verkstadsdörr bakom disken
-    ctx.fillStyle = '#1b1f2a'; ctx.fillRect(109, 21, 38, 8);
-    drawText(ctx, 'VERKSTAD', 113, 22, '#e8b230');
-    ctx.fillStyle = '#5a3d2b'; ctx.fillRect(114, 29, 28, 15); ctx.fillStyle = '#6e4b35'; ctx.fillRect(116, 31, 11, 13); ctx.fillRect(129, 31, 11, 13);
-    ctx.fillStyle = '#e8b230'; ctx.fillRect(125, 37, 2, 2);
-    // hyllor med lagret
-    this.drawShelf(ctx, 5, 12, 0); this.drawShelf(ctx, 183, 12, 1);
+  // lagret ändras → rita om montrar och vägghylla
+  refreshStock() {
+    this.sigT -= 1 / 60;
+    if (this.sig !== null && this.sigT > 0) return;
+    this.sigT = 0.25;
+    const g = this.game, shop = this.shop;
+    const sig = shop.parts.map((p) => g.stockFree(p.id)).join(',');
+    if (sig === this.sig) return;
+    this.sig = sig;
+    this.vits.forEach((vt) => { vt.img = this.renderVitrine(vt); });
+    this.shelfImg = this.renderShelf();
   }
 
-  drawShelf(ctx, x, y, side) {
-    const g = this.game, cats = this.shop.catOrder;
-    const mine = cats.filter((_, i) => i % 2 === side);
-    ctx.fillStyle = '#6b4a33'; ctx.fillRect(x, y, 68, 32);
-    ctx.fillStyle = '#4e3524'; ctx.fillRect(x + 2, y + 2, 64, 28);
-    mine.forEach((cat, r) => {
-      const n = this.shop.parts.filter((p) => p.cat === cat).reduce((s, p) => s + g.stockFree(p.id), 0);
-      const col = this.shop.cats[cat].color;
-      const row = y + 2 + r * 7;
-      ctx.fillStyle = '#8a6448'; ctx.fillRect(x + 2, row + 6, 64, 1);
-      for (let i = 0; i < Math.min(n, 10); i++) {
-        ctx.fillStyle = col; ctx.fillRect(x + 4 + i * 6, row + 1, 5, 5);
-        ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(x + 4 + i * 6, row + 1, 5, 1);
-      }
+  renderVitrine(vt) {
+    const { sc, v, frame } = vt, g = this.game, W = v.x1 - v.x0, { GH, D, H } = PR.VIT;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+    x.drawImage(frame.under, 0, 0);
+    const parts = this.shop.parts.filter((p) => p.cat === sc.cat && g.stockFree(p.id) > 0).sort((a, b) => (b.cost || 0) - (a.cost || 0)).slice(0, 6);
+    const wide = W > 140;
+    const [iw, ih] = wide ? [46, 30] : [34, 26];
+    // upp till 3 i en rad, annars bakre rad (3) + främre rad förskjuten som tegel
+    const n = parts.length, two = n > 3, cols = two ? 3 : Math.max(1, n), cell = (W - 8) / (two ? 3.5 : cols);
+    const placed = parts.map((p, i) => {
+      const r = two && i >= 3 ? 1 : 0, k = r ? i - 3 : i;
+      const cx = two ? 4 + cell * (k + (r ? 1 : 0.5)) : 4 + (W - 8) * (k + 0.5) / cols;
+      const bottom = GH + (two ? (r ? D - 3 : D * 0.5) : D * 0.78);
+      return { p, cx, bottom };
     });
+    for (const it of placed) {
+      x.fillStyle = 'rgba(8,4,14,.45)';
+      x.fillRect(Math.round(it.cx - iw * 0.3), Math.round(it.bottom - 3), Math.round(iw * 0.6), 2);
+      x.drawImage(this.icon(it.p, iw, ih), Math.round(it.cx - iw / 2), Math.round(it.bottom - ih + 1));
+    }
+    for (const it of placed) {
+      const label = '×' + g.stockFree(it.p.id), tw = textW(SMALL, label) + 3;
+      const tx = Math.round(it.cx + iw * 0.18), ty = Math.round(it.bottom - 8);
+      x.fillStyle = '#17151a'; x.fillRect(tx - 1, ty - 1, tw + 2, 9);
+      x.fillStyle = '#f4efe2'; x.fillRect(tx, ty, tw, 7);
+      ctxText(x, SMALL, label, tx + 2, ty + 1, '#17151a');
+    }
+    if (!parts.length) {
+      const label = 'SLUT I LAGER', tw = textW(SMALL, label) + 8, tx = Math.round((W - tw) / 2), ty = GH + 12;
+      x.fillStyle = 'rgba(8,4,14,.45)'; x.fillRect(tx + 2, ty + 2, tw, 11);
+      x.fillStyle = '#f4efe2'; x.fillRect(tx, ty, tw, 11);
+      x.fillStyle = '#c9323a'; x.fillRect(tx, ty, tw, 1); x.fillRect(tx, ty + 10, tw, 1);
+      ctxText(x, SMALL, label, tx + 4, ty + 3, '#9e1b22');
+    }
+    x.drawImage(frame.over, 0, 0);
+    return c;
   }
 
-  drawCounter(ctx, th) {
-    ctx.fillStyle = '#1d1a20'; ctx.fillRect(58, 70, 142, 16);
-    ctx.fillStyle = '#e8e1d2'; ctx.fillRect(60, 64, 138, 8);      // bänkskiva
-    ctx.fillStyle = '#cfc6b3'; ctx.fillRect(60, 71, 138, 1);
-    ctx.fillStyle = th.counter; ctx.fillRect(60, 72, 138, 12);    // front
-    ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(60, 81, 138, 3);
-    ctx.fillStyle = '#e8b230'; ctx.fillRect(60, 75, 138, 1);
-    drawText(ctx, 'BESTÄLL', 90, 77, '#fff');
-    drawText(ctx, 'UTLÄMNING', 155, 77, '#fff');
-    // kassa
-    ctx.fillStyle = '#3a3d42'; ctx.fillRect(146, 58, 14, 8); ctx.fillStyle = '#7ee8a0'; ctx.fillRect(148, 59, 10, 3);
-    // skärm
-    ctx.fillStyle = '#23262b'; ctx.fillRect(86, 54, 18, 11); ctx.fillStyle = '#3c78d8'; ctx.fillRect(88, 56, 14, 7);
-    ctx.fillStyle = '#23262b'; ctx.fillRect(94, 65, 2, 1);
-    // en dator som visas upp
-    ctx.fillStyle = '#2a2c30'; ctx.fillRect(66, 52, 10, 13); ctx.fillStyle = '#7ee8fa'; ctx.fillRect(68, 54, 1, 9); ctx.fillStyle = '#e07a2e'; ctx.fillRect(71, 56, 3, 3);
+  renderShelf() {
+    const shop = this.shop, g = this.game, S = SC.SHELF;
+    const shown = new Set((shop.showcases || []).map((s) => s.cat));
+    const cats = (shop.catOrder || Object.keys(shop.cats || {})).filter((c) => !shown.has(c)).slice(0, 6);
+    const c = document.createElement('canvas'); c.width = S.x1 - S.x0; c.height = 60;
+    const x = c.getContext('2d');
+    const oy = 20, gw = (S.x1 - S.x0 - 8) / 3;
+    const SIZE = { case: [10, 15], mb: [14, 10], psu: [11, 8], cooler: [9, 11], storage: [9, 6], fans: [11, 11] };
+    cats.forEach((cat, i) => {
+      const board = S.boards[i < 3 ? 0 : 1], gx = 4 + (i % 3) * gw;
+      const col = shop.cats?.[cat]?.color || '#8a8f9c';
+      x.fillStyle = col; x.fillRect(Math.round(gx + gw / 2 - 3), board + 2 - oy, 6, 2);
+      const parts = shop.parts.filter((p) => p.cat === cat && g.stockFree(p.id) > 0).sort((a, b) => (b.cost || 0) - (a.cost || 0));
+      const boxes = [];
+      for (const p of parts) for (let n = 0; n < Math.min(2, g.stockFree(p.id)) && boxes.length < 3; n++) boxes.push(p);
+      const [bw, bh] = SIZE[cat] || [10, 10];
+      const span = bw + (boxes.length - 1) * Math.max(4, Math.min(bw - 2, (gw - 2 - bw) / Math.max(1, boxes.length - 1)));
+      boxes.forEach((p, j) => {
+        const L = p.look || {};
+        const base = hex(L.color || L.pcb || L.fan || L.label || L.frame, hex(col, 0x8a8f9c));
+        const bx = Math.round(gx + (gw - span) / 2 + j * (boxes.length > 1 ? (span - bw) / (boxes.length - 1) : 0)), by = board - bh - oy;
+        x.fillStyle = css(mul(base, 0.55)); x.fillRect(bx - 1, by - 1, bw + 2, bh + 1);
+        x.fillStyle = css(base); x.fillRect(bx, by, bw, bh);
+        x.fillStyle = css(mix(base, 0xffffff, 0.35)); x.fillRect(bx, by, bw, 1); x.fillRect(bx, by, 1, bh);
+        x.fillStyle = col; x.fillRect(bx, by + Math.round(bh * 0.55), bw, 2);
+        x.fillStyle = '#f4f1ea'; x.fillRect(bx + 2, by + 2, 2, 2);
+        x.fillStyle = css(mul(base, 0.7)); x.fillRect(bx + bw - 1, by + 1, 1, bh - 1);
+      });
+    });
+    return c;
   }
 
-  drawPlant(ctx, x, y) {
-    const sway = Math.round(Math.sin(this.t * 1.3 + x) * 0.6);
-    ctx.fillStyle = '#b5652f'; ctx.fillRect(x - 4, y - 6, 8, 6); ctx.fillStyle = '#8c4a22'; ctx.fillRect(x - 4, y - 6, 8, 1);
-    ctx.fillStyle = '#2f8f46'; ctx.fillRect(x - 5 + sway, y - 12, 4, 6); ctx.fillRect(x + 1 + sway, y - 13, 4, 7); ctx.fillRect(x - 2 + sway, y - 16, 4, 9);
-    ctx.fillStyle = '#45b964'; ctx.fillRect(x - 1 + sway, y - 15, 2, 5); ctx.fillRect(x + 2 + sway, y - 12, 2, 3);
+  drawWallLife(ctx) {
+    const t = this.t, [nx0, ny0, nx1, ny1] = SC.NEON_BOX;
+    // neonskylt med flimmer
+    const flick = (Math.sin(t * 23) > 0.985 || (t % 11) < 0.08) ? 0.55 : 0.93 + 0.07 * Math.sin(t * 3);
+    ctx.globalAlpha = flick;
+    const n = this.neon;
+    ctx.drawImage(n.img, Math.round((nx0 + nx1 - n.img.width) / 2), Math.round((ny0 + ny1 - n.img.height) / 2) + 1);
+    ctx.globalAlpha = (t % 7) < 0.15 ? 0.35 : 0.95;
+    ctx.drawImage(this.open.img, 146 - (this.open.img.width >> 1), 21);
+    ctx.globalAlpha = 1;
+    if (this.shelfImg) ctx.drawImage(this.shelfImg, SC.SHELF.x0, 20);
+    // klockan (riktig tid)
+    const [cx, cy] = SC.CLOCK, now = new Date();
+    const hand = (ang, len, col) => {
+      ctx.fillStyle = col;
+      for (let i = 1; i <= len; i++) ctx.fillRect(Math.round(cx + Math.sin(ang) * i), Math.round(cy - Math.cos(ang) * i), 1, 1);
+    };
+    const mins = now.getMinutes() + now.getSeconds() / 60;
+    hand((now.getHours() % 12 + mins / 60) / 12 * Math.PI * 2, 4, '#17151a');
+    hand(mins / 60 * Math.PI * 2, 6, '#3a3d48');
+    hand(now.getSeconds() / 60 * Math.PI * 2, 5, '#c9323a');
+    ctx.fillStyle = '#17151a'; ctx.fillRect(cx, cy, 1, 1);
+    this.drawTv(ctx);
   }
 
-  drawChair(ctx, x, y) {
-    ctx.fillStyle = '#2c6fb7'; ctx.fillRect(x - 7, y - 6, 14, 5);
-    ctx.fillStyle = '#1f4f85'; ctx.fillRect(x - 7, y - 1, 14, 2); ctx.fillRect(x - 6, y + 1, 2, 3); ctx.fillRect(x + 4, y + 1, 2, 3);
+  drawTv(ctx) {
+    const [x0, y0, x1, y1] = SC.TV, w = x1 - x0, h = y1 - y0, t = this.t, scene = Math.floor(t / 5) % 3, lt = t % 5;
+    for (let y = 0; y < h; y++) { ctx.fillStyle = css(mix(0x0c1030, scene === 1 ? 0x4a0f1c : 0x1f3a2a, y / h)); ctx.fillRect(x0, y0 + y, w, 1); }
+    if (scene === 0 && this.heroPart) {
+      const ic = this.icon(this.heroPart, 30, 20), sx = Math.round(x0 + w / 2 - 15 + Math.max(0, 1 - lt * 1.5) * 30);
+      ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
+      ctx.drawImage(ic, sx, y0 + 1);
+      ctx.restore();
+      const title = this.heroTitle.split(' ').slice(0, 2).join(' ');
+      ctxText(ctx, SMALL, title, x0 + Math.round((w - textW(SMALL, title)) / 2), y1 - 7, lt % 0.8 < 0.6 ? '#76ff4a' : '#ffffff');
+    } else if (scene === 1) {
+      const on = lt % 0.7 < 0.5;
+      ctxText(ctx, BIG, 'REA', x0 + Math.round((w - textW(BIG, 'REA')) / 2), y0 + 5, on ? '#ffd23a' : '#ff6a6a');
+      ctxText(ctx, SMALL, 'BYGG DIN PC', x0 + Math.round((w - textW(SMALL, 'BYGG DIN PC')) / 2), y0 + 17, '#ffffff');
+    } else {
+      const txt = (this.shop.sign || '') + '   ', tw = textW(SMALL, txt);
+      const off = Math.round((lt * 22) % (tw + 4));
+      ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
+      ctxText(ctx, SMALL, txt + txt, x0 + 2 - off, y0 + 11, '#7ee8fa');
+      ctx.restore();
+      for (let i = 0; i < 5; i++) { ctx.fillStyle = css(hsl(t * 90 + i * 60, 0.9, 0.6)); ctx.fillRect(x0 + 6 + i * 8, y0 + 4, 5, 2); }
+    }
+    ctx.fillStyle = 'rgba(255,255,255,.10)'; ctx.fillRect(x0, y0, w, 1);
+    for (let y = y0; y < y1; y += 2) { ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(x0, y, w, 1); }
   }
 
-  drawShowcase(ctx) {
-    ctx.fillStyle = '#6b4a33'; ctx.fillRect(170, 176, 44, 12);
-    ctx.fillStyle = '#8a6448'; ctx.fillRect(170, 174, 44, 3);
-    ctx.fillStyle = '#1b1b1b'; ctx.fillRect(178, 160, 12, 15);
-    const hue = (this.t * 90) % 360;
-    ctx.fillStyle = `hsl(${hue},90%,60%)`; ctx.fillRect(180, 162, 1, 11);
-    ctx.fillStyle = '#23262b'; ctx.fillRect(194, 162, 16, 11); ctx.fillStyle = '#6ad26a'; ctx.fillRect(196, 164, 12, 7);
+  drawDoor(ctx) {
+    const { x0, x1 } = LY.DOOR, y0 = 26, y1 = LY.WALL_Y, half = (x1 - x0) / 2;
+    const e = this.door * this.door * (3 - 2 * this.door), open = Math.round(e * (half - 3));
+    ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
+    const panel = (px, flipH) => {
+      const pw = Math.ceil(half);
+      ctx.fillStyle = 'rgba(214,236,255,.2)'; ctx.fillRect(px, y0, pw, y1 - y0);
+      ctx.fillStyle = 'rgba(255,255,255,.28)';
+      for (let y = y0; y < y1; y++) { const k = (y - y0) % 38; if (k < 14) ctx.fillRect(px + ((y * 1) % pw + (flipH ? 9 : 3)) % pw, y, k < 11 ? 2 : 1, 1); }
+      ctx.fillStyle = '#3b4150'; ctx.fillRect(px, y0, pw, 2); ctx.fillRect(px, y1 - 3, pw, 3); ctx.fillRect(px, y0, 2, y1 - y0); ctx.fillRect(px + pw - 2, y0, 2, y1 - y0);
+      ctx.fillStyle = '#6d7486'; ctx.fillRect(px, y0, pw, 1); ctx.fillRect(px, y0, 1, y1 - y0);
+      ctx.fillStyle = '#c8ccd6'; ctx.fillRect(flipH ? px + 4 : px + pw - 6, y0 + 22, 2, 14);
+      ctx.fillStyle = '#e8b230'; ctx.fillRect(px + 2, y0 + 38, pw - 4, 1);
+    };
+    panel(x0 - open, false);
+    panel(x0 + Math.floor(half) + open, true);
+    // öppettider-dekal
+    ctx.fillStyle = '#f4f1ea'; ctx.fillRect(x0 - open + 6, y0 + 8, 11, 12);
+    ctx.fillStyle = '#9aa0aa'; for (let i = 0; i < 4; i++) ctx.fillRect(x0 - open + 8, y0 + 10 + i * 2, 7, 1);
+    ctx.restore();
   }
 
-  drawCustomer(ctx, c) {
-    const frame = c.moving ? (Math.floor(c.walk) % 2) + 1 : 0;
-    drawPerson(ctx, c.x, c.y, c.look, c.dir, frame);
+  drawCounter(ctx) {
+    const c = this.counter, t = this.t;
+    ctx.drawImage(c.img, c.x, c.y);
+    // demodatorns rgb-fläktar
+    for (const [fx, fy, ph] of [[386, 101, 0], [386, 114, 120]]) {
+      for (let a = 0; a < 8; a++) {
+        const ang = a / 8 * Math.PI * 2;
+        ctx.fillStyle = css(hsl(t * 120 + ph + a * 45, 0.95, 0.6));
+        ctx.fillRect(Math.round(fx + Math.cos(ang) * 4), Math.round(fy + Math.sin(ang) * 4), 1, 1);
+      }
+      ctx.fillStyle = '#2a2d33'; ctx.fillRect(fx - 1, fy - 1, 3, 3);
+      const sp = t * 12;
+      ctx.fillStyle = '#5a5f6a'; ctx.fillRect(Math.round(fx + Math.cos(sp) * 2), Math.round(fy + Math.sin(sp) * 2), 1, 1);
+    }
+    ctx.fillStyle = css(hsl(t * 120, 0.9, 0.55)); ctx.fillRect(381, 94, 1, 26);
+    // färdiga datorer som väntar på upphämtning
+    const ready = this.game.customers.filter((x) => x.phase === 'ready').length;
+    for (let i = 0; i < Math.min(3, ready); i++) {
+      const bx = 428 + i * 22, by = 98;
+      ctx.fillStyle = '#17151a'; ctx.fillRect(bx - 1, by - 1, 20, 25);
+      ctx.fillStyle = '#c9a36b'; ctx.fillRect(bx, by + 4, 18, 19);
+      ctx.fillStyle = '#e0c08a'; ctx.fillRect(bx, by, 18, 4);
+      ctx.fillStyle = '#9e7a48'; ctx.fillRect(bx + 16, by + 4, 2, 19);
+      ctx.fillStyle = '#2c6fb7'; ctx.fillRect(bx + 3, by + 9, 11, 7);
+      ctx.fillStyle = '#7ee8fa'; ctx.fillRect(bx + 5, by + 11, 3, 3);
+      ctx.fillStyle = '#e8b230'; ctx.fillRect(bx, by + 2, 18, 1);
+    }
+  }
+
+  drawHero(ctx) {
+    const B = PR.HERO_BOX, t = this.t, x = LY.HERO.cx - B.ax, y = LY.HERO.base - B.ay;
+    const [c0, ct, c1, cb] = B.cube;
+    const hue = (t * 70) % 360;
+    // färgat sken bakom kuben
+    for (let r = 4; r >= 1; r--) {
+      ctx.fillStyle = css(hsl(hue + r * 20, 0.95, 0.6));
+      ctx.globalAlpha = 0.07 * (5 - r);
+      ctx.fillRect(x + c0 - r, y + ct - 3 - r, c1 - c0 + r * 2, cb - ct + 3 + r * 2);
+    }
+    ctx.globalAlpha = 1;
+    ctx.drawImage(this.heroUnder, x, y);
+    // rgb-ljus på kubens botten
+    const floorY = y + cb - 9;
+    for (let i = 0; i < 5; i++) {
+      ctx.fillStyle = css(hsl(hue + i * 12, 1, 0.55));
+      ctx.globalAlpha = 0.18 - i * 0.03;
+      ctx.fillRect(x + c0 + 4 + i * 3, floorY - i, c1 - c0 - 8 - i * 6, 4 + i * 2);
+    }
+    ctx.globalAlpha = 1;
+    if (this.heroIcon) {
+      const bob = Math.round(Math.sin(t * 1.6) * 1.2);
+      ctx.drawImage(this.heroIcon, x + Math.round((c0 + c1 - this.heroIcon.width) / 2), y + cb - this.heroIcon.height - 3 + bob);
+    }
+    ctx.drawImage(this.heroOver, x, y);
+    // kanter i rgb
+    ctx.fillStyle = css(hsl(hue, 1, 0.62));
+    ctx.globalAlpha = 0.75;
+    ctx.fillRect(x + c0, y + ct + B.cubeD, 1, cb - ct - B.cubeD); ctx.fillRect(x + c1 - 1, y + ct + B.cubeD, 1, cb - ct - B.cubeD);
+    ctx.fillRect(x + c0, y + cb - 1, c1 - c0, 1);
+    ctx.globalAlpha = 1;
+    // ljussvep över glaset
+    const cycle = t % 4.5;
+    if (cycle < 0.9) {
+      const k = cycle / 0.9, sweep = x + c0 - 50 + k * (c1 - c0 + 100);
+      ctx.save(); ctx.beginPath(); ctx.rect(x + c0 + 1, y + ct, c1 - c0 - 2, cb - ct); ctx.clip();
+      for (let yy = y + ct; yy < y + cb; yy++) {
+        const sx = Math.round(sweep - (yy - y - ct) * 0.8);
+        ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fillRect(sx, yy, 4, 1);
+        ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fillRect(sx + 7, yy, 2, 1);
+      }
+      ctx.restore();
+    }
+    // gnistor
+    for (const [sx, sy, ph] of [[c0 - 3, ct - 4, 0], [c1 + 2, ct + 20, 2.1], [c0 + 8, cb - 6, 4.2]]) {
+      const a = Math.max(0, Math.sin(t * 2.3 + ph));
+      if (a < 0.2) continue;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x + sx, y + sy - 2, 1, 5); ctx.fillRect(x + sx - 2, y + sy, 5, 1);
+      ctx.globalAlpha = 1;
+    }
+    // led-list i podiet
+    const [p0, , p1, pb] = B.ped;
+    for (let i = p0 + 2; i < p1 - 2; i++) { ctx.fillStyle = css(hsl(hue - i * 6, 1, 0.58)); ctx.fillRect(x + i, y + pb - 5, 1, 2); }
   }
 
   drawBubble(ctx, c) {
-    const x = Math.round(c.x), top = Math.round(c.y) - 26 + (c.look.kid ? 3 : 0);
+    const t = this.t, x = Math.round(c.x), kid = c.look && c.look.kid;
+    const head = Math.round(c.y) - (kid ? 29 : 38) + (c._sit ? 4 : 0);
+    const INK = '#17151a';
     if (this.clickable(c) && !c.moving) {
-      const bob = Math.round(Math.sin(this.t * 6) * 1.5);
-      ctx.fillStyle = '#17151a'; ctx.fillRect(x - 5, top - 10 + bob, 11, 11);
-      ctx.fillStyle = '#e8b230'; ctx.fillRect(x - 4, top - 9 + bob, 9, 9);
-      ctx.fillStyle = '#17151a'; ctx.fillRect(x, top - 8 + bob, 1, 4); ctx.fillRect(x, top - 3 + bob, 1, 1);
-      ctx.fillRect(x - 1, top + 1 + bob, 3, 1);
+      const bob = Math.round(Math.sin(t * 6) * 1.5), by = head - 21 + bob;
+      ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x - 7, by + 2, 17, 17);
+      ctx.fillStyle = INK; ctx.fillRect(x - 9, by, 17, 17); ctx.fillRect(x - 2, by + 17, 3, 2); ctx.fillRect(x - 1, by + 19, 1, 1);
+      ctx.fillStyle = '#e8b230'; ctx.fillRect(x - 8, by + 1, 15, 15); ctx.fillRect(x - 1, by + 16, 1, 2);
+      ctx.fillStyle = '#ffe28a'; ctx.fillRect(x - 8, by + 1, 15, 2); ctx.fillRect(x - 8, by + 1, 2, 15);
+      ctx.fillStyle = '#b88418'; ctx.fillRect(x - 8, by + 14, 15, 2);
+      ctx.fillStyle = INK; ctx.fillRect(x - 2, by + 4, 3, 7); ctx.fillRect(x - 2, by + 12, 3, 2);
     } else if (c.phase === 'queue' && !c.moving) {
-      ctx.fillStyle = '#17151a'; ctx.fillRect(x + 5, top + 1, 11, 7);
-      ctx.fillStyle = '#fff'; ctx.fillRect(x + 6, top + 2, 9, 5);
-      ctx.fillStyle = '#17151a'; for (let i = 0; i < 3; i++) if (Math.floor(this.t * 2) % 4 > i) ctx.fillRect(x + 7 + i * 3, top + 4, 1, 1);
+      const bx = x + 7, by = head - 4;
+      ctx.fillStyle = INK; ctx.fillRect(bx, by, 17, 10); ctx.fillRect(bx - 2, by + 7, 3, 2);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(bx + 1, by + 1, 15, 8); ctx.fillRect(bx - 1, by + 7, 2, 1);
+      ctx.fillStyle = INK;
+      for (let i = 0; i < 3; i++) if (Math.floor(t * 2.5 + c.id) % 4 > i) ctx.fillRect(bx + 3 + i * 4, by + 4, 2, 2);
     }
-    // tålamodsmätare
     if ((c.phase === 'queue' || c.phase === 'waiting') && isFinite(c.patienceMax) && !c.moving) {
-      const f = Math.max(0, c.patience / c.patienceMax);
-      ctx.fillStyle = '#17151a'; ctx.fillRect(x - 17, top + 3, 4, 12);
-      ctx.fillStyle = f > 0.35 ? '#45b964' : '#c9323a'; const hgt = Math.round(10 * f); ctx.fillRect(x - 16, top + 4 + 10 - hgt, 2, hgt);
+      const f = Math.max(0, Math.min(1, c.patience / c.patienceMax));
+      const px = x - 17, py = head + 2, ph = 20;
+      ctx.fillStyle = INK; ctx.fillRect(px, py, 6, ph + 2);
+      ctx.fillStyle = '#3a3440'; ctx.fillRect(px + 1, py + 1, 4, ph);
+      const hh = Math.round(ph * f);
+      ctx.fillStyle = f > 0.5 ? '#45b964' : f > 0.25 ? '#e8b230' : '#e0474f';
+      ctx.fillRect(px + 1, py + 1 + ph - hh, 4, hh);
+      ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(px + 1, py + 1 + ph - hh, 1, hh);
     }
     if (c.phase === 'waiting' && !c.moving) {
-      ctx.fillStyle = '#fff'; ctx.fillRect(x - 3, top - 5, 7, 6);
-      ctx.fillStyle = '#6b7684'; ctx.fillRect(x - 2, top - 4, 5, 3); ctx.fillRect(x - 1, top, 3, 1); // liten skärm-ikon
+      const bx = x - 7, by = head - 14 + Math.round(Math.sin(t * 2 + c.id) * 0.8);
+      ctx.fillStyle = INK; ctx.fillRect(bx, by, 15, 12); ctx.fillRect(bx + 6, by + 12, 3, 2);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(bx + 1, by + 1, 13, 10); ctx.fillRect(bx + 7, by + 11, 1, 2);
+      ctx.fillStyle = '#3a3d48'; ctx.fillRect(bx + 3, by + 3, 9, 5); ctx.fillRect(bx + 6, by + 8, 3, 1);
+      ctx.fillStyle = Math.floor(t * 2) % 2 ? '#7ee8fa' : '#45b964'; ctx.fillRect(bx + 4, by + 4, 7, 3);
     }
     if (c.mood && c.bubbleT > 0) {
-      const y = top - 8 - Math.round((3 - c.bubbleT) * 3);
-      if (c.mood === 'happy') { ctx.fillStyle = '#e23b5a'; ctx.fillRect(x - 3, y, 2, 2); ctx.fillRect(x + 1, y, 2, 2); ctx.fillRect(x - 3, y + 1, 6, 2); ctx.fillRect(x - 2, y + 3, 4, 1); ctx.fillRect(x - 1, y + 4, 2, 1); }
-      if (c.mood === 'sad') { ctx.fillStyle = '#58a6c9'; ctx.fillRect(x, y, 1, 1); ctx.fillRect(x - 1, y + 1, 3, 2); }
-      if (c.mood === 'angry') { ctx.fillStyle = '#c9323a'; ctx.fillRect(x - 3, y, 2, 1); ctx.fillRect(x + 2, y, 2, 1); ctx.fillRect(x - 2, y + 1, 1, 1); ctx.fillRect(x + 2, y + 1, 1, 1); ctx.fillRect(x - 1, y + 3, 3, 1); }
+      const y = head - 10 - Math.round((3 - c.bubbleT) * 5);
+      if (c.mood === 'happy') {
+        ctx.fillStyle = INK; ctx.fillRect(x - 6, y - 1, 5, 4); ctx.fillRect(x + 1, y - 1, 5, 4); ctx.fillRect(x - 7, y + 1, 14, 4); ctx.fillRect(x - 5, y + 5, 10, 2); ctx.fillRect(x - 3, y + 7, 6, 2); ctx.fillRect(x - 1, y + 9, 2, 1);
+        ctx.fillStyle = '#e23b5a'; ctx.fillRect(x - 5, y, 3, 3); ctx.fillRect(x + 2, y, 3, 3); ctx.fillRect(x - 6, y + 2, 12, 3); ctx.fillRect(x - 4, y + 5, 8, 2); ctx.fillRect(x - 2, y + 7, 4, 2);
+        ctx.fillStyle = '#ff9aae'; ctx.fillRect(x - 5, y + 1, 1, 1);
+      }
+      if (c.mood === 'sad') { ctx.fillStyle = INK; ctx.fillRect(x - 3, y - 1, 6, 9); ctx.fillStyle = '#58a6c9'; ctx.fillRect(x - 1, y, 2, 2); ctx.fillRect(x - 2, y + 2, 4, 5); ctx.fillStyle = '#bfe6f5'; ctx.fillRect(x - 1, y + 3, 1, 1); }
+      if (c.mood === 'angry') {
+        ctx.fillStyle = '#c9323a';
+        for (const [dx, dy] of [[-6, 0], [4, 0], [-6, 6], [4, 6]]) { ctx.fillRect(x + dx, y + dy, 3, 1); ctx.fillRect(x + dx + (dx < 0 ? 2 : 0), y + dy + (dy ? -1 : 1), 1, 2); }
+      }
     }
   }
+}
+
+// "ASUS ROG Astral GeForce RTX 5080 OC" → ["RTX 5080 OC", "ASUS ROG ASTRAL"]
+function heroTitle(name) {
+  const m = name.match(/\b(RTX|GTX|RX|ARC)\s*[A-Z]?\d{3,4}\w*(\s+(XTX|XT|TI|SUPER|OC))*/i);
+  if (m) {
+    const title = m[0].toUpperCase().slice(0, 12);
+    const sub = name.slice(0, m.index).replace(/\b(NVIDIA|GEFORCE|AMD|RADEON)\b/gi, '').replace(/\s+/g, ' ').trim().toUpperCase();
+    return [title, sub.length > 18 ? sub.slice(0, 18) : sub];
+  }
+  const words = name.toUpperCase().split(/\s+/).filter(Boolean);
+  const title = words.slice(-2).join(' ').slice(0, 12);
+  return [title || 'STJÄRNAN', words.slice(0, -2).join(' ').slice(0, 18)];
+}
+
+// neonrör: kärna + glöd, förrenderat
+function neonSign(textStr, color, scale, pad) {
+  const w = textW(BIG, textStr, scale) + pad * 2, h = (BIG.h + 2) * scale + pad * 2;
+  const mask = new Uint8Array(w * h);
+  eachTextPixel(BIG, textStr, pad, pad + 2 * scale, scale, (x, y) => { if (x >= 0 && y >= 0 && x < w && y < h) mask[y * w + x] = 1; });
+  const P = new Pix(w, h);
+  const core = mix(color, 0xffffff, 0.6);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (mask[y * w + x]) { P.px(x, y, core); continue; }
+    let d = 99;
+    for (let yy = Math.max(0, y - pad); yy <= Math.min(h - 1, y + pad); yy++) for (let xx = Math.max(0, x - pad); xx <= Math.min(w - 1, x + pad); xx++) {
+      if (mask[yy * w + xx]) d = Math.min(d, Math.hypot(xx - x, yy - y));
+    }
+    if (d <= 1.01) P.px(x, y, color, 0.95);
+    else if (d < pad + 0.5) { const a = 0.5 * Math.pow(1 - (d - 1) / pad, 1.6); if (bayer(x, y) < 0.85) P.px(x, y, color, a); }
+  }
+  return { img: P.flush() };
+}
+
+// svaga ljuskäglor från taket (adderas)
+function makeBeams() {
+  const P = new Pix(FW, FH);
+  const beam = (sx, y0, y1, w0, w1, a0) => {
+    for (let y = y0; y < y1; y++) {
+      const t = (y - y0) / (y1 - y0), half = (w0 + (w1 - w0) * t) / 2, a = a0 * Math.sin(Math.PI * Math.min(1, t * 1.15)) * Math.min(1, t * 2.5);
+      for (let x = Math.floor(sx - half); x <= sx + half; x++) {
+        const e = 1 - Math.abs(x - sx) / half;
+        if (bayer(x, y) < Math.min(1, e * 2.2)) P.px(x, y, 0x3a3222, a * 2.4);
+      }
+    }
+  };
+  beam(LY.HERO.cx, 96, LY.HERO.base - 8, 40, 118, 0.3);
+  return P.flush();
 }

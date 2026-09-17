@@ -1,0 +1,336 @@
+// Statisk bakgrund för butiksgolvet: gatan utanför fönstren och själva rummet
+// (golv, väggar, fönster, dörrkarmar, vägghyllor, affisch, klocka, verkstadsdörr).
+// Ritas en gång till offscreen-canvasar.
+import { Pix, hex, mul, mix, hash, bayer, SMALL, textW, text } from './floor-pix.js';
+import { FW, FH, WALL_Y, DOOR, VITRINES, HERO, ROPE, SOFA, TABLE, ARMCHAIR, COUNTER, QUEUE, PICKUP } from './floor-layout.js';
+
+export const WIN = [[12, 18, 87, 71], [96, 18, 171, 71]]; // glas [x0, y0, x1, y1)
+export const TRANSOM = [DOOR.x0, 12, DOOR.x1, 22];
+export const DOOR_OPEN = [DOOR.x0, 26, DOOR.x1, WALL_Y];
+export const STREET_W = 252;
+export const NEON_BOX = [294, 9, 448, 34];
+export const SHELF = { x0: 256, x1: 332, boards: [50, 74] };
+export const POSTER = [338, 36, 366, 70];
+export const CLOCK = [382, 46, 8];
+export const TV = [398, 34, 444, 62];
+export const SPOT_X = [52, 132, 214, 318, 420, 478];
+
+const T = (theme, k, fb) => hex(theme && theme[k], fb);
+
+// ---------- Gatan ----------
+export function paintStreet() {
+  const P = new Pix(STREET_W, WALL_Y);
+  // himmel
+  for (let y = 0; y < 44; y++) for (let x = 0; x < STREET_W; x++) {
+    const f = y / 44 + (bayer(x, y) - 0.5) * 0.09;
+    P.px(x, y, mix(0x6fb0e2, 0xd9eef3, f));
+  }
+  // hus på andra sidan gatan
+  const houses = [
+    [0, 40, 13, 0xa9573c, 'brick'], [40, 84, 22, 0xe3d4b2, 'plaster'], [84, 122, 8, 0x6c9ea6, 'plaster'],
+    [122, 170, 17, 0xd6ad55, 'plaster'], [170, 208, 11, 0x9b8f9f, 'plaster'], [208, 252, 19, 0xa9573c, 'brick'],
+  ];
+  for (const [x0, x1, top, col, kind] of houses) {
+    for (let y = top; y < 54; y++) for (let x = x0; x < x1; x++) {
+      let c = col;
+      if (kind === 'brick') {
+        const row = Math.floor((y - top) / 3), mortar = (y - top) % 3 === 2 || ((x + (row % 2) * 3) % 6 === 0);
+        c = mortar ? mix(col, 0xd8cbb8, 0.45) : mul(col, 0.94 + hash(x >> 1, y, 3) * 0.12);
+      } else c = mul(col, 0.96 + hash(x, y, 4) * 0.06);
+      if (x === x1 - 1) c = mul(c, 0.8);
+      P.px(x, y, c);
+    }
+    P.hl(x0, top, x1 - x0, mix(col, 0xffffff, 0.35)); P.hl(x0, top + 1, x1 - x0, mul(col, 0.7));
+    // fönster
+    for (let wy = top + 5; wy < 38; wy += 10) for (let wx = x0 + 4; wx + 5 < x1 - 2; wx += 9) {
+      P.rect(wx - 1, wy - 1, 7, 8, mix(col, 0xffffff, 0.3));
+      P.rect(wx, wy, 5, 6, 0x2d4a6b);
+      P.px(wx, wy, 0x9fc7e0); P.px(wx + 1, wy, 0x7fb0d0); P.px(wx, wy + 1, 0x7fb0d0);
+      if (hash(wx, wy, 9) > 0.7) P.rect(wx + 1, wy + 3, 3, 3, 0xf3d68a);
+      P.hl(wx - 1, wy + 7, 7, mul(col, 0.7));
+    }
+    // butik i bottenplan med markis
+    P.rect(x0 + 3, 44, x1 - x0 - 6, 10, 0x33424f);
+    P.rect(x0 + 4, 45, (x1 - x0 - 8) >> 1, 8, 0x4f6a7c); P.px(x0 + 4, 45, 0x9fc7e0);
+    const aw = hash(x0, 1, 2) > 0.5 ? 0xc9323a : 0x2f8f6f;
+    for (let x = x0 + 2; x < x1 - 2; x++) {
+      const stripe = ((x - x0) >> 2) % 2 ? aw : 0xf4efe6;
+      P.rect(x, 40, 1, 3, stripe); if ((x - x0) % 4 !== 3) P.px(x, 43, mul(stripe, 0.85));
+    }
+  }
+  // träd
+  for (const tx of [30, 150, 230]) {
+    P.rect(tx - 1, 40, 3, 14, 0x5a3d2b); P.vl(tx - 1, 40, 14, 0x3e2a1d);
+    for (let y = 18; y < 44; y++) for (let x = tx - 12; x <= tx + 12; x++) {
+      const dd = Math.hypot((x - tx) / 12, (y - 31) / 13) + (hash(x, y, 5) - 0.5) * 0.25;
+      if (dd < 1) P.px(x, y, dd < 0.45 && (x - tx) + (y - 31) < 0 ? 0x6fbf5a : dd < 0.8 ? 0x3f9447 : 0x2c6e3a);
+    }
+  }
+  // väg
+  P.rect(0, 52, STREET_W, 2, 0xb9b3a6);
+  for (let y = 54; y < 66; y++) for (let x = 0; x < STREET_W; x++) P.px(x, y, mul(0x4b4e57, 0.92 + hash(x, y, 7) * 0.16));
+  for (let x = 0; x < STREET_W; x += 16) P.rect(x, 59, 9, 1, 0xe6dfc4);
+  // trottoarkant + trottoar (här går kunderna)
+  P.hl(0, 66, STREET_W, 0xd4d0c6); P.hl(0, 67, STREET_W, 0x8e8a83);
+  for (let y = 68; y < WALL_Y; y++) for (let x = 0; x < STREET_W; x++) {
+    const row = Math.floor((y - 68) / 6), joint = (y - 68) % 6 === 5 || (x + row * 7) % 14 === 0;
+    let c = joint ? 0x9e998f : mul(0xc3beb3, 0.95 + hash(x, y, 8) * 0.08);
+    if (!joint && (y - 68) % 6 === 0) c = mix(c, 0xffffff, 0.15);
+    P.px(x, y, c);
+  }
+  // gatlykta
+  P.rect(118, 26, 2, 42, 0x2a2d36); P.rect(114, 23, 10, 3, 0x2a2d36); P.rect(115, 26, 8, 2, 0xf7e6a8);
+  // trottoarskylt utanför dörren
+  P.rect(141, 60, 15, 16, 0x6b4a33); P.rect(142, 61, 13, 12, 0x223328);
+  text(P, SMALL, 'NYHET', 142, 62, 0xf4efe6); P.hl(143, 69, 11, 0xe8b230); P.hl(144, 71, 8, 0x9fd8ef);
+  P.vl(141, 76, 3, 0x4a3324); P.vl(155, 76, 3, 0x4a3324);
+  return P.flush();
+}
+
+// moln som driver (ritas förskjutet och upprepat)
+export function paintClouds() {
+  const P = new Pix(STREET_W, 30);
+  for (const [cx, cy, r] of [[30, 12, 9], [44, 14, 7], [20, 15, 6], [140, 8, 8], [152, 10, 6], [128, 11, 5], [210, 16, 7], [222, 14, 5]]) {
+    for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r * 1.6; x <= cx + r * 1.6; x++) {
+      const dd = Math.hypot((x - cx) / (r * 1.6), (y - cy) / r);
+      if (dd < 1 && y < cy + r * 0.45) P.px(x, y, y > cy + r * 0.1 ? 0xdfe8ee : dd < 0.6 && y < cy ? 0xffffff : 0xf2f6f8, 0.95);
+    }
+  }
+  return P.flush();
+}
+
+// ---------- Rummet ----------
+export function paintRoom(theme) {
+  const P = new Pix(FW, FH);
+  const wall = T(theme, 'wall', 0x3d5a80), wallDk = T(theme, 'wallDark', 0x2c4463);
+  const flA = T(theme, 'floorA', 0xe9e1d2), flB = T(theme, 'floorB', 0xd8ccb6);
+  paintFloor(P, flA, flB);
+  paintWalls(P, wall, wallDk);
+  paintStorefront(P, wall);
+  paintWallDecor(P, wall, wallDk, theme);
+  return P;
+}
+
+function paintFloor(P, flA, flB) {
+  const TW = 32, TH = 20;
+  for (let y = WALL_Y; y < FH; y++) for (let x = 0; x < FW; x++) {
+    const tx = Math.floor(x / TW), ty = Math.floor((y - WALL_Y) / TH);
+    const lx = x - tx * TW, ly = (y - WALL_Y) - ty * TH;
+    let c = mix(flA, flB, ((tx + ty) & 1) ? 0.18 : 0.62);
+    c = mul(c, 0.97 + hash(tx, ty, 1) * 0.05);
+    const h = hash(x, y, 2);
+    if (h > 0.94) c = mul(c, 0.95); else if (h < 0.02) c = mix(c, 0xffffff, 0.25);
+    if (lx === 0 || ly === 0) c = mul(c, 0.84);
+    else if (lx === 1 || ly === 1) c = mix(c, 0xffffff, 0.2);
+    else if (lx + ly > 9 && lx + ly < 12 && ly < 8) c = mix(c, 0xffffff, 0.07); // glans
+    P.px(x, y, c);
+  }
+  // personalgolv bakom disken (gummimatta)
+  for (let y = WALL_Y; y < COUNTER.front; y++) for (let x = COUNTER.x0; x < COUNTER.x1; x++) {
+    P.px(x, y, ((x + y) % 4 === 0 && (x >> 1) % 2 === 0) ? 0x3a3c44 : 0x2c2e35);
+  }
+  // ljusfläckar från fönstren
+  for (const [x0, , x1] of [[12, 0, 87], [96, 0, 171], [DOOR.x0, 0, DOOR.x1]]) {
+    for (let y = WALL_Y; y < WALL_Y + 70; y++) {
+      const s = (y - WALL_Y) * 0.55, fade = 1 - (y - WALL_Y) / 70;
+      for (let x = Math.round(x0 + s); x < x1 + s; x++) if (bayer(x, y) < fade * 0.9) P.px(x, y, 0xfff6dc, 0.11);
+    }
+  }
+  // dörrmatta
+  const mx0 = DOOR.cx - 22, mx1 = DOOR.cx + 22;
+  for (let y = WALL_Y + 1; y < WALL_Y + 16; y++) for (let x = mx0; x < mx1; x++) P.px(x, y, (x + y) % 2 ? 0x34363d : 0x2d2f35);
+  P.box(mx0, WALL_Y + 1, 44, 15, 0x1f2026);
+  text(P, SMALL, 'VÄLKOMMEN', DOOR.cx - (textW(SMALL, 'VÄLKOMMEN') >> 1), WALL_Y + 6, 0xb9b3a6);
+  P.hl(DOOR.x0, WALL_Y, DOOR.x1 - DOOR.x0, 0xa9aeb8);
+  // museimatta under stjärnobjektet
+  paintRug(P, ROPE.x0 - 10, ROPE.back - 12, ROPE.x1 + 10, ROPE.front + 12, 0x5e1622, 0xd8b24a, 'museum');
+  // väntrumsmatta
+  paintRug(P, SOFA.x0 - 10, SOFA.base - 32, ARMCHAIR.x1 + 8, TABLE.base + 22, 0x3f5667, 0xd9d2c3, 'stripe');
+  // ljuskäglor på golvet
+  P.ell(HERO.cx, HERO.base - 22, 88, 42, 0xfff3d0, 0.22, 6);
+  VITRINES.forEach((v) => P.ell((v.x0 + v.x1) / 2, v.base - 8, (v.x1 - v.x0) * 0.62, 26, 0xfff3d0, 0.14));
+  P.ell(QUEUE[0][0], QUEUE[0][1] + 16, 46, 36, 0xfff3d0, 0.09);
+  P.ell(PICKUP[0][0], PICKUP[0][1] + 16, 46, 36, 0xfff3d0, 0.09);
+  // golvdekaler: stå här
+  for (const [fx, fy, col] of [[QUEUE[0][0], QUEUE[0][1], 0xe8b230], [PICKUP[0][0], PICKUP[0][1], 0x45b964]]) {
+    P.rect(fx - 12, fy - 5, 24, 9, col, 0.85); P.box(fx - 12, fy - 5, 24, 9, mul(col, 0.6), 0.9);
+    for (const sx of [-6, 3]) { P.rect(fx + sx, fy - 3, 3, 3, 0x2a2430, 0.7); P.rect(fx + sx, fy + 1, 3, 1, 0x2a2430, 0.7); }
+  }
+  // kontaktskuggor under möbler
+  for (const v of VITRINES) shadowRect(P, v.x0 + 1, v.base, v.x1 - v.x0 - 2, 4);
+  shadowRect(P, COUNTER.x0, COUNTER.base, COUNTER.x1 - COUNTER.x0, 4);
+  shadowRect(P, SOFA.x0 + 2, SOFA.base, SOFA.x1 - SOFA.x0 - 4, 3);
+  shadowRect(P, ARMCHAIR.x0 + 2, ARMCHAIR.base, ARMCHAIR.x1 - ARMCHAIR.x0 - 4, 3);
+  shadowRect(P, TABLE.x0 + 2, TABLE.base, TABLE.x1 - TABLE.x0 - 4, 3);
+  P.ell(HERO.cx, HERO.base + 1, 54, 5, 0x140c1c, 0.35, 3);
+  // mörkare golv längs väggen (ambient occlusion)
+  for (let y = WALL_Y; y < WALL_Y + 7; y++) for (let x = 0; x < FW; x++) {
+    if (x >= DOOR.x0 && x < DOOR.x1) continue;
+    if (bayer(x, y) < 1 - (y - WALL_Y) / 7) P.px(x, y, 0x1a1426, 0.18);
+  }
+}
+
+function shadowRect(P, x, y, w, h) {
+  for (let j = 0; j < h; j++) for (let i = -2; i < w + 2; i++) {
+    const edge = i < 0 || i >= w;
+    if (bayer(x + i, y + j) < (1 - j / h) * (edge ? 0.5 : 1)) P.px(x + i, y + j, 0x140c1c, 0.28);
+  }
+}
+
+function paintRug(P, x0, y0, x1, y1, base, trim, kind) {
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    const bx = Math.min(x - x0, x1 - 1 - x), by = Math.min(y - y0, y1 - 1 - y), b = Math.min(bx, by);
+    let c = mul(base, 0.95 + hash(x, y, 11) * 0.08);
+    if (b === 0) c = mul(base, 0.6);
+    else if (b === 2 || b === 3) c = trim;
+    else if (kind === 'museum' && b > 6) {
+      const u = Math.abs(((x - x0) % 16) - 8) + Math.abs(((y - y0) % 12) - 6);
+      if (u === 5) c = mix(base, trim, 0.45);
+      if (u === 0) c = trim;
+    } else if (kind === 'stripe' && b > 5 && ((y - y0) >> 2) % 3 === 0) c = mix(base, trim, 0.18);
+    if (b === 1 && (x + y) % 2) c = mix(c, 0x000000, 0.2);
+    P.px(x, y, c);
+  }
+  for (let x = x0 + 1; x < x1 - 1; x += 2) { P.px(x, y1, mix(trim, base, 0.4)); }
+}
+
+function paintWalls(P, wall, wallDk) {
+  for (let y = 7; y < 80; y++) for (let x = 6; x < 506; x++) {
+    let c = mix(mul(wall, 0.8), wall, Math.min(1, (y - 7) / 26) + (bayer(x, y) - 0.5) * 0.12);
+    if (x % 40 === 0) c = mul(c, 0.9); else if (x % 40 === 1) c = mix(c, 0xffffff, 0.05);
+    if (y >= 57) { // bröstpanel
+      const px = (x - 6) % 36, py = y - 57;
+      c = wallDk;
+      if (py === 0) c = mul(wallDk, 0.75);
+      else if (px === 3 || py === 3) c = mix(wallDk, 0xffffff, 0.12);
+      else if (px === 32 || py === 19) c = mul(wallDk, 0.78);
+      else if (px > 3 && px < 32 && py > 3 && py < 19) c = mix(wallDk, wall, 0.18 + (bayer(x, y) - 0.5) * 0.06);
+    }
+    P.px(x, y, c);
+  }
+  // listverk
+  P.hl(6, 55, 500, 0xd4b27c); P.hl(6, 56, 500, 0x8a6a45);
+  // väggbelysning från spotlights
+  for (const sx of SPOT_X) for (let y = 9; y < 70; y++) {
+    const half = 2 + (y - 9) * 0.42, fade = 1 - (y - 9) / 61;
+    for (let x = Math.floor(sx - half); x <= sx + half; x++) {
+      const e = 1 - Math.abs(x - sx) / half;
+      if (bayer(x, y) < e * fade * 1.1) P.px(x, y, 0xfff4d6, 0.07 + 0.05 * fade);
+    }
+  }
+  // sockel
+  P.rect(6, 80, 500, 6, 0x2b2a33); P.hl(6, 80, 500, 0x4c4a58); P.hl(6, 85, 500, 0x1b1a21);
+  // tak + skenor + spotlights
+  P.rect(0, 0, FW, 7, 0x1c1f2b); P.hl(0, 6, FW, 0x0f1118); P.hl(6, 3, 500, 0x5a5f6e); P.hl(6, 4, 500, 0x3a3e4a);
+  for (const sx of SPOT_X) {
+    P.rect(sx - 2, 4, 5, 5, 0x2a2d36); P.vl(sx - 2, 4, 5, 0x4a4f5c); P.hl(sx - 2, 9, 5, 0xfff2c0); P.px(sx, 9, 0xffffff);
+  }
+  // sidoväggar
+  for (const x0 of [0, 506]) { P.rect(x0, 0, 6, FH, 0x1c1f2b); P.vl(x0 === 0 ? 5 : 506, 7, FH - 7, 0x363c50); }
+}
+
+function glass(P, x0, y0, x1, y1, a = 0.16) {
+  P.erase(x0, y0, x1 - x0, y1 - y0);
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    const s = (x - x0 + (y - y0)) % 46;
+    P.px(x, y, 0xdff0ff, s < 3 ? a + 0.2 : s === 6 ? a + 0.13 : a);
+  }
+}
+
+function frameRect(P, x0, y0, x1, y1, t = 3) {
+  P.rect(x0 - t, y0 - t, x1 - x0 + t * 2, t, 0x3b4150); P.rect(x0 - t, y1, x1 - x0 + t * 2, t, 0x2b303b);
+  P.rect(x0 - t, y0, t, y1 - y0, 0x353a48); P.rect(x1, y0, t, y1 - y0, 0x2b303b);
+  P.hl(x0 - t, y0 - t, x1 - x0 + t * 2, 0x6d7486); P.vl(x0 - t, y0 - t, y1 - y0 + t * 2, 0x5d6476);
+  P.hl(x0 - 1, y0 - 1, x1 - x0 + 2, 0x23262f);
+}
+
+function paintStorefront(P, wall) {
+  for (const [x0, y0, x1, y1] of WIN) {
+    glass(P, x0, y0, x1, y1);
+    frameRect(P, x0, y0, x1, y1);
+    const mx = (x0 + x1) >> 1;
+    P.rect(mx - 1, y0, 2, y1 - y0, 0x3b4150); P.vl(mx - 1, y0, y1 - y0, 0x6d7486);
+    // fönsterbräda
+    P.rect(x0 - 5, y1 + 3, x1 - x0 + 10, 2, 0xdcbf92); P.rect(x0 - 5, y1 + 5, x1 - x0 + 10, 2, 0x8e6d4a); P.hl(x0 - 4, y1 + 7, x1 - x0 + 8, 0x3a2c22);
+  }
+  // krukväxt + liten robotfigur på fönsterbrädorna
+  plantSmall(P, 28, 74);
+  // dörr: karm, överljus och öppning
+  const { x0, x1 } = DOOR;
+  glass(P, TRANSOM[0], TRANSOM[1], TRANSOM[2], TRANSOM[3], 0.14);
+  P.rect(x0 - 3, 9, x1 - x0 + 6, 3, 0x3b4150); P.hl(x0 - 3, 9, x1 - x0 + 6, 0x6d7486);
+  P.rect(x0, 22, x1 - x0, 4, 0x3b4150); P.hl(x0, 22, x1 - x0, 0x5d6476); P.hl(x0, 25, x1 - x0, 0x23262f);
+  P.erase(x0, 26, x1 - x0, WALL_Y - 26);
+  P.rect(x0 - 3, 9, 3, WALL_Y - 9, 0x353a48); P.vl(x0 - 3, 9, WALL_Y - 9, 0x6d7486);
+  P.rect(x1, 9, 3, WALL_Y - 9, 0x2b303b); P.vl(x1 + 2, 9, WALL_Y - 9, 0x1f232b);
+  text(P, SMALL, 'INGÅNG', DOOR.cx - 11, 15, 0xffffff, 0.75);
+  // pelare mellan skyltfönster och innervägg
+  for (let y = 7; y < 86; y++) for (let x = 238; x < 250; x++) {
+    let c = mix(wall, 0xffffff, 0.08);
+    if (x === 238) c = mix(wall, 0xffffff, 0.25); if (x >= 248) c = mul(wall, 0.72);
+    if (y >= 80) c = y === 80 ? 0x4c4a58 : 0x2b2a33;
+    P.px(x, y, c);
+  }
+}
+
+export function plantSmall(P, x, y) {
+  P.rect(x - 4, y - 6, 9, 6, 0xb5652f); P.hl(x - 4, y - 6, 9, 0xd88a50); P.vl(x + 4, y - 5, 5, 0x8c4a22);
+  const leaves = [[-5, -12, 0x2f8f46], [2, -14, 0x2f8f46], [-2, -16, 0x45b964], [3, -10, 0x45b964], [-4, -9, 0x3a9f50]];
+  for (const [dx, dy, c] of leaves) { P.rect(x + dx, y + dy, 3, 5, c); P.px(x + dx, y + dy, mix(c, 0xffffff, 0.3)); }
+}
+
+function paintWallDecor(P, wall, wallDk, theme) {
+  // neonskyltens bakplatta
+  const [nx0, ny0, nx1, ny1] = NEON_BOX;
+  for (let y = ny0; y < ny1; y++) for (let x = nx0; x < nx1; x++) P.px(x, y, mul(0x1e2029, 0.9 + ((x * 7) % 5) * 0.03));
+  P.box(nx0, ny0, nx1 - nx0, ny1 - ny0, 0x3a3d4a); P.hl(nx0 + 1, ny1, nx1 - nx0 - 1, 0x10111a, 0.6);
+  for (const [bx, by] of [[nx0 + 3, ny0 + 3], [nx1 - 5, ny0 + 3], [nx0 + 3, ny1 - 5], [nx1 - 5, ny1 - 5]]) { P.rect(bx, by, 2, 2, 0x8a8f9c); P.px(bx, by, 0xd0d4dc); }
+  // vägghylla (lådor ritas dynamiskt efter lagret)
+  const S = SHELF;
+  P.rect(S.x0 + 2, 28, 2, 52, 0x2f323b); P.rect(S.x1 - 4, 28, 2, 52, 0x2f323b); P.vl(S.x0 + 2, 28, 52, 0x5a5f6e); P.vl(S.x1 - 4, 28, 52, 0x5a5f6e);
+  for (const by of S.boards) {
+    P.rect(S.x0, by, S.x1 - S.x0, 2, 0xd9b98a); P.rect(S.x0, by + 2, S.x1 - S.x0, 2, 0x8a6446); P.hl(S.x0, by + 4, S.x1 - S.x0, 0x1a1426, 0.35);
+    for (let x = S.x0; x < S.x1; x++) if (hash(x, by, 12) > 0.8) P.px(x, by + 1, 0xc4a276);
+  }
+  P.rect(S.x0 + 1, 21, 25, 7, 0x1b1f2a); P.box(S.x0 + 1, 21, 25, 7, 0x3a3f4d); text(P, SMALL, 'LAGER', S.x0 + 4, 22, 0xe8b230);
+  // affisch med stjärnobjektet (ikonen läggs på av floor.js)
+  const [px0, py0, px1, py1] = POSTER;
+  P.rect(px0 - 1, py0 - 1, px1 - px0 + 2, py1 - py0 + 2, 0x15151a);
+  for (let y = py0; y < py1; y++) for (let x = px0; x < px1; x++) P.px(x, y, mix(0x151b3a, 0x4a1f4a, (y - py0) / (py1 - py0) + (bayer(x, y) - 0.5) * 0.15));
+  for (let i = 0; i < 20; i++) P.px(px0 + ((i * 11) % 26) + 1, py0 + ((i * 7) % 14) + 1, 0xffffff, 0.5);
+  P.rect(px0, py1 - 9, px1 - px0, 9, 0x76b900); text(P, SMALL, 'NYHET', px0 + 4, py1 - 7, 0x10140a);
+  P.hl(px0 - 1, py1 + 1, px1 - px0 + 2, 0x0e0a14, 0.35);
+  // klocka
+  const [cx, cy, r] = CLOCK;
+  for (let y = -r - 1; y <= r + 1; y++) for (let x = -r - 1; x <= r + 1; x++) {
+    const dd = Math.hypot(x, y);
+    if (dd < r + 0.5) P.px(cx + x, cy + y, dd > r - 1.2 ? 0x2a2d36 : (x + y < -4 ? 0xffffff : 0xf1ece2));
+    else if (dd < r + 1.5 && x + y > 0) P.px(cx + x, cy + y, 0x0e0a14, 0.3);
+  }
+  for (const [dx, dy] of [[0, -6], [6, 0], [0, 6], [-6, 0]]) P.px(cx + dx, cy + dy, 0x2a2d36);
+  // tv-skärm på väggarm
+  const [tx0, ty0, tx1, ty1] = TV;
+  P.rect(((tx0 + tx1) >> 1) - 3, ty1, 6, 3, 0x2a2d36);
+  P.rect(tx0 - 2, ty0 - 2, tx1 - tx0 + 4, ty1 - ty0 + 4, 0x15161b); P.hl(tx0 - 2, ty0 - 2, tx1 - tx0 + 4, 0x3a3d48);
+  P.hl(tx0 - 1, ty1 + 2, tx1 - tx0 + 2, 0x0e0a14, 0.35); P.px(tx1, ty1 + 1, 0x45e06a);
+  // brandsläckare
+  P.rect(446, 60, 5, 15, 0xc9323a); P.vl(447, 61, 13, 0xe86a70); P.rect(447, 57, 3, 3, 0x2a2d36); P.rect(445, 66, 7, 2, 0x2a2d36);
+  // verkstadsdörren
+  const dx0 = 456, dx1 = 500, dy0 = 38;
+  P.rect(dx0 - 3, dy0 - 3, dx1 - dx0 + 6, WALL_Y - dy0 + 3, 0x2b2f38); P.hl(dx0 - 3, dy0 - 3, dx1 - dx0 + 6, 0x4a5060);
+  for (let y = dy0; y < WALL_Y; y++) for (let x = dx0; x < dx1; x++) {
+    let c = mul(0x5c6b7a, 0.95 + hash(x, y >> 2, 13) * 0.08);
+    if (x === dx0) c = 0x7d8c9b; if (x === dx1 - 1) c = 0x46525e;
+    P.px(x, y, c);
+  }
+  P.rect(469, 44, 18, 15, 0x23262f); // fönster med varmt ljus
+  for (let y = 45; y < 58; y++) for (let x = 470; x < 486; x++) P.px(x, y, mix(0xffd27a, 0xe0873a, (y - 45) / 13 + (bayer(x, y) - 0.5) * 0.2));
+  P.hl(470, 50, 16, 0x7a4a26); P.hl(470, 55, 16, 0x7a4a26); P.rect(472, 47, 3, 3, 0x5a3d2b); P.rect(479, 52, 4, 3, 0x2c6fb7);
+  P.px(470, 45, 0xfff4d0); P.px(471, 45, 0xfff4d0);
+  P.rect(490, 60, 4, 10, 0xc8ccd2); P.vl(490, 60, 10, 0xeef0f3);
+  for (let y = 77; y < WALL_Y; y++) for (let x = dx0; x < dx1; x++) P.px(x, y, ((x + y) >> 2) % 2 ? 0xe8b230 : 0x23232a);
+  P.rect(452, 24, 52, 10, 0x1b1f2a); P.box(452, 24, 52, 10, 0xe8b230, 0.8);
+  text(P, SMALL, 'VERKSTAD', 478 - (textW(SMALL, 'VERKSTAD') >> 1), 27, 0xe8b230);
+  // eluttag
+  P.rect(268, 68, 6, 6, 0xe8e4da); P.px(270, 70, 0x555555); P.px(272, 70, 0x555555);
+}

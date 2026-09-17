@@ -16,6 +16,14 @@ export function mix(a, b, t) {
   return rgb(ar + (br - ar) * t | 0, ag + (bg - ag) * t | 0, ab + (bb - ab) * t | 0);
 }
 export const css = (c) => '#' + c.toString(16).padStart(6, '0');
+export function hsl(h, s, l) {
+  h = ((h % 360) + 360) % 360;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => { const k = (n + h / 30) % 12; return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
+  return ((f(0) * 255 | 0) << 16) | ((f(8) * 255 | 0) << 8) | (f(4) * 255 | 0);
+}
+// RGB-regnbåge som vandrar med tiden
+export const rainbow = (t, offset = 0, l = 0.6) => hsl(t * 90 + offset * 40, 0.95, l);
 
 const FACE_SHADE = { top: 1, left: 0.8, right: 0.64 };
 
@@ -117,6 +125,8 @@ export class Raster {
 
 // Vanliga textur-byggstenar
 export const T = {
+  // text i en yta: (x,y) i enheter, texten börjar i (x0,y0), px = enheter per textpixel
+  text(bm, x, y, x0, y0, px) { return bm.on(Math.floor((x - x0) / px), Math.floor((y - y0) / px)); },
   solid: (c) => () => c,
   // ram runt toppen
   bordered(c, edge, w = 0.25) {

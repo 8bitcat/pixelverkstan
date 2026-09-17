@@ -25,3 +25,20 @@ export function drawText(ctx, s, x, y, color, scale = 1) {
     cx += (w + 1) * scale;
   }
 }
+
+// Text som bitmapp (för att stämpla text i texturer): { w, h, on(x, y) }
+const BITMAPS = new Map();
+export function textBitmap(s) {
+  let bm = BITMAPS.get(s);
+  if (bm) return bm;
+  const w = Math.max(1, textWidth(s)), h = 5, data = new Uint8Array(w * h);
+  let cx = 0;
+  for (const ch of s.toUpperCase()) {
+    const g = G[ch] || G['?'], gw = wOf(g);
+    for (let i = 0; i < g.length; i++) if (g[i] === '1') data[((i / gw) | 0) * w + cx + (i % gw)] = 1;
+    cx += gw + 1;
+  }
+  bm = { w, h, on: (x, y) => x >= 0 && y >= 0 && x < w && y < h && data[(y | 0) * w + (x | 0)] === 1 };
+  BITMAPS.set(s, bm);
+  return bm;
+}
