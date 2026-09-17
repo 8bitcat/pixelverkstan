@@ -64,6 +64,8 @@ export default {
   tutorialOrder: orders.tutorialOrder,
   tutorialCount: orders.TUTORIAL_COUNT,
   generateOrder: orders.generateOrder,
+  replacementFor: orders.replacementFor,
+  fixOrder: orders.fixOrder,
   priceFor: orders.priceFor,
   xpFor: orders.xpFor,
   feeFor: orders.feeFor,

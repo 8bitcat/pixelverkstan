@@ -161,7 +161,7 @@ export class Game {
     return order.items.filter((it) => it.choice && !Object.keys(this.stock).some((id) => this.stock[id] > 0 && this.shop.part[id]?.cat === it.cat)).map((it) => it.cat);
   }
   // saknade delar som inte redan är på väg
-  toBuyFor(order) { return this.missingFor(order).map((m) => ({ ...m, buy: Math.max(0, m.buy - this.incoming(m.id)) })).filter((m) => m.buy > 0); }
+  toBuyFor(order) { return this.missingFor(order).map((m) => ({ ...m, buy: Math.max(0, m.buy - this.incoming(m.id)) })).filter((m) => m.buy > 0 && this.onSale(this.shop.part[m.id])); }
   buyMissing(order) {
     const miss = this.toBuyFor(order);
     if (!this.buyMany(miss.map((m) => [m.id, m.buy]))) return false;
@@ -170,8 +170,16 @@ export class Game {
   }
 
   // ---------- Kunder ----------
+  // Delar som slutat säljas byts mot likvärdiga som finns i år (kunden ändrar sig)
+  refreshOrder(order) {
+    if (!order || !this.shop.fixOrder) return null;
+    return this.shop.fixOrder(order, this.year, (id) => this.stockFree(id));
+  }
+  hasGone(order) { return order.items.some((it) => it.gone); }
+
   spawn(order) {
     if (!order) return null;
+    this.refreshOrder(order);
     const c = {
       id: this.nextId++, name: order.name, look: makeLook(), order,
       phase: 'arriving', patience: QUEUE_PATIENCE, patienceMax: QUEUE_PATIENCE,
@@ -312,7 +320,13 @@ export class Game {
       if (this.tutorialStep === this.shop.tutorialCount) setTimeout(() => this.emit('toast', { text: 'Nu kör du på egen hand! Fyll på lagret hos 🛒 Grossisten.', kind: '' }), 3500);
     }
     this.emit('toast', { text: `+${fmt(p.total)} kr${p.tip ? ` (varav ${fmt(p.tip)} kr dricks)` : ''}`, kind: 'good' });
-    if (this.year > before) this.emit('levelup', { ...this.levelInfo(), from: before });
+    if (this.year > before) {
+      for (const cu of this.customers) if (cu.phase === 'arriving' || cu.phase === 'queue') {
+        const swaps = this.refreshOrder(cu.order);
+        if (swaps?.length) this.emit('toast', { text: `${cu.name} bytte till ${swaps[0][1]} (${swaps[0][0]} säljs inte längre).`, kind: '' });
+      }
+      this.emit('levelup', { ...this.levelInfo(), from: before });
+    }
     this.save(); this.emit('change');
   }
 }

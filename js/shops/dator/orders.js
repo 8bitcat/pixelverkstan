@@ -206,6 +206,61 @@ export function tutorialOrder(i, game) {
   };
 }
 
+// ---------- Laga en beställning ----------
+// Delar som slutat säljas (eller inte längre passar ihop) byts mot likvärdiga som
+// finns i år. Moderkort och processor byts tillsammans när båda gått ur tiden.
+const sellable = (p, year) => !!p && p.year <= year && (p.until ?? 9999) >= year;
+
+export function fitsWith(p, others, year) {
+  const by = {};
+  for (const q of others) by[q.cat] ||= q;
+  const cards = others.filter((q) => q.cat === 'gpu' || q.cat === 'sound').map((q) => q.bus).filter((bus) => bus !== p.bus);
+  switch (p.cat) {
+    case 'cpu': return !by.mb || C.cpuFitsMb(p, by.mb);
+    case 'mb': return (!by.cpu || C.cpuFitsMb(by.cpu, p)) && (!by.ram || C.ramFitsMb(by.ram, p)) && (!by.case || C.caseFitsMb(by.case, p))
+      && (!by.gpu || C.cardFitsMb(by.gpu, p)) && (!by.storage || C.storageFitsMb(by.storage, p)) && (!by.media || C.mediaFitsMb(by.media, p));
+    case 'ram': return !by.mb || C.ramFitsMb(p, by.mb);
+    case 'case': return !by.mb || C.caseFitsMb(p, by.mb);
+    case 'cooler': return !by.cpu || C.coolerFitsCpu(p, by.cpu);
+    case 'gpu': case 'sound': return !by.mb || C.cardsFit([...cards, p.bus], by.mb);
+    case 'storage': return !by.mb || C.storageFitsMb(p, by.mb);
+    case 'media': return !by.mb || C.mediaFitsMb(p, by.mb);
+    case 'psu': return !by.mb || (C.psuFits(p, by.mb, by.cpu || {}, by.gpu).ok && p.watt >= C.wattNeed(by.cpu, by.gpu, 0, year));
+    default: return true;
+  }
+}
+
+export function replacementFor(order, item, year, others = null) {
+  const old = item.part ? DB.part[item.part] : null;
+  const rest = others || order.items.filter((x) => x !== item && x.part).map((x) => DB.part[x.part]).filter((p) => sellable(p, year));
+  const same = (p) => item.cat !== 'media' || !old || String(p.kind).startsWith('floppy') === String(old.kind).startsWith('floppy');
+  const cand = onSale(year).filter((p) => p.cat === item.cat && same(p) && fitsWith(p, rest, year));
+  if (!cand.length) return null;
+  const tier = old?.tier ?? 3, cost = old?.cost ?? 0;
+  return cand.sort((a, b) => Math.abs(a.tier - tier) - Math.abs(b.tier - tier) || Math.abs(a.cost - cost) - Math.abs(b.cost - cost))[0];
+}
+
+// Ser över hela beställningen: [[gammalt namn, nytt namn], …]. it.gone = går inte att få tag på.
+export function fixOrder(order, year, stockFree = () => 0) {
+  const swaps = [];
+  const keep = (p) => sellable(p, year) || stockFree(p.id) > 0;
+  for (let pass = 0; pass < 4; pass++) {
+    let changed = false;
+    for (const it of order.items) {
+      if (!it.part) continue;
+      const p = DB.part[it.part];
+      const others = order.items.filter((x) => x !== it && x.part && !x.gone).map((x) => DB.part[x.part]).filter((q) => q && keep(q));
+      if (p && keep(p) && fitsWith(p, others, year)) { delete it.gone; continue; }
+      const rep = replacementFor(order, it, year, others);
+      if (rep && rep.id !== it.part) { swaps.push([p?.name || it.part, rep.name]); it.part = rep.id; delete it.gone; changed = true; }
+      else if (!rep) it.gone = true;
+      else delete it.gone;
+    }
+    if (!changed) break;
+  }
+  return swaps;
+}
+
 export function feeFor(order) { return TEMPLATE[order.template]?.fee || 700; }
 export function xpFor(order) { return TEMPLATE[order.template]?.xp || 14; }
 

@@ -6,11 +6,14 @@ const { Game } = await import('../js/core/game.js');
 const { FIRST_NAMES } = await import('../js/core/people.js');
 await shop.init();
 const year0 = +(process.argv[2] || 1991);
+const fast = process.argv[3] === 'fast';   // hoppa ett år efter varje kund (som när man spelar länge)
 const g = new Game(shop, { fresh: true, startYear: year0, slot: year0 });
-let spawned = 0, served = 0, stuck = 0;
+let spawned = 0, served = 0, stuck = 0, gone = 0, buyFail = 0;
+const toasts = [];
 const origSpawn = g.spawn.bind(g);
 g.spawn = (o) => { const c = origSpawn(o); if (c) spawned++; return c; };
 const log = [];
+g.on((t, d) => { if (t === 'toast') { toasts.push(d.text); if (/säljs inte längre|finns inte förrän/.test(d.text)) { buyFail++; log.push('KÖPFEL: ' + d.text); } } });
 const step = (sec) => { for (let t = 0; t < sec; t += 0.5) { g.update(0.5, { shopVisible: true }); for (const d of g.deliveries) if (d.state === 'arrived') g.unpack(d.id, true); } };
 // köp startpaketet
 g.buyMany(shop.starterKit(g));
@@ -23,15 +26,17 @@ for (let round = 0; round < 60 && g.year < year0 + 4; round++) {
   lastSpawnAt = g.time;
   c.phase = 'queue';
   // köp det som saknas, packa upp, ta emot, leverera direkt
+  if (g.hasGone(c.order)) { gone++; log.push(`år ${g.year}: ${c.name} (${c.order.template}) ville ha ${c.order.items.filter((it) => it.gone).map((it) => `${it.cat}: ${shop.part[it.part]?.name} (${shop.part[it.part]?.year}–${shop.part[it.part]?.until})`).join(', ')}`); g.decline(c); continue; }
   if (g.toBuyFor(c.order).length) { g.buyMissing(c.order); step(14); }
   const o = g.accept(c);
   if (!o) { g.decline(c); continue; }
   const p = g.complete(o, { stars: 3, time: 60, errors: 0, help: true, warnings: [] });
   g.pay(p, c); served++;
+  if (fast) { g.xp += 30; }
   g.customers = g.customers.filter((x) => x !== c);
   // fyll på: köp in delar i samma kategorier som ordern (ställs ut)
   if (g.money > 20000) for (const it of o.items.slice(0, 4)) if (it.part && g.onSale(shop.part[it.part]) && shop.part[it.part].cost < g.money / 4) g.buy(it.part, 1);
 }
-console.log(`startår ${year0} → år ${g.year}: ${spawned} kunder kom, ${served} betjänade, guidesteg ${g.tutorialStep}, pengar ${Math.round(g.money)}`);
+console.log(`startår ${year0}${fast ? ' (snabba år)' : ''} → år ${g.year}: ${spawned} kunder, ${served} betjänade, ${gone} omöjliga, ${buyFail} köpfel, guidesteg ${g.tutorialStep}, pengar ${Math.round(g.money)}`);
 for (const l of log) console.log('  ' + l);
-process.exit(stuck ? 1 : 0);
+process.exit(stuck || buyFail ? 1 : 0);
