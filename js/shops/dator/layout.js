@@ -2,7 +2,7 @@
 // till uttag, kompatibilitet och kontroll innan datorn ställs upp.
 // core/build.js är generisk och frågar bara detta API.
 import { G, VIEW, PORTS, SCREWS, driveBox } from './geom.js';
-import { drawPart, drawMat, drawScrews } from './art.js';
+import { drawPart, drawMat, drawScrews, drawScrewHoles } from './art.js';
 import { gpuBox } from './art-parts.js';
 import { CONN, connectorIcon, drawCablePixels, cableCurve } from './connectors.js';
 
@@ -187,13 +187,27 @@ export function canConnect(c, key, b, help) {
 }
 
 // ---------- Kontroll innan datorn ställs upp ----------
+// Vilken del som skruvas med vilket handgrepp, och var hålen sitter
+export const SCREW_OF = {
+  mb: { key: 'mb', act: 'mb_screws', where: 'i de blanka hålen i moderkortets hörn och kanter' },
+  m2: { key: 'm2', act: 'm2_screw', where: 'i änden av M.2-disken (mässingshålet)' },
+  gpu: { key: 'gpu', act: 'gpu_screw', where: 'på metallfliken längst bak på grafikkortet, vid bakpanelen' },
+  psu: { key: 'psu', act: 'psu_screws', where: 'i bakpanelen precis ovanför nätagget' },
+};
+export function screwStatus(slotId, b) {
+  const s = SCREW_OF[slotId];
+  if (!s || actDone(b, s.act)) return null;
+  const n = ACTION[s.act].points.length, left = n - actCount(b, s.act);
+  return `Inte fastskruvad (${left} ${left === 1 ? 'skruv' : 'skruvar'} kvar) – skruvhålet sitter ${s.where}. Tryck på hålet.`;
+}
+
 export function standCheck(b) {
   const p = b.placed, out = [];
   if (p.cpu && !actDone(b, 'lever')) out.push({ msg: 'Sockelspaken är inte låst – processorn sitter löst!', hint: 'Lås spaken bredvid processorn.' });
-  if (p.mb && !actDone(b, 'mb_screws')) out.push({ msg: 'Det skramlar! Moderkortet är inte fastskruvat.', hint: `Skruva i alla ${SCREWS.mb.length} skruvar i moderkortet.` });
-  if (p.gpu && !actDone(b, 'gpu_screw')) out.push({ msg: 'Grafikkortet hänger snett och glappar i sloten.', hint: 'Skruva fast grafikkortet i bakpanelen.' });
-  if (p.psu && !actDone(b, 'psu_screws')) out.push({ msg: 'Nätagget glider runt i botten!', hint: 'Skruva fast nätagget i bakpanelen.' });
-  if (p.m2 && !actDone(b, 'm2_screw')) out.push({ msg: 'M.2-disken står snett upp ur sin plats.', hint: 'Skruva fast M.2-disken.' });
+  if (p.mb && !actDone(b, 'mb_screws')) out.push({ msg: `Det skramlar! Moderkortet är inte fastskruvat – tryck på skruvhålen ${SCREW_OF.mb.where}.`, hint: '' });
+  if (p.gpu && !actDone(b, 'gpu_screw')) out.push({ msg: `Grafikkortet hänger snett – skruva fast det ${SCREW_OF.gpu.where}.`, hint: '' });
+  if (p.psu && !actDone(b, 'psu_screws')) out.push({ msg: `Nätagget glider runt – skruva fast det ${SCREW_OF.psu.where}.`, hint: '' });
+  if (p.m2 && !actDone(b, 'm2_screw')) out.push({ msg: `M.2-disken står snett – skruva fast den ${SCREW_OF.m2.where}.`, hint: '' });
   return out;
 }
 
@@ -241,10 +255,11 @@ export function drawScene(R, b, anim = {}) {
     const p = b.placed[s.id];
     if (!p) continue;
     drawPart(R, p, { ...base, id: ids[s.id] });
-    if (s.id === 'mb') drawScrews(R, 'mb', actSet(b, 'mb_screws'), ids.mb);
-    if (s.id === 'm2') drawScrews(R, 'm2', actSet(b, 'm2_screw'), ids.m2);
-    if (s.id === 'gpu') drawScrews(R, 'gpu', actSet(b, 'gpu_screw'), ids.gpu);
-    if (s.id === 'psu') drawScrews(R, 'psu', actSet(b, 'psu_screws'), ids.psu);
+    const screw = SCREW_OF[s.id];
+    if (screw) {
+      drawScrewHoles(R, screw.key, actSet(b, screw.act), ids[s.id]);
+      drawScrews(R, screw.key, actSet(b, screw.act), ids[s.id]);
+    }
   }
 }
 

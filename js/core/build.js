@@ -23,7 +23,11 @@ export class BuildView {
     $('#build-back').onclick = () => this.hooks.onExit();
     $('#build-boot').onclick = () => this.topAction();
     this.canvas.addEventListener('pointerdown', (e) => this.onCanvasDown(e));
-    this.canvas.addEventListener('pointermove', (e) => { this.hover = this.local(e); });
+    this.canvas.addEventListener('pointermove', (e) => {
+      this.hover = this.local(e);
+      const over = this.order && this.b.help !== null && this.phase === 'build' && this.actionAt(this.hover);
+      this.canvas.style.cursor = over ? 'pointer' : '';
+    });
     window.addEventListener('pointermove', (e) => this.onDragMove(e));
     window.addEventListener('pointerup', (e) => this.onDragEnd(e));
   }
@@ -262,7 +266,7 @@ export class BuildView {
   local(e) { const r = this.canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
 
   actionAt(pt) {
-    const r = this.help ? 26 : 16;
+    const r = this.help ? 26 : 22;
     let best = null, bd = r;
     for (const a of this.L.ACTIONS) {
       if (!this.L.actionReady(a, this.b)) continue;
@@ -333,7 +337,8 @@ export class BuildView {
     if (slot && this.b.placed[slot.id]) {
       const p = this.b.placed[slot.id];
       this.pending = { slot };
-      this.say(`<b>${esc(p.name)}</b> – ${esc(this.shop.specLine(p))} <button class="btn btn-small" data-act="remove">Ta ur</button>`, 'info');
+      const loose = this.L.screwStatus?.(slot.id, this.b);
+      this.say(`<b>${esc(p.name)}</b> – ${esc(this.shop.specLine(p))}${loose ? `<br>🪛 ${esc(loose)}` : ''} <button class="btn btn-small" data-act="remove">Ta ur</button>`, loose ? 'err' : 'info');
     }
   }
   onTrayDown(e, entry) {

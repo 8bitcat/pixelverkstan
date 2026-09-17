@@ -199,7 +199,7 @@ export function drawGpu(R, p, o) {
   const spin = o.spin || 0;
   // bracket + flik med skruvhål
   R.box(0.5, 0.75, 13.6, 15.6, BOARD_TOP, 4.35, (f, x, y) => (f === 'right' && ((y * 4) | 0) % 3 === 1) ? 0x2a2a2a : C.steel, o.id);
-  R.box(0.2, 0.8, 14.2, 15.0, 4.35, 4.5, () => C.steel, o.id);
+  R.box(0.2, 0.8, 14.05, 15.15, 3.85, 4.6, (f, x, y) => f === 'top' ? 0xd6dade : C.steel, o.id);
   R.box(g.u0, g.u1, g.v0, g.v1, g.z0, g.z1, (f, x, y, W, H) => {
     if (f === 'left') {
       if (p.rgb && y < 0.16) return led(o, 'gpu', x);
@@ -281,6 +281,27 @@ export function drawFans(R, p, o) {
 }
 
 // ---------- Skruvar ----------
+// Tomt skruvhål (syns tills skruven sitter i): blank ring + mörkt gängat hål
+function holeTex(x, y, cx, cy, r, ring) {
+  const d = Math.hypot(x - cx, y - cy);
+  if (d > r) return -1;
+  if (d > r * 0.62) return (x - cx + (y - cy) < 0) ? shade(ring, 1.25) : ring;
+  if (d < r * 0.2) return 0x050505;
+  return ((Math.atan2(y - cy, x - cx) * 2 + d * 20) % 1.2 < 0.4) ? 0x2a2a2e : 0x121214;
+}
+export function drawScrewHoles(R, key, done, id) {
+  const ring = key === 'mb' || key === 'm2' ? C.brass : 0xd6dade;
+  for (const [i, [u, v, z]] of SCREWS[key].entries()) {
+    if (done.has(i)) continue;
+    if (key === 'gpu' || key === 'psu') {
+      R.box(u - 0.02, u + 0.04, v - 0.3, v + 0.3, z - 0.3, z + 0.3, (f, x, y, W, H) => f === 'right' ? holeTex(x, y, W / 2, H / 2, 0.3, ring) : -1, id, { noEdges: true });
+    } else {
+      const lift = key === 'm2' ? 0.08 : 0.01;
+      R.box(u - 0.3, u + 0.3, v - 0.3, v + 0.3, z + lift, z + lift + 0.02, (f, x, y, W, H) => f === 'top' ? holeTex(x, y, W / 2, H / 2, 0.3, ring) : -1, id, { noEdges: true });
+    }
+  }
+}
+
 export function drawScrews(R, key, done, id) {
   for (const [i, [u, v, z]] of SCREWS[key].entries()) {
     if (typeof done === 'number' ? i >= done : !done.has(i)) continue;

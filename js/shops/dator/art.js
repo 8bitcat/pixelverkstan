@@ -2,10 +2,10 @@
 import { Raster } from '../../core/raster.js';
 import { VIEW } from './geom.js';
 import { drawMat, drawCase, drawBoard } from './art-base.js';
-import { drawCpu, drawCooler, drawRam, drawStorage, drawGpu, drawPsu, drawFans, drawScrews } from './art-parts.js';
+import { drawCpu, drawCooler, drawRam, drawStorage, drawGpu, drawPsu, drawFans, drawScrews, drawScrewHoles } from './art-parts.js';
 import { drawCaseStanding } from './art-case.js';
 
-export { drawMat, drawScrews, drawCaseStanding };
+export { drawMat, drawScrews, drawScrewHoles, drawCaseStanding };
 
 export function drawPart(R, part, o) {
   switch (part.cat) {
