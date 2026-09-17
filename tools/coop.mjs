@@ -14,7 +14,7 @@ async function newPlayer(name, color) {
   page.on("console", (m) => { if (m.type() === "error" && !m.text().includes('404')) errors.push(`[${name}] ${m.text()}`); });
   await page.goto(URL);
   await page.evaluate(() => localStorage.clear());
-  await page.evaluate(async ([n, c]) => { const A = await import('/js/core/avatar.js'); A.saveAvatar({ ...A.loadAvatar(), name: n, color: c }); }, [name, color]);
+  await page.evaluate(async ([n, c]) => { const A = await import(new URL('js/core/avatar.js', location.href).href); A.saveAvatar({ ...A.loadAvatar(), name: n, color: c }); }, [name, color]);
   await page.reload(); await page.waitForTimeout(600);
   return page;
 }
