@@ -130,7 +130,7 @@ export function generateOrder(game, names) {
   for (let i = 0; i < 30; i++) {
     const b = composeBuild(t, year);
     if (!b) continue;
-    const missing = b.filter((p) => game.stockFree(p.id) < 1).length;
+    const missing = b.filter((p) => (game.shownFree ? game.shownFree(p.id) : game.stockFree(p.id)) < 1).length;
     const score = wantMissing ? -Math.abs(missing - 1) * 10 + Math.random() : -missing * 10 + Math.random();
     if (score > bestScore) { bestScore = score; best = b; }
   }
@@ -162,10 +162,12 @@ export function startFor(year) {
   for (let i = 0; i < 12 && !a; i++) a = composeBuild(t, year, cheapest);
   for (let i = 0; i < 20 && !b; i++) b = composeBuild(t, year);
   b ||= a;
-  const stock = {};
-  for (const p of [...(a || []), ...(b || [])]) stock[p.id] = (stock[p.id] || 0) + 1;
+  // butiken börjar tom: startkassan räcker till startpaketet (båda byggena) och lite till
+  const kit = {};
+  for (const p of [...(a || []), ...(b || [])]) kit[p.id] = (kit[p.id] || 0) + 1;
+  const kitCost = Object.entries(kit).reduce((s, [id, n]) => s + DB.part[id].cost * n, 0);
   const cost = (a || []).reduce((s, p) => s + p.cost, 0);
-  return { money: Math.max(2000, Math.round(cost * 0.6 / 500) * 500), stock, builds: [a, b], template: t.id };
+  return { money: Math.round((kitCost + Math.max(2000, cost * 0.6)) / 500) * 500, stock: {}, kit, builds: [a, b], template: t.id };
 }
 
 const TUTOR_NAMES = ['Birgitta', 'Oscar', 'Wilma'];

@@ -126,7 +126,7 @@ export class Desk {
     if (plug.target === 'strip') {
       const [sx, sy] = this.proj(...this.STRIP);
       if (Math.hypot(sx - pt[0], sy - pt[1]) > 60 * Math.max(0.6, this.s / 2)) return v.say('Stickkontakten ska i grenuttaget på bordet.', 'err');
-      d.plugs[id] = 'STRIP';
+      v.op({ t: 'plug', id, key: 'STRIP' });
       v.say('Skärmen har fått ström.', 'info');
       return v.refresh();
     }
@@ -143,7 +143,7 @@ export class Desk {
     if (id === 'video' && port.owner === 'mb' && this.b.placed.gpu && v.help) {
       return v.fail('Den passar, men datorn har ett grafikkort – koppla skärmen till grafikkortets uttag längre ner, annars blir det ingen bild.');
     }
-    d.plugs[id] = port.key;
+    v.op({ t: 'plug', id, key: port.key });
     v.say(`Klick! ${esc(plug.name)} sitter i ${esc(port.label.toLowerCase())}.`, 'info');
     v.refresh();
   }
@@ -163,7 +163,7 @@ export class Desk {
       // strömbrytare
       const SW = this.SWITCH;
       if (inRect([this.insetX + SW.x * si - 4, this.insetY + SW.y * si - 4, SW.w * si + 8, SW.h * si + 8])) {
-        d.psuOn = !d.psuOn; this.run = null; this.state.powered = false; d.success = false;
+        v.op({ t: 'psu', on: !d.psuOn }); this.run = null; this.state.powered = false;
         if (this.era?.at && d.psuOn) { v.refresh(); return this.pressPower(); }
         v.say(d.psuOn ? 'Nätagget är påslaget (I).' : 'Nätagget är avslaget (O).', 'info');
         return v.refresh();
@@ -171,7 +171,7 @@ export class Desk {
       // dra ur en kontakt
       const port = this.portAt(pt, 2);
       const plugged = port && Object.entries(d.plugs).find(([, k]) => k === port.key);
-      if (plugged) { delete d.plugs[plugged[0]]; this.run = null; d.success = false; this.state.powered = false; v.say(`${esc(this.PLUGS[plugged[0]].name)} är urdragen.`, 'info'); return v.refresh(); }
+      if (plugged) { v.op({ t: 'unplugd', id: plugged[0] }); this.run = null; this.state.powered = false; v.say(`${esc(this.PLUGS[plugged[0]].name)} är urdragen.`, 'info'); return v.refresh(); }
     }
     if (deskVisible) {
       const [bx, by] = this.powerButton();
@@ -180,18 +180,20 @@ export class Desk {
         return this.pressPower();
       }
       const [px, py] = this.proj(...this.STRIP);
-      if (d.plugs.mon_power && Math.hypot(px - pt[0], py - pt[1]) < 30) { delete d.plugs.mon_power; this.run = null; d.success = false; v.say('Skärmens stickkontakt är urdragen.', 'info'); return v.refresh(); }
+      if (d.plugs.mon_power && Math.hypot(px - pt[0], py - pt[1]) < 30) { v.op({ t: 'unplugd', id: 'mon_power' }); this.run = null; v.say('Skärmens stickkontakt är urdragen.', 'info'); return v.refresh(); }
     }
   }
   guideAction(act) {
-    if (act === 'retry') { if (this.era?.at) this.d.psuOn = true; this.pressPower(); }
+    if (act === 'retry') { if (this.era?.at && !this.d.psuOn) this.view.op({ t: 'psu', on: true }); this.pressPower(); }
     if (act === 'deliver') this.view.finish({ warnings: this.warnings || [] });
   }
 
   // ---------- Starta ----------
-  pressPower() {
+  // remote = en kompis tryckte på startknappen
+  pressPower(remote = false) {
     if (this.run && !this.run.done) return;
-    this.run = { t: 0, ...this.evaluate() };
+    if (!remote) this.view.op({ t: 'power' });
+    this.run = { t: 0, local: !remote, ...this.evaluate() };
     this.pressAnim = 0.25;
     this.view.msg = null; this.view.guideKey = null;
   }
@@ -291,14 +293,14 @@ export class Desk {
   report(run) {
     const v = this.view, d = this.d;
     if (run.kind === 'ok') {
-      d.success = true;
+      if (run.local) v.op({ t: 'result', success: true });
       this.warnings = run.warnings;
       const warn = run.warnings.length ? `<br>⚠️ ${run.warnings.map(esc).join(' ')} <i>(${run.warnings.length} ⭐ mindre – eller öppna datorn och fixa)</i>` : '';
       v.say(`<b>Datorn fungerar!</b>${warn} <button class="btn btn-small btn-go" data-act="deliver">📦 Leverera till ${esc(v.order.name)}</button>`, 'good');
       return v.refresh();
     }
     const f = run.fail;
-    v.b.errors++;
+    if (run.local) v.op({ t: 'err' });
     d.attempts[f.key] = (d.attempts[f.key] || 0) + 1;
     const showCause = v.help || d.attempts[f.key] >= 2;
     const where = f.where === 'inside' ? 'Felet sitter <b>inne i datorn</b> – tryck på 🔧 Öppna datorn.' : 'Felet sitter <b>utanför datorn</b> – kolla kablarna på baksidan och bordet.';

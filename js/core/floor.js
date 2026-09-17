@@ -10,6 +10,7 @@ import { Pix, hex, mix, mul, hsl, bayer, SMALL, BIG, textW, ctxText, eachTextPix
 import * as LY from './floor-layout.js';
 import * as SC from './floor-scene.js';
 import * as PR from './floor-props.js';
+import * as WK from './floor-walk.js';
 
 export const FW = LY.FW, FH = LY.FH;
 const SPEED = 58, OUT_SPEED = 66;
@@ -32,10 +33,18 @@ export class Floor {
     this.cars = []; this.carT = 1.5;
     this.walkers = []; this.walkerT = 4;
     this.sig = null; this.sigT = 0;
+    // spelarnas avatarer: { id, name, look, color, x, y, dir, walk, moving, path, local, away, act }
+    this.players = [];
+    this.boxDrop = new Map(); this.hoverBox = null; this.vans = [];
+    this.onBoxClick = null;
     this.build();
     if (canvas._floorOff) canvas._floorOff();
     const down = (e) => this.click(e);
-    const move = (e) => { const c = this.hit(e); canvas.style.cursor = (c && this.clickable(c)) || this.showcaseAt(e) ? 'pointer' : 'default'; };
+    const move = (e) => {
+      const c = this.hit(e), bx = this.boxAt(e);
+      this.hoverBox = bx ? bx.id : null;
+      canvas.style.cursor = (c && this.clickable(c)) || this.showcaseAt(e) || bx ? 'pointer' : this.inFloor(e) ? 'crosshair' : 'default';
+    };
     canvas.addEventListener('pointerdown', down);
     canvas.addEventListener('pointermove', move);
     canvas._floorOff = () => { canvas.removeEventListener('pointerdown', down); canvas.removeEventListener('pointermove', move); };
@@ -107,8 +116,11 @@ export class Floor {
         c.x = left ? LY.SPAWN_X[0] : LY.SPAWN_X[1]; c.y = LY.SIDEWALK_Y; c.dir = left ? 'right' : 'left';
       }
     }
-    for (const c of [...g.customers]) this.moveCustomer(c, dt);
-    this.updateKeeper(dt);
+    if (!this.mirror) for (const c of [...g.customers]) this.moveCustomer(c, dt);
+    else this.followCustomers(dt);
+    for (const pl of this.players) this.movePlayer(pl, dt);
+    for (const v of this.vans) { v.t += dt; if (v.stop > 0 && Math.abs(v.x - LY.DOOR.cx + 15) < 3) { v.stop -= dt; } else v.x += v.v * dt; }
+    this.vans = this.vans.filter((v) => v.x < SC.STREET_W + 40);
     this.updateStreet(dt);
     // automatdörren
     const near = [...g.customers, ...this.walkers.filter((w) => w.enter)].some((c) => Math.abs(c.x - LY.DOOR.cx) < 24 && c.y > LY.SIDEWALK_Y - 4 && c.y < LY.WALL_Y + 20);
@@ -116,6 +128,57 @@ export class Floor {
     for (const p of this.particles) { p.vy += 520 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
     this.particles = this.particles.filter((p) => p.life > 0);
   }
+
+  // ---------- Spelarna ----------
+  localPlayer() { return this.players.find((p) => p.local); }
+  movePlayer(pl, dt) {
+    if (!pl.local) {
+      // andra spelare: glid mot senaste kända position
+      if (pl.tx === undefined) return;
+      const dx = pl.tx - pl.x, dy = pl.ty - pl.y, d = Math.hypot(dx, dy);
+      pl.moving = d > 0.6;
+      if (d > 60) { pl.x = pl.tx; pl.y = pl.ty; }
+      else if (pl.moving) { const k = Math.min(1, dt * 10); pl.x += dx * k; pl.y += dy * k; pl.walk = (pl.walk || 0) + dt * 8.5; if (Math.abs(dx) + Math.abs(dy) > 0.3) pl.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down'); }
+      else pl.dir = pl.tdir || pl.dir;
+      return;
+    }
+    const path = pl.path;
+    if (path && path.length) {
+      const [tx, ty] = path[0];
+      const dx = tx - pl.x, dy = ty - pl.y, d = Math.hypot(dx, dy), sp = 92 * dt;
+      if (d > 0.01) pl.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
+      if (d <= sp) { pl.x = tx; pl.y = ty; path.shift(); } else { pl.x += dx / d * sp; pl.y += dy / d * sp; }
+      pl.moving = true; pl.walk = (pl.walk || 0) + dt * 10;
+      return;
+    }
+    pl.moving = false;
+    if (pl.act) { const fn = pl.act; pl.act = null; if (pl.faceDir) pl.dir = pl.faceDir; fn(); }
+  }
+  // gå till (x,y) och gör sedan fn (direkt om man redan står där)
+  goTo(x, y, fn = null, faceDir = null) {
+    const pl = this.localPlayer();
+    if (!pl) { fn?.(); return; }
+    pl.away = null;
+    const [nx, ny] = WK.nearestFree(x, y);
+    if (Math.hypot(nx - pl.x, ny - pl.y) < 6) { pl.path = []; pl.act = null; if (faceDir) pl.dir = faceDir; fn?.(); return; }
+    pl.path = WK.findPath(pl.x, pl.y, nx, ny);
+    pl.act = fn; pl.faceDir = faceDir;
+  }
+  // klienten i co-op: kunderna flyttas av värden, här glider vi bara mot deras position
+  followCustomers(dt) {
+    for (const c of this.game.customers) {
+      if (c.tx === undefined) continue;
+      const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy);
+      if (d > 50 || c.x === undefined) { c.x = c.tx; c.y = c.ty; }
+      else { const k = Math.min(1, dt * 9); c.x += dx * k; c.y += dy * k; }
+      if (c.moving) c.walk = (c.walk || 0) + dt * 8.5;
+    }
+  }
+  spawnVan() {
+    this.vans.push({ x: -40, v: 70, stop: 1.4, t: 0 });
+  }
+  boxPos(i) { return WK.DELIVERY[i % WK.DELIVERY.length]; }
+  arrivedBoxes() { return this.game.deliveries.filter((d) => d.state === 'arrived'); }
 
   pickSpot(c) {
     const g = this.game;
@@ -281,11 +344,33 @@ export class Floor {
     return best;
   }
   clickable(c) { return c.phase === 'queue' && this.game.queue()[0] === c; }
+  inFloor(e) { const [x, y] = this.toLocal(e); return x > 0 && x < FW && y > LY.WALL_Y && y < FH; }
+  boxAt(e) {
+    const [x, y] = this.toLocal(e);
+    const boxes = this.arrivedBoxes();
+    for (let i = boxes.length - 1; i >= 0; i--) {
+      const [bx, by] = this.boxPos(i);
+      if (x > bx - 14 && x < bx + 14 && y > by - 26 && y < by + 4) return boxes[i];
+    }
+    return null;
+  }
   click(e) {
+    const bx = this.boxAt(e);
+    if (bx) {
+      const i = this.arrivedBoxes().indexOf(bx), [x, y] = this.boxPos(i);
+      return this.goTo(x - 18, y + 2, () => this.onBoxClick?.(bx), 'right');
+    }
     const c = this.hit(e);
-    if (c && this.onCustomerClick) return this.onCustomerClick(c);
+    if (c && this.onCustomerClick) {
+      if (this.clickable(c)) return this.goTo(WK.SPOTS.counter[0], WK.SPOTS.counter[1], () => this.onCustomerClick(c), 'down');
+      return this.onCustomerClick(c);
+    }
     const sc = this.showcaseAt(e);
-    if (sc && this.onShowcaseClick) this.onShowcaseClick(sc);
+    if (sc && this.onShowcaseClick) {
+      const [x, y] = this.toLocal(e);
+      return this.goTo(x, y + 26, () => this.onShowcaseClick(sc), 'up');
+    }
+    if (this.inFloor(e)) { const [x, y] = this.toLocal(e); this.goTo(x, y); }
   }
   // Monter eller stjärnobjekt under pekaren → { cat, title } | { hero }
   showcaseAt(e) {
@@ -345,6 +430,7 @@ export class Floor {
       if (car.dir > 0) ctx.drawImage(car.img, Math.round(car.x), y);
       else { ctx.save(); ctx.translate(Math.round(car.x) + 30, y); ctx.scale(-1, 1); ctx.drawImage(car.img, 0, 0); ctx.restore(); }
     }
+    for (const v of this.vans) this.drawVan(ctx, v);
     ctx.drawImage(this.street, 0, 66, SC.STREET_W, LY.WALL_Y - 66, 0, 66, SC.STREET_W, LY.WALL_Y - 66);
     const outside = [
       ...this.walkers.map((w) => ({ y: w.y, x: w.x, look: w.look, dir: w.dir > 0 ? 'right' : 'left', f: WALK_SEQ[Math.floor(w.walk) % 4] })),
@@ -360,8 +446,16 @@ export class Floor {
     // y-sorterade möbler och personer
     const S = [];
     for (const f of this.furniture) S.push([f.sort, () => ctx.drawImage(f.img, f.x, f.y)]);
-    const k = this.keeper;
-    S.push([k.y, () => drawPerson(ctx, k.x, k.y, SHOPKEEPER, k.dir, k.moving ? WALK_SEQ[Math.floor(k.walk) % 4] : (Math.sin(t * 2.1) > 0.7 ? 4 : 0))]);
+    for (const pl of this.players) {
+      if (pl.away) continue;
+      S.push([pl.y, () => drawPerson(ctx, pl.x, pl.y, pl.look || SHOPKEEPER, pl.dir || 'down', pl.moving ? WALK_SEQ[Math.floor(pl.walk || 0) % 4] : (Math.sin(t * 2.1 + (pl.seed || 0)) > 0.7 ? 4 : 0))]);
+    }
+    this.arrivedBoxes().forEach((d, i) => {
+      const [bx, by] = this.boxPos(i);
+      if (!this.boxDrop.has(d.id)) this.boxDrop.set(d.id, t);
+      const age = t - this.boxDrop.get(d.id), drop = Math.max(0, 1 - age * 2.2);
+      S.push([by, () => this.drawBox(ctx, d, bx, by - Math.round(drop * drop * 60))]);
+    });
     S.push([LY.COUNTER.base, () => this.drawCounter(ctx)]);
     this.vits.forEach((vt) => S.push([vt.v.base, () => ctx.drawImage(vt.img, vt.v.x0, vt.v.base - PR.VIT.H + 1, vt.img.width / this.RES, vt.img.height / this.RES)]));
     S.push([LY.ROPE.back, () => ctx.drawImage(this.ropeBack.img, this.ropeBack.x, this.ropeBack.y)]);
@@ -382,6 +476,8 @@ export class Floor {
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
 
     for (const c of g.customers) if (c.y >= LY.WALL_Y) this.drawBubble(ctx, c);
+    this.drawNameTags(ctx);
+    if (this.hoverBox) { const i = this.arrivedBoxes().findIndex((d) => d.id === this.hoverBox); if (i >= 0) this.drawBoxTip(ctx, this.arrivedBoxes()[i], ...this.boxPos(i)); }
     for (const p of this.particles) {
       const x = p.x | 0, y = p.y | 0, spin = Math.floor((p.life * 10) % 3);
       ctx.fillStyle = '#8a5a0b'; ctx.fillRect(x - 1, y - 1, spin === 1 ? 3 : 6, 6);
@@ -401,7 +497,7 @@ export class Floor {
   }
 
   // delar i lager (lagret är glest – snabbare än att gå igenom alla delar)
-  owned() { const g = this.game; return Object.keys(g.stock).filter((id) => g.stock[id] > 0).map((id) => this.shop.part[id]).filter(Boolean); }
+  owned() { const g = this.game; return Object.keys(g.shown).filter((id) => g.shownFree(id) > 0).map((id) => this.shop.part[id]).filter(Boolean); }
 
   // lagret ändras → rita om montrar och vägghylla
   refreshStock() {
@@ -410,7 +506,7 @@ export class Floor {
     this.sigT = 0.25;
     const g = this.game, shop = this.shop;
     if (g.year !== this.heroYear) { this.build(); this.sig = null; }
-    const sig = Object.entries(g.stock).filter(([, n]) => n > 0).map(([id, n]) => id + ':' + n).join(',');
+    const sig = Object.keys(g.shown).map((id) => id + ':' + g.shownFree(id)).join(',');
     if (sig === this.sig) return;
     this.sig = sig;
     this.vits.forEach((vt) => { vt.img = this.renderVitrine(vt); });
@@ -440,14 +536,14 @@ export class Floor {
       x.drawImage(this.icon(it.p, iw * RES, ih * RES), Math.round(it.cx - iw / 2), Math.round(it.bottom - ih + 1), iw, ih);
     }
     for (const it of placed) {
-      const label = '×' + g.stockFree(it.p.id), tw = textW(SMALL, label) + 3;
+      const label = '×' + g.shownFree(it.p.id), tw = textW(SMALL, label) + 3;
       const tx = Math.round(it.cx + iw * 0.18), ty = Math.round(it.bottom - 8);
       x.fillStyle = '#17151a'; x.fillRect(tx - 1, ty - 1, tw + 2, 9);
       x.fillStyle = '#f4efe2'; x.fillRect(tx, ty, tw, 7);
       ctxText(x, SMALL, label, tx + 2, ty + 1, '#17151a');
     }
     if (!parts.length) {
-      const label = 'SLUT I LAGER', tw = textW(SMALL, label) + 8, tx = Math.round((W - tw) / 2), ty = GH + 12;
+      const label = 'TOM MONTER', tw = textW(SMALL, label) + 8, tx = Math.round((W - tw) / 2), ty = GH + 12;
       x.fillStyle = 'rgba(8,4,14,.45)'; x.fillRect(tx + 2, ty + 2, tw, 11);
       x.fillStyle = '#f4efe2'; x.fillRect(tx, ty, tw, 11);
       x.fillStyle = '#c9323a'; x.fillRect(tx, ty, tw, 1); x.fillRect(tx, ty + 10, tw, 1);
@@ -471,7 +567,7 @@ export class Floor {
       x.fillStyle = col; x.fillRect(Math.round(gx + gw / 2 - 3), board + 2 - oy, 6, 2);
       const parts = this.owned().filter((p) => p.cat === cat).sort((a, b) => (b.cost || 0) - (a.cost || 0));
       const boxes = [];
-      for (const p of parts) for (let n = 0; n < Math.min(2, g.stockFree(p.id)) && boxes.length < 3; n++) boxes.push(p);
+      for (const p of parts) for (let n = 0; n < Math.min(2, g.shownFree(p.id)) && boxes.length < 3; n++) boxes.push(p);
       const [bw, bh] = SIZE[cat] || [10, 10];
       const span = bw + (boxes.length - 1) * Math.max(4, Math.min(bw - 2, (gw - 2 - bw) / Math.max(1, boxes.length - 1)));
       boxes.forEach((p, j) => {
@@ -646,6 +742,70 @@ export class Floor {
     // led-list i podiet
     const [p0, , p1, pb] = B.ped;
     for (let i = p0 + 2; i < p1 - 2; i++) { ctx.fillStyle = css(hsl(hue - i * 6, 1, 0.58)); ctx.fillRect(x + i, y + pb - 5, 1, 2); }
+  }
+
+  // Kartong från grossisten med etikett: antal delar och kategoriernas färger
+  drawBox(ctx, d, x, y) {
+    const shop = this.shop, INK = '#17151a';
+    const x0 = Math.round(x - 12), y0 = Math.round(y - 20), w = 24, h = 20;
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x0 + 2, y0 + h - 2, w + 2, 4);
+    ctx.fillStyle = INK; ctx.fillRect(x0 - 1, y0 - 1, w + 2, h + 2);
+    ctx.fillStyle = '#c9a36b'; ctx.fillRect(x0, y0 + 5, w, h - 5);
+    ctx.fillStyle = '#e0c08a'; ctx.fillRect(x0, y0, w, 5);
+    ctx.fillStyle = '#9e7a48'; ctx.fillRect(x0 + w - 3, y0 + 5, 3, h - 5); ctx.fillRect(x0, y0 + 5, w, 1);
+    ctx.fillStyle = '#d8b67a'; ctx.fillRect(x0 + w / 2 - 2, y0, 4, 5);           // tejp
+    ctx.fillStyle = '#b89058'; ctx.fillRect(x0 + w / 2 - 2, y0 + 5, 4, 3);
+    // etikett
+    const items = Object.entries(d.items), count = items.reduce((s, [, n]) => s + n, 0);
+    ctx.fillStyle = '#f4f1ea'; ctx.fillRect(x0 + 3, y0 + 9, 16, 9);
+    ctx.fillStyle = '#c9c3b4'; ctx.fillRect(x0 + 3, y0 + 17, 16, 1);
+    const cats = [...new Set(items.map(([id]) => shop.part[id]?.cat).filter(Boolean))].slice(0, 4);
+    cats.forEach((cat, i) => { ctx.fillStyle = shop.cats?.[cat]?.color || '#888'; ctx.fillRect(x0 + 4 + i * 3, y0 + 10, 2, 2); });
+    ctxText(ctx, SMALL, String(count), x0 + 5, y0 + 12, INK);
+    if (Math.floor(this.t * 2) % 2 && this.hoverBox !== d.id) { ctx.fillStyle = '#e8b230'; ctx.fillRect(x0 + w - 5, y0 - 5, 4, 4); ctx.fillStyle = INK; ctx.fillRect(x0 + w - 4, y0 - 4, 2, 2); }
+  }
+  drawBoxTip(ctx, d, x, y) {
+    const shop = this.shop, INK = '#17151a';
+    const lines = Object.entries(d.items).map(([id, n]) => `${n}× ${(shop.part[id]?.name || id).toUpperCase()}`.slice(0, 26));
+    const shown = lines.slice(0, 6);
+    if (lines.length > 6) shown.push(`+${lines.length - 6} TILL`);
+    const head = 'FRÅN GROSSISTEN: TRYCK FÖR ATT PACKA UPP';
+    const w = Math.max(textW(SMALL, head), ...shown.map((l) => textW(SMALL, l))) + 8, h = 9 + shown.length * 7 + 4;
+    const bx = Math.max(2, Math.min(FW - w - 2, Math.round(x - w / 2))), by = Math.max(LY.WALL_Y - 30, Math.round(y - 28 - h));
+    ctx.fillStyle = INK; ctx.fillRect(bx - 1, by - 1, w + 2, h + 2);
+    ctx.fillStyle = '#f4efe2'; ctx.fillRect(bx, by, w, h);
+    ctx.fillStyle = '#c9a36b'; ctx.fillRect(bx, by, w, 8);
+    ctxText(ctx, SMALL, head, bx + 4, by + 2, INK);
+    shown.forEach((l, i) => ctxText(ctx, SMALL, l, bx + 4, by + 11 + i * 7, INK));
+  }
+  drawNameTags(ctx) {
+    if (this.players.length < 2) return;
+    for (const pl of this.players) {
+      if (pl.away) continue;
+      const name = (pl.name || '?').toUpperCase().slice(0, 12), w = textW(SMALL, name) + 4;
+      const x = Math.round(pl.x - w / 2), y = Math.round(pl.y - (pl.look?.kid ? 40 : 50));
+      ctx.fillStyle = '#17151a'; ctx.fillRect(x - 1, y - 1, w + 2, 9);
+      ctx.fillStyle = pl.color || '#7ee8fa'; ctx.fillRect(x, y, w, 7);
+      ctxText(ctx, SMALL, name, x + 2, y + 1, '#17151a');
+    }
+    // spelare i verkstaden: skylt vid dörren
+    const away = this.players.filter((p) => p.away === 'workshop');
+    away.forEach((pl, i) => {
+      const x = 454 + i * 9, y = 88;
+      ctx.fillStyle = '#17151a'; ctx.fillRect(x - 1, y - 1, 8, 8);
+      ctx.fillStyle = pl.color || '#7ee8fa'; ctx.fillRect(x, y, 6, 6);
+      ctx.fillStyle = '#17151a'; ctx.fillRect(x + 2, y + 1, 2, 4); ctx.fillRect(x + 1, y + 1, 4, 1);
+    });
+  }
+  drawVan(ctx, v) {
+    const x = Math.round(v.x), y = 44;
+    ctx.fillStyle = '#17151a'; ctx.fillRect(x - 1, y - 1, 38, 18);
+    ctx.fillStyle = '#e8e3d6'; ctx.fillRect(x, y, 26, 14);
+    ctx.fillStyle = '#c9323a'; ctx.fillRect(x, y + 7, 26, 3);
+    ctx.fillStyle = '#e8e3d6'; ctx.fillRect(x + 26, y + 4, 10, 10);
+    ctx.fillStyle = '#9fc7e0'; ctx.fillRect(x + 28, y + 5, 6, 4);
+    ctx.fillStyle = '#c9a36b'; ctx.fillRect(x + 4, y + 2, 6, 4); ctx.fillStyle = '#e0c08a'; ctx.fillRect(x + 4, y + 2, 6, 1);
+    for (const wx of [6, 29]) { ctx.fillStyle = '#1b1b1f'; ctx.fillRect(x + wx - 2, y + 13, 5, 4); ctx.fillStyle = '#9a9ea6'; ctx.fillRect(x + wx, y + 14, 1, 1); }
   }
 
   drawBubble(ctx, c) {

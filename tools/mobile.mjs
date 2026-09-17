@@ -11,6 +11,7 @@ page.on("pageerror", (e) => errors.push(e.message));
 await page.goto("http://localhost:8777/index.html?year=2024");
 await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForTimeout(500);
 await page.tap('[data-shop="dator"]'); await page.waitForFunction(() => window.PV?.game, null, { timeout: 30000 });
+await page.evaluate(() => { const g = PV.game; for (const [id, n] of g.shop.starterKit(g)) { g.stock[id] = (g.stock[id] || 0) + n; g.shown[id] = (g.shown[id] || 0) + n; } g.emit('change'); });
 await page.evaluate(() => {
   const g = PV.game; g.tutorialStep = 9; g.spawnTimer = 9999;
   const c = g.spawn(g.shop.tutorialOrder(0, g)); c.phase = 'queue';

@@ -37,27 +37,33 @@ python -m http.server 8777
 
 ## Spelloop
 
-1. Kunden går in och ställer sig vid disken → tryck på kunden (❗).
-2. Beställningen visar vad som finns i lager ✓ och vad som saknas ✗.
-   Saknade delar kan köpas in direkt om du har råd, annars tackar du nej.
-3. Välj byggläge: **med hjälp** (markeringar, checklista, förklaringar) eller
+1. **Köp in varor.** Butiken börjar tom. Tryck på 🛒 Grossist – Startpaketet innehåller
+   delarna till de första kundernas datorer. Allt du köper kommer i en **låda** en stund senare.
+2. **Packa upp och ställ ut.** Lådan står vid dörren med en etikett på vad som kommit.
+   Gå fram (tryck på lådan) och packa upp: delarna ställs ut i montrarna eller läggs i
+   förrådet. **Kunderna beställer det de ser** – 📦 Lager visar vad som står framme.
+3. Kunden ställer sig vid disken → tryck på kunden så går din avatar bakom disken och
+   tar beställningen. Saknas något kan du beställa det – ta emot när lådan är uppackad.
+4. Välj byggläge: **med hjälp** (markeringar, checklista, förklaringar) eller
    **utan hjälp** (proffsläge, +15 % betalt – misstag märks först vid start).
-4. **Montering** i det öppna chassit: sätt i delarna, skruva fast moderkort,
-   M.2, grafikkort och nätagg, lås sockelspaken, stryk kylpasta.
-5. **Kablar**: dra varje kabel (pixlade kontakter) till rätt uttag – epokens egna:
-   P8/P9, ATX 20/24-pin, ATX12V/EPS, Molex, Berg, IDE/diskett/MFM-flatkablar, SATA,
-   PCIe/12V-2x6, CPU_FAN/SYS_FAN, ARGB, frontpanel, USB, ljud, CD-ljud.
-   Fel form går inte; rätt form i fel uttag (t.ex. P8/P9 omvända) märks vid start.
-6. **Skrivbordet**: datorn ställs upp. Koppla in ström, skärm (DE9/VGA/DVI/HDMI –
-   till grafikkortet!), skärmens ström, tangentbord (DIN/PS/2/USB) och mus
-   (serieport/PS/2/USB) på baksidan, slå på nätagget och tryck på startknappen
-   (AT-datorer startar direkt med den röda strömbrytaren).
-7. Startsekvensen visar vad som är fel: ingenting händer, svart skärm,
-   "Ingen signal", CPU FAN ERROR, ingen startenhet, överhettning … Felsök
-   (öppna datorn eller kolla kablarna) och starta igen.
-8. Kunden hämtar vid utlämningen och betalar. Erfarenhet ger nya nivåer och delar.
+5. **Montering** i det öppna chassit och **kablar** till rätt uttag (se Epoker).
+6. **Skrivbordet**: koppla in ström, skärm, tangentbord och mus, slå på och starta.
+   Startsekvensen visar vad som är fel – felsök och starta igen.
+7. Kunden hämtar vid utlämningen och betalar. Erfarenhet för åren framåt.
 
 De tre första kunderna är guidade.
+
+## Avatar och co-op
+
+- **👤 Min avatar** i menyn: bygg din figur (frisyr, kläder, glasögon, huvudbonad …),
+  välj namn och färg. Avataren går runt i butiken – tryck på golvet för att gå.
+- **👥 Spela tillsammans**: starta ett rum (du blir värd och väljer vilket sparat spel)
+  eller gå med med en **rumskod på fyra bokstäver** (eller länken `?rum=ABCD`).
+  Lobbyn visar alla spelare; värden öppnar butiken.
+- Ni delar kassa, lager, lådor och kunder: en tar emot kunder, en packar upp, båda kan
+  gå in i verkstaden och **bygga samma dator samtidigt** – ni ser varandras muspekare
+  och vad kompisen håller i. Nätverket är WebRTC via PeerJS; värden kör spelet och
+  sparar det.
 
 ## Struktur
 
@@ -71,7 +77,13 @@ js/core/        generisk motor – vet inget om datorer
   build-draw.js markeringar, uttagsetiketter, etikettrutor
   raster.js     isometrisk pixelrastrering (skarpa pixlar, klicktest per pixel)
   pixfont.js    3×5-pixelfont + textstämplar i texturer
-  ui.js         HUD, dialoger, grossist (sök/filter/sidor), nytt år, museivy
+  ui.js         HUD, dialoger, grossist (sök/filter/sidor, startpaket), lådor, lager, nytt år, museivy
+  session.js    kommandon som ändrar spelet (körs hos värden i co-op)
+  net.js        PeerJS-rum med fyrbokstavskod
+  coop.js       synk mellan värd och klienter (läge, kunder, avatarer, byggen, muspekare)
+  build-ops.js  byggoperationer som delas mellan spelare
+  floor-walk.js gångnät (A*) för avatarerna
+  avatar.js     avatarredigeraren
 js/shops/
   index.js      register över verksamheter (meny)
   dator/        Datorbutiken
@@ -121,6 +133,9 @@ node tools/erabuild.mjs 1990 c90 help    # hel kund via klick/drag i webbläsare
 node tools/e2e.mjs                       # butik → bygge → skrivbord → leverans → betalt
 node tools/era-start.mjs                 # startårsval, laddtid, butik och grossist 1983
 node tools/slots.mjs                     # sparningar per startår: byta år, fortsätta, börja om
+node tools/shopflow.mjs                  # tom butik → startpaket → låda → packa upp → kund
+node tools/coop.mjs                      # två webbläsare: lobby, delad butik, bygga ihop, muspekare
+node tools/avatar.mjs                    # avatarredigeraren
 node tools/mobile.mjs                    # mobilvy (iPhone 13)
 node tools/zoom.mjs                      # renderingstider vid zoom
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner

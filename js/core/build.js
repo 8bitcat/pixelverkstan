@@ -4,7 +4,8 @@
 import { Raster } from './raster.js';
 import * as D from './build-draw.js';
 import * as U from './build-ui.js';
-import { modalOpen } from './ui.js';
+import { modalOpen, closeModal } from './ui.js';
+import { applyBuildOp, newBuild } from './build-ops.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = U.esc;
@@ -23,6 +24,8 @@ export class BuildView {
     this.cableCanvas = document.createElement('canvas');
     this.cableCtx = this.cableCanvas.getContext('2d');
     this.ptrs = new Map();
+    this.cursors = new Map();   // kompisarnas muspekare: id → { order, s, x, y, drag, name, color, t }
+    this.cursorIcons = new Map();
     this.zoomUI();
     this.t = 0; this.spin = 0; this.order = null;
     this.finale = this.shop.Finale ? new this.shop.Finale(this) : null;
@@ -51,15 +54,38 @@ export class BuildView {
   // Byggreglerna för just den här beställningen (butiken kan ge en rigg per order)
   get L() { return this.rig || this.shop.layout; }
 
+  // Alla ändringar av bygget går via op(): körs här och delas med kompisar (hooks.onOp)
+  op(o) { applyBuildOp(this.shop, this.order, o); this.hooks.onOp?.(this.order, o); }
+  // Spelkommandon (lager m.m.) – i co-op skickas de till värden
+  act(name, args) { return this.hooks.act ? this.hooks.act(name, args) : undefined; }
+  // En kompis ändrade ett bygge
+  remoteOp(order, o) {
+    applyBuildOp(this.shop, order, o);
+    if (order !== this.order) return;
+    this.dirty = true; this.cablesDirty = true;
+    if (o.t === 'place' || o.t === 'remove') this.flash = null;
+    if (o.t === 'cable') this.plugAnim = { id: o.id, t: 0 };
+    if (o.t === 'mode' && this.choosingMode) { this.choosingMode = false; closeModal(); this.start(); return; }
+    if (o.t === 'phase') {
+      this.selected = null;
+      if (o.v === 'desk') this.finale?.enter();
+      else this.say('Datorn ligger på bänken igen – leta efter felet!', 'info');
+    }
+    if (o.t === 'power' && this.phase === 'desk') this.finale?.pressPower(true);
+    if (o.t === 'act') { const a = this.L.ACTION[o.id]; if (a) this.toolAnim = { pt: a.points[o.i], t: 0, icon: a.icon }; }
+    this.refresh();
+  }
+
   open(order) {
     this.order = order;
     this.rig = this.shop.layout.rigFor ? this.shop.layout.rigFor(order) : null;
-    order.build ||= { placed: {}, acts: new Map(), cables: new Map(), errors: 0, time: 0, help: null, phase: 'build', seen: new Set() };
+    order.build ||= newBuild();
+    order.build.seen ||= new Set();
     this.selected = null; this.msg = null; this.guideKey = null; this.dirty = true; this.cablesDirty = true; this.userCam = false;
     $('#build-title').innerHTML = `<span class="r">${esc(order.title)}</span> åt ${esc(order.name)}`;
     if (order.build.help === null) {
-      if (order.guided) order.build.help = true;
-      else { this.refresh(); U.chooseMode(this, (help) => { order.build.help = help; this.start(); }); return; }
+      if (order.guided) this.op({ t: 'mode', help: true });
+      else { this.refresh(); this.choosingMode = true; U.chooseMode(this, (help) => { this.choosingMode = false; this.op({ t: 'mode', help }); this.start(); }); return; }
     }
     this.start();
   }
@@ -184,11 +210,8 @@ export class BuildView {
   place(entry, slot) {
     const b = this.b, res = this.L.canPlace(slot, entry.part, b);
     if (!res.ok) return this.fail(res.msg);
-    if (entry.choice) {
-      if (!this.game.takeStock(entry.part.id)) return false;
-      this.order.chosen[entry.part.cat] = entry.part.id;
-    }
-    b.placed[slot.id] = entry.part;
+    if (entry.choice && this.act('choose', { orderId: this.order.id, id: entry.part.id }) === false) return false;
+    this.op({ t: 'place', slot: slot.id, part: entry.part.id });
     this.selected = null; this.dirty = true; this.cablesDirty = true;
     this.flash = { slot, t: 0.6 };
     this.say(`<b>${esc(this.shop.cats[entry.part.cat].name)}:</b> ${esc(this.L.fact(entry.part.cat, entry.part))}`, 'fact');
@@ -200,20 +223,15 @@ export class BuildView {
     if (!part) return;
     const res = this.L.canRemove(slot, b);
     if (!res.ok) return this.say(res.msg, 'err');
-    delete b.placed[slot.id];
-    if (this.order.chosen[part.cat] === part.id && !this.order.items.some((it) => it.part === part.id)) {
-      delete this.order.chosen[part.cat];
-      this.game.returnStock(part.id);
-    }
-    this.L.onRemove(slot, b);
+    if (this.order.chosen[part.cat] === part.id && !this.order.items.some((it) => it.part === part.id)) this.act('unchoose', { orderId: this.order.id, id: part.id });
+    this.op({ t: 'remove', slot: slot.id });
     this.dirty = true; this.cablesDirty = true;
     this.say(`${esc(part.name)} ligger i lådan igen.`, 'info');
     this.refresh();
   }
   doAction(a, i) {
-    const set = new Set(this.L.actSet(this.b, a.id));
-    set.add(i);
-    this.b.acts.set(a.id, set);
+    this.op({ t: 'act', id: a.id, i });
+    const set = this.L.actSet(this.b, a.id);
     this.dirty = true;
     this.toolAnim = { pt: a.points[i], t: 0, icon: a.icon };
     if (this.L.actDone(this.b, a.id)) this.say(`<b>${esc(a.name)}:</b> ${esc(this.L.fact(a.id))}`, 'fact');
@@ -223,7 +241,7 @@ export class BuildView {
   connect(entry, key) {
     const b = this.b, res = this.L.canConnect(entry.cable, key, b, this.help);
     if (!res.ok) return this.fail(res.msg);
-    b.cables.set(entry.cable.id, key);
+    this.op({ t: 'cable', id: entry.cable.id, port: key });
     this.plugAnim = { id: entry.cable.id, t: 0 };
     this.cablesDirty = true; this.selected = null;
     if (!b.seen.has(entry.conn) && this.L.fact(entry.conn)) {
@@ -234,13 +252,13 @@ export class BuildView {
     return true;
   }
   unplug(id) {
-    this.b.cables.delete(id);
+    this.op({ t: 'unplug', id });
     this.cablesDirty = true;
     this.say('Kabeln är urdragen och ligger i lådan igen.', 'info');
     this.refresh();
   }
   fail(msg) {
-    this.b.errors++;
+    this.op({ t: 'err' });
     this.say(esc(msg), 'err');
     this.shake = 0.35;
     this.refresh();
@@ -254,13 +272,13 @@ export class BuildView {
     if (this.help && this.steps().some((s) => !s.done)) return this.say('Gör klart checklistan först (skruvar och kablar).', 'err');
     const probs = this.L.standCheck(this.b);
     if (probs.length) return this.fail(probs.map((p) => p.msg + (this.help ? ' ' + p.hint : '')).join(' '));
-    this.b.phase = 'desk';
+    this.op({ t: 'phase', v: 'desk' });
     this.selected = null; this.msg = null;
     this.finale.enter();
     this.refresh();
   }
   backToBuild() {
-    this.b.phase = 'build';
+    this.op({ t: 'phase', v: 'build' });
     this.dirty = true; this.cablesDirty = true;
     this.say('Datorn ligger på bänken igen – leta efter felet!', 'info');
     this.refresh();
@@ -380,6 +398,7 @@ export class BuildView {
     if (d.moved) {
       const g = $('#drag-ghost'); g.style.left = e.clientX + 'px'; g.style.top = e.clientY + 'px';
       this.hover = this.local(e);
+      this.sendCursor(e);
     }
   }
   onDragEnd(e) {
@@ -439,7 +458,7 @@ export class BuildView {
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     document.querySelector('#zoom-ctl')?.classList.toggle('hidden', this.phase !== 'build');
-    if (this.phase === 'desk') { this.finale.frame(dt); this.finale.draw(ctx); return; }
+    if (this.phase === 'desk') { this.finale.frame(dt); this.finale.draw(ctx); this.drawCursors(ctx); return; }
     if (this.flash) { this.flash.t -= dt; if (this.flash.t <= 0) this.flash = null; }
     if (this.toolAnim) { this.toolAnim.t += dt; if (this.toolAnim.t > 0.45) this.toolAnim = null; }
     if (this.plugAnim) { this.plugAnim.t += dt * 3; this.cablesDirty = true; if (this.plugAnim.t >= 1) { this.plugAnim = null; } }
@@ -505,6 +524,72 @@ export class BuildView {
     stage.append(box);
   }
 
+  // ---------- Kompisarnas muspekare (co-op) ----------
+  // Skickas i världskoordinater (bänken) eller skrivbordets/baksidans egna, så att
+  // pekaren hamnar rätt även om kompisen har zoomat annorlunda.
+  sendCursor(e) {
+    if (!this.hooks.onCursor || !this.order || this.b.help === null) return;
+    const now = performance.now();
+    if (now - (this._curT || 0) < 66) return;
+    const r = this.canvas.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
+    this._curT = now;
+    const [x, y] = this.local(e);
+    let data;
+    if (this.phase === 'desk') {
+      const f = this.finale;
+      const rear = (!f.compact || f.showRear) && x >= f.insetX && x <= f.insetX + 90 * f.si && y >= f.insetY && y <= f.insetY + 160 * f.si;
+      data = rear ? { s: 'rear', x: (x - f.insetX) / f.si, y: (y - f.insetY) / f.si } : { s: 'desk', x: (x - f.ox) / f.s, y: (y - f.oy) / f.s };
+    } else {
+      const P = this.P, a = (x - P.ox) / P.k, b2 = (y - P.oy + P.hz) * 2 / P.k;
+      data = { s: 'board', x: (a + b2) / 2, y: (b2 - a) / 2 };
+    }
+    data.order = this.order.id;
+    data.drag = this.drag?.moved ? this.drag.entry.key : (this.selected || null);
+    this.hooks.onCursor(data);
+  }
+  remoteCursor(id, m, info) {
+    this.cursors.set(id, { order: m.order, s: m.s, x: m.x, y: m.y, drag: m.drag, name: info?.name || 'Kompis', color: info?.color || '#7ee8fa', t: performance.now() });
+  }
+  removeCursor(id) { this.cursors.delete(id); }
+  drawCursors(ctx) {
+    if (!this.order || !this.cursors.size) return;
+    const now = performance.now();
+    for (const [id, c] of this.cursors) {
+      if (c.order !== this.order.id || now - c.t > 5000) continue;
+      let x, y;
+      if (c.s === 'board') { if (this.phase !== 'build') continue; [x, y] = this.P.proj(c.x, c.y, 1); }
+      else if (this.phase !== 'desk') continue;
+      else {
+        const f = this.finale;
+        if (c.s === 'rear') { if (f.compact && !f.showRear) continue; x = f.insetX + c.x * f.si; y = f.insetY + c.y * f.si; }
+        else { if (f.compact && f.showRear) continue; x = f.ox + c.x * f.s; y = f.oy + c.y * f.s; }
+      }
+      x = Math.round(x); y = Math.round(y);
+      const fade = now - c.t > 3000 ? 0.45 : 1;
+      ctx.save(); ctx.globalAlpha = fade;
+      // det kompisen håller i
+      if (c.drag) {
+        let icon = this.cursorIcons.get(c.drag);
+        if (icon === undefined) {
+          const entry = this.trayEntries().find((en) => en.key === c.drag);
+          icon = entry ? this.entryIcon(entry, 44, 38) : null;
+          if (icon) this.cursorIcons.set(c.drag, icon);
+        }
+        if (icon) { ctx.fillStyle = 'rgba(23,21,26,.25)'; ctx.fillRect(x + 12, y + 12, 44, 38); ctx.drawImage(icon, x + 10, y + 10); }
+      }
+      // pixelpil med spelarens färg
+      const A = ['X.........', 'XX........', 'XoX.......', 'XooX......', 'XoooX.....', 'XooooX....', 'XoooooX...', 'XooooooX..', 'XoooooooX.', 'XooooXXXXX', 'XoXooX....', 'XX.XooX...', 'X...XoX...', '.....XX...'];
+      A.forEach((row, j) => { for (let i = 0; i < row.length; i++) { if (row[i] === '.') continue; ctx.fillStyle = row[i] === 'X' ? '#17151a' : c.color; ctx.fillRect(x + i * 2, y + j * 2, 2, 2); } });
+      ctx.font = '16px "VT323", monospace';
+      const w = Math.ceil(ctx.measureText(c.name).width) + 10;
+      ctx.fillStyle = '#17151a'; ctx.fillRect(x + 14, y + 22, w + 2, 18);
+      ctx.fillStyle = c.color; ctx.fillRect(x + 15, y + 23, w, 16);
+      ctx.fillStyle = '#17151a'; ctx.textBaseline = 'middle'; ctx.fillText(c.name, x + 20, y + 31);
+      ctx.restore();
+    }
+  }
+
   // ---------- Pekare: klick, panorering, nypzoom ----------
   onPtrDown(e) {
     if (!this.order || modalOpen()) return;
@@ -515,6 +600,7 @@ export class BuildView {
   }
   onPtrMove(e) {
     this.hover = this.local(e);
+    this.sendCursor(e);
     const p = this.ptrs.get(e.pointerId);
     if (!p) {
       const over = this.order && this.b.help !== null && this.phase === 'build' && this.actionAt(this.hover);
@@ -592,6 +678,7 @@ export class BuildView {
       });
       D.drawLabels(ctx, this, labels, this.cw, this.ch);
     }
+    this.drawCursors(ctx);
     ctx.restore();
   }
 }

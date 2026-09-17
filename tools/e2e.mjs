@@ -13,6 +13,8 @@ page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 await page.goto("http://localhost:8777/index.html?year=2024");
 await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForTimeout(500);
 await page.click('[data-shop="dator"]'); await page.waitForFunction(() => window.PV?.game, null, { timeout: 30000 }); await page.waitForTimeout(300);
+// butiken börjar tom: lägg in startpaketet direkt
+await page.evaluate(() => { const g = PV.game; for (const [id, n] of g.shop.starterKit(g)) { g.stock[id] = (g.stock[id] || 0) + n; g.shown[id] = (g.shown[id] || 0) + n; } g.emit('change'); });
 // vänta på första kunden och klicka på den i butiken
 for (let i = 0; i < 80; i++) { if (await page.evaluate(() => { const c = PV.game.queue()[0]; return c && c.phase === 'queue' && !c.moving; })) break; await page.waitForTimeout(250); }
 const cpos = await page.evaluate(() => { const f = PV.floor, c = PV.game.queue()[0], r = f.canvas.getBoundingClientRect(); return { x: r.left + f.offX + c.x * f.scale, y: r.top + f.offY + (c.y - 12) * f.scale }; });

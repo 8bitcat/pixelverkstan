@@ -4,14 +4,28 @@
 //
 // frame: 0 stå · 1/2 gångsteg · 3 mellansteg (kroppen upp 1 px) · 4 andas in · 5 sitter
 
-const SKIN = ['#f6d7bf', '#eec3a0', '#e0a97f', '#c68a5c', '#a06a43', '#744a2d', '#553522'];
-const HAIR = ['#1d1714', '#1d1714', '#3b2619', '#3b2619', '#6b4226', '#a5692f', '#d9a95c', '#ecd489', '#b9b3ab', '#e6e2da', '#b7392b', '#3f4fa8', '#c65fa0', '#2f8f6f'];
-const SHIRT = ['#d9433b', '#3a7bd5', '#46a35a', '#f0b429', '#8e5bd1', '#2f3440', '#e8e3d6', '#e07a2e', '#2aa39a', '#b83d7a', '#5f7f99', '#f4f1ea', '#7a2e3e', '#26605a'];
-const PANTS = ['#3f5f8f', '#2d3a5c', '#2b2b30', '#9a8560', '#6f7c8a', '#5a4632', '#556b3a', '#7a2e2e'];
-const SHOES = ['#1c1c1c', '#f2f2f2', '#6b3e1e', '#c23b3b', '#3a6bc2', '#e0b24a', '#2f2f36'];
-const STYLES = ['short', 'short', 'side', 'long', 'long', 'ponytail', 'bun', 'curly', 'afro', 'spiky', 'bald', 'mohawk', 'bob', 'buzz'];
-const TOPS = ['tee', 'tee', 'stripes', 'hoodie', 'hoodie', 'jacket', 'sweater'];
-const BOTTOMS = ['jeans', 'jeans', 'pants', 'pants', 'shorts', 'skirt'];
+// Slumptabellerna för kunder (dubbletter = vanligare). Ändra inte ordning/innehåll –
+// makeLook(rng) måste ge samma kunder som förut.
+export const SKIN = ['#f6d7bf', '#eec3a0', '#e0a97f', '#c68a5c', '#a06a43', '#744a2d', '#553522'];
+export const HAIR = ['#1d1714', '#1d1714', '#3b2619', '#3b2619', '#6b4226', '#a5692f', '#d9a95c', '#ecd489', '#b9b3ab', '#e6e2da', '#b7392b', '#3f4fa8', '#c65fa0', '#2f8f6f'];
+export const SHIRT = ['#d9433b', '#3a7bd5', '#46a35a', '#f0b429', '#8e5bd1', '#2f3440', '#e8e3d6', '#e07a2e', '#2aa39a', '#b83d7a', '#5f7f99', '#f4f1ea', '#7a2e3e', '#26605a'];
+export const PANTS = ['#3f5f8f', '#2d3a5c', '#2b2b30', '#9a8560', '#6f7c8a', '#5a4632', '#556b3a', '#7a2e2e'];
+export const SHOES = ['#1c1c1c', '#f2f2f2', '#6b3e1e', '#c23b3b', '#3a6bc2', '#e0b24a', '#2f2f36'];
+export const STYLES = ['short', 'short', 'side', 'long', 'long', 'ponytail', 'bun', 'curly', 'afro', 'spiky', 'bald', 'mohawk', 'bob', 'buzz'];
+export const TOPS = ['tee', 'tee', 'stripes', 'hoodie', 'hoodie', 'jacket', 'sweater'];
+export const BOTTOMS = ['jeans', 'jeans', 'pants', 'pants', 'shorts', 'skirt'];
+export const PHONE_COLORS = ['#e8e8e8', '#222228', '#c9323a', '#3a7bd5'];
+export const BAG_COLORS = ['#2f3440', '#c9323a', '#3a7bd5', '#46a35a', '#e0a02a', '#6b4a33', '#8e5bd1'];
+
+// Alla giltiga värden (även sådana som bara avatarer använder – kunder slumpas aldrig fram dem)
+export const HAIR_STYLES = ['short', 'side', 'long', 'ponytail', 'bun', 'curly', 'afro', 'spiky', 'bald', 'mohawk', 'bob', 'buzz', 'braids', 'pigtails', 'wavy'];
+export const TOP_TYPES = ['tee', 'stripes', 'hoodie', 'jacket', 'sweater', 'shirt'];
+export const BOTTOM_TYPES = ['jeans', 'pants', 'shorts', 'skirt', 'dress'];
+export const HAT_TYPES = [null, 'cap', 'beanie', 'headband', 'bow', 'crown'];
+export const GLASSES_TYPES = [false, 'square', 'round', 'sun'];
+export const BEARD_TYPES = [false, 'full', 'mustache', 'stubble', 'goatee'];
+export const BAG_TYPES = [null, 'backpack', 'shoulder'];
+export const BUILDS = [4, 5, 6];
 
 export const FIRST_NAMES = ['Alva', 'Elsa', 'Maja', 'Ella', 'Wilma', 'Saga', 'Nora', 'Vera', 'Liv', 'Stina', 'Ines', 'Greta',
   'Oscar', 'Liam', 'Noah', 'Hugo', 'William', 'Elias', 'Ludvig', 'Sixten', 'Vincent', 'Frans', 'Kalle', 'Bosse',
@@ -33,8 +47,8 @@ export function makeLook(rng = Math.random) {
     hat, cap: pick(rng, SHIRT),
     glasses: gl < 0.16 ? 'square' : gl < 0.24 ? 'round' : gl < 0.28 ? 'sun' : false,
     beard: !kid && rng() < 0.2 ? pick(rng, ['full', 'full', 'mustache', 'stubble']) : false,
-    phones: rng() < 0.12, phoneColor: pick(rng, ['#e8e8e8', '#222228', '#c9323a', '#3a7bd5']),
-    bag, bagColor: pick(rng, ['#2f3440', '#c9323a', '#3a7bd5', '#46a35a', '#e0a02a', '#6b4a33', '#8e5bd1']),
+    phones: rng() < 0.12, phoneColor: pick(rng, PHONE_COLORS),
+    bag, bagColor: pick(rng, BAG_COLORS),
     build: kid ? 4 : pick(rng, [4, 5, 5, 6]),
     blush: rng() < 0.35,
     kid,
@@ -99,11 +113,15 @@ function render(L0, dir, frame) {
   };
   const rect = (x, y, w, h, c) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) put(x + i, y + j, c); };
   const has = (x, y) => { if (flip) x = SW - 1 - x; return x >= 0 && y >= 0 && x < SW && y < SH && d[(y * SW + x) * 4 + 3] > 0; };
+  const topAt = (x, fb) => { for (let y = 0; y < SH; y++) if (has(x, y)) return y; return fb; }; // översta ritade pixeln i kolumnen
 
   const K = !!L.kid;
+  // klänning = kjol i tröjans färg (lite längre, utan bälte)
+  const dress = L.bottom === 'dress', skirted = L.bottom === 'skirt' || dress;
+  const skirtLen = (K ? 3 : 5) + (dress ? 1 : 0), bareFrom = dress && !K ? 4 : 3;
   const skin = ramp(toInt(L.skin, 0xeabf98)), hair = ramp(toInt(L.hair, 0x3b2619));
   const shirt = ramp(toInt(L.shirt, 0x3a7bd5)), acc = ramp(toInt(L.accent, 0xf4f1ea));
-  const pants = ramp(toInt(L.pants, 0x2d3a5c)), shoe = ramp(toInt(L.shoes, 0x1c1c1c));
+  const pants = ramp(toInt(dress ? L.shirt : L.pants, dress ? 0x3a7bd5 : 0x2d3a5c)), shoe = ramp(toInt(L.shoes, 0x1c1c1c));
   const capc = ramp(toInt(L.cap, 0xc9323a)), bagc = ramp(toInt(L.bagColor, 0x2f3440));
   const sole = (toInt(L.shoes, 0) === 0xf2f2f2 || L.bottom === 'shorts') ? 0xd9d6cc : 0xe9e6dc;
 
@@ -129,17 +147,17 @@ function render(L0, dir, frame) {
         rect(x0 - (left ? 1 : 0), top, lw + 1, 3, lap.base);
         rect(x0 - (left ? 1 : 0), top, lw + 1, 1, lap.hi);
         rect(x0 - (left ? 1 : 0), top + 2, lw + 1, 1, lap.lo);
-        if (L.bottom === 'skirt') rect(x0 - (left ? 1 : 0), top, lw + 1, 2, pants.base);
+        if (skirted) rect(x0 - (left ? 1 : 0), top, lw + 1, 2, pants.base);
         const shin = shoeTop - (top + 3);
-        const skinLeg = L.bottom === 'shorts' || L.bottom === 'skirt';
+        const skinLeg = L.bottom === 'shorts' || skirted;
         rect(x0, top + 3, lw, shin, skinLeg ? skin.base : pants.base);
         rect(left ? x0 : x0 + lw - 1, top + 3, 1, shin, skinLeg ? skin.lo : pants.lo);
       } else {
         const len = legLen - lift;
-        const shorts = L.bottom === 'shorts', skirt = L.bottom === 'skirt';
+        const shorts = L.bottom === 'shorts', skirt = skirted;
         for (let j = 0; j < len; j++) {
           const y = legTop + j;
-          const bare = (shorts && j >= 3) || (skirt && j >= 3);
+          const bare = (shorts && j >= 3) || (skirt && j >= bareFrom);
           const base = bare ? (skirt ? mix(skin.base, 0x2a2430, 0.15) : skin.base) : pants.base;
           const lo = bare ? skin.lo : pants.lo, hi = bare ? skin.hi : pants.hi;
           rect(x0, y, lw, 1, base);
@@ -162,18 +180,19 @@ function render(L0, dir, frame) {
     // ---------- höfter / kjol ----------
     const hy = hipTop + (sit ? bob : 0);
     rect(12 - tw, hy, tw * 2, hipH, pants.base);
-    if (L.bottom === 'skirt') {
-      for (let j = 0; j < (K ? 3 : 5); j++) {
+    if (skirted) {
+      for (let j = 0; j < skirtLen; j++) {
         const w = tw + Math.min(2, (j + 1) >> 1);
         rect(12 - w, hy + j, w * 2, 1, pants.base);
         put(12 - w, hy + j, pants.hi); put(11 + w, hy + j, pants.lo);
-        if (j === (K ? 2 : 4)) rect(12 - w, hy + j, w * 2, 1, pants.lo);
+        if (j === skirtLen - 1) rect(12 - w, hy + j, w * 2, 1, pants.lo);
       }
+      if (dress && !back) for (let j = 1; j < skirtLen - 1; j += 2) put(12 - tw + 2 + (j % 4 === 1 ? 0 : 1), hy + j, pants.lo); // veck
     } else if (!K) {
       rect(12 - tw, hy, tw * 2, 1, mix(pants.dk, 0x1c1814, 0.4)); // bälte
       if (!back) rect(11, hy, 2, 1, 0xc9b27a);
     }
-    if (!sit) put(11, legTop, pants.dk), put(12, legTop, pants.dk);
+    if (!sit && !dress) put(11, legTop, pants.dk), put(12, legTop, pants.dk);
 
     // ---------- bål ----------
     const ty0 = torsoTop, ty1 = hipTop + (sit ? bob : 0); // [ty0, ty1)
@@ -201,6 +220,14 @@ function render(L0, dir, frame) {
     }
     if (!back && (L.top === 'tee' || L.top === 'stripes')) { rect(11, ty0, 2, 1, skin.lo); if (!K) put(11, ty0 + 1, skin.lo), put(12, ty0 + 1, skin.lo); }
     if (!back && L.top === 'sweater') { rect(10, ty0, 4, 1, shirt.lo); rect(11, ty0, 2, 1, skin.lo); }
+    if (L.top === 'shirt') { // skjorta: krage + knappar i detaljfärgen
+      if (!back) {
+        rect(11, ty0, 2, 1, skin.lo); put(11, ty0 + 1, skin.lo);
+        put(10, ty0, acc.hi); put(13, ty0, acc.hi); put(10, ty0 + 1, acc.base); put(12, ty0 + 1, acc.base); put(13, ty0 + 1, acc.lo);
+        for (let y = ty0 + 2; y < ty1 - 1; y++) put(11, y, shirt.lo);
+        for (let y = ty0 + 3; y < ty1 - 1; y += 2) put(12, y, acc.base);
+      } else rect(10, ty0, 4, 1, acc.base);
+    }
     if (!back && L.top === 'tee' && !L.apron && !K) { rect(13, ty0 + 3, 2, 2, acc.base); put(13, ty0 + 3, acc.hi); }
     if (L.apron) {
       if (!back) {
@@ -283,6 +310,7 @@ function render(L0, dir, frame) {
       if (L.beard === 'full') { for (let y = eyeRow + 2; y < h0 + headH; y++) { const e = y >= h0 + headH - 1 ? 9 : y >= h0 + headH - 2 ? 8 : 7; rect(e, y, 24 - e * 2, 1, hair.base); } rect(11, eyeRow + 4, 2, 1, lip); put(12, eyeRow + 2, skin.lo); rect(8, eyeRow + 2, 8, 1, hair.lo); rect(10, eyeRow + 2, 4, 1, skin.base); }
       if (L.beard === 'mustache') rect(10, eyeRow + 3, 4, 1, hair.base);
       if (L.beard === 'stubble') for (let y = eyeRow + 3; y < h0 + headH; y++) for (let x = 8; x < 16; x++) if ((x + y) % 2 === 0 && x !== 11 && x !== 12) put(x, y, mix(skin.base, hair.base, 0.35));
+      if (L.beard === 'goatee') { rect(10, eyeRow + 3, 4, 1, hair.base); put(10, eyeRow + 4, hair.lo); put(13, eyeRow + 4, hair.lo); rect(11, h0 + headH, 2, 1, hair.base); put(12, h0 + headH, hair.lo); }
       // glasögon
       if (L.glasses === 'sun') { rect(8, eyeRow - 1, 3, 2, 0x16161c); rect(13, eyeRow - 1, 3, 2, 0x16161c); rect(11, eyeRow - 1, 2, 1, 0x16161c); put(8, eyeRow - 1, 0x8fa0b8); put(13, eyeRow - 1, 0x8fa0b8); }
       else if (L.glasses) {
@@ -303,8 +331,34 @@ function render(L0, dir, frame) {
       for (let j = 0; j < rows; j++) put(16, h0 + j, H.lo);
     };
     const st = L.style;
+    const TIE = 0xc9323a;
+    // fläta: 2 px bred, flätmönster, snodd + tofs i änden. xa bredvid ansiktet, xb nedanför hakan
+    const braidEnd = h0 + headH + (K ? 2 : 4);
+    const braid = (xa, xb, y0, dark) => {
+      const A = dark ? [H.lo, H.dk] : [H.base, H.lo], B = dark ? [H.base, H.lo] : [H.hi, H.base];
+      for (let y = y0; y < braidEnd; y++) { const x = y < h0 + headH ? xa : xb, c = (y - y0) % 2 ? B : A; put(x, y, c[0]); put(x + 1, y, c[1]); }
+      rect(xb, braidEnd, 2, 1, TIE); put(xb + (dark ? 1 : 0), braidEnd + 1, H.base); put(xb + (dark ? 0 : 1), braidEnd + 1, H.lo);
+    };
+    // tofs (råttsvans) på sidan av huvudet; x speglas med mx
+    const TAIL = [[5], [4, 5], [3, 4, 5], [3, 4, 5], [3, 4], [3, 4], [4]];
+    const tail = (mx, dark) => {
+      TAIL.forEach((xs, j) => xs.forEach((x, i) => put(mx(x), h0 + j, j === TAIL.length - 1 ? H.lo : i === 0 && j > 1 ? (dark ? H.lo : H.hi) : dark ? H.lo : H.base)));
+      put(mx(6), h0 + 1, TIE); put(mx(6), h0 + 2, TIE);
+    };
+    const L2R = (x) => x, R2L = (x) => 23 - x;
     if (!back) {
       switch (st) {
+        case 'braids': cap(3); rect(8, h0 + 3, 3, 1, H.base); rect(13, h0 + 3, 3, 1, H.base); put(12, h0, H.lo); put(12, h0 + 1, H.lo);
+          braid(6, 7, h0 + 2, false); braid(16, 15, h0 + 2, true); break;
+        case 'pigtails': cap(3); rect(8, h0 + 3, 8, 1, H.base); put(10, h0 + 3, H.lo); put(13, h0 + 3, H.lo); rect(7, h0 + 3, 1, 2, H.base); rect(16, h0 + 3, 1, 2, H.lo);
+          tail(L2R, false); tail(R2L, true); break;
+        case 'wavy': cap(3); rect(8, h0 + 3, 3, 1, H.base); rect(13, h0 + 3, 3, 1, H.base);
+          for (let j = 0; j < headH + 3; j++) {
+            const y = h0 + 1 + j, out = ((j + 1) >> 1) % 2 === 1;
+            rect(out ? 5 : 6, y, out ? 3 : 2, 1, H.base); rect(16, y, out ? 3 : 2, 1, H.lo);
+            put(out ? 5 : 6, y, out ? H.hi : H.base); put(out ? 18 : 17, y, H.dk);
+          }
+          put(6, h0 + 2, H.hi); break;
         case 'short': cap(3); rect(7, h0 + 3, 1, 3, H.base); rect(16, h0 + 3, 1, 3, H.lo); rect(8, h0 + 3, 3, 1, H.base); break;
         case 'side': cap(3); rect(7, h0 + 3, 1, 3, H.base); rect(16, h0 + 3, 1, 4, H.lo); rect(11, h0 + 3, 5, 1, H.base); put(15, h0 + 4, H.lo); put(10, h0, H.lo); break;
         case 'long': cap(3); rect(8, h0 + 3, 3, 1, H.base); rect(13, h0 + 3, 3, 1, H.base);
@@ -336,13 +390,20 @@ function render(L0, dir, frame) {
           for (let y = h0 - 2; y < h0 + headH - 2; y++) for (let x = 6; x < 18; x++) if (has(x, y) && (x * 3 + y * 5) % 4 === 0) put(x, y, (x + y) % 3 ? H.hi : H.lo);
           break;
         default: {
-          const long = st === 'long' || st === 'bob';
-          const bottom = st === 'long' ? h0 + headH + 3 : st === 'bob' ? eyeRow + 3 : h0 + headH - 3;
+          const long = st === 'long' || st === 'bob' || st === 'wavy';
+          const bottom = st === 'long' || st === 'wavy' ? h0 + headH + 3 : st === 'bob' ? eyeRow + 3 : h0 + headH - 3;
           rect(8, h0 - 1, 8, 1, H.base); rect(7, h0, 10, bottom - h0, H.base);
           if (long) rect(6, h0 + 1, 12, bottom - h0 - 1, H.base);
           rect(9, h0 - 1, 3, 1, H.hi); rect(8, h0, 3, 1, H.hi); put(8, h0 + 1, H.hi);
           for (let y = h0; y < bottom; y++) put(long ? 17 : 16, y, H.lo);
           rect(long ? 7 : 8, bottom - 1, long ? 10 : 8, 1, H.lo);
+          if (st === 'wavy') for (let y = h0 + 1; y < bottom; y++) {
+            const out = ((y - h0) >> 1) % 2 === 1;
+            if (out) { put(5, y, H.base); put(18, y, H.lo); }
+            if (y > h0 + 1 && y < bottom - 1) { const o = out ? 1 : 0; put(9 + o, y, H.lo); put(14 - o, y, H.lo); }
+          }
+          if (st === 'braids') { braid(8, 8, bottom - 1, false); braid(14, 14, bottom - 1, true); put(12, h0, H.lo); put(12, h0 + 1, H.lo); }
+          if (st === 'pigtails') { tail(L2R, true); tail(R2L, true); }
           if (st === 'ponytail') { rect(11, bottom, 2, K ? 5 : 7, H.base); put(12, bottom + 1, H.lo); rect(11, bottom - 1, 2, 1, 0xc9323a); }
           if (st === 'bun') { rect(10, h0 - 3, 4, 3, H.base); rect(11, h0 - 4, 2, 1, H.base); put(10, h0 - 3, H.hi); }
           if (st === 'spiky') for (let i = 0; i < 4; i++) put(8 + i * 2, h0 - 2, H.base);
@@ -364,6 +425,24 @@ function render(L0, dir, frame) {
       rect(9, h0 - 3, 3, 1, capc.hi); put(8, h0 - 2, capc.hi);
       rect(11, h0 - 5, 2, 2, 0xf4f1ea); put(12, h0 - 4, 0xd8d4c8);
     }
+    if (L.hat === 'headband') { // hårband längs hela frisyrens bredd
+      let a = 11, b = 12;
+      while (a > 0 && has(a - 1, h0)) a--;
+      while (b < SW - 1 && has(b + 1, h0)) b++;
+      rect(a, h0, b - a + 1, 1, capc.base); put(a, h0, capc.hi); put(b, h0, capc.lo);
+    }
+    if (L.hat === 'bow') { // rosett på ena sidan av huvudet
+      const bx = back ? 6 : 13, by = Math.max(1, topAt(bx + 2, h0) + 1);
+      put(bx, by - 1, capc.hi); put(bx + 1, by - 1, capc.base); put(bx + 3, by - 1, capc.base); put(bx + 4, by - 1, capc.lo);
+      rect(bx, by, 5, 1, capc.base); put(bx, by, capc.hi); put(bx + 2, by, capc.dk); put(bx + 4, by, capc.lo);
+      put(bx, by + 1, capc.lo); put(bx + 1, by + 1, capc.lo); put(bx + 3, by + 1, capc.lo); put(bx + 4, by + 1, capc.dk);
+    }
+    if (L.hat === 'crown') {
+      const cy = Math.max(3, topAt(9, h0));
+      rect(8, cy - 1, 8, 2, capc.base); rect(8, cy - 1, 8, 1, capc.hi); put(15, cy - 1, capc.base); put(15, cy, capc.lo);
+      put(8, cy - 2, capc.hi); put(15, cy - 2, capc.base); rect(11, cy - 3, 2, 2, capc.base); put(11, cy - 3, capc.hi);
+      if (!back) { put(9, cy, 0x3a8ae0); rect(11, cy, 2, 1, 0xd83a4a); put(14, cy, 0x3a8ae0); }
+    }
     if (L.phones) {
       const pc = ramp(toInt(L.phoneColor, 0x222228));
       rect(9, h0 - 3, 6, 1, 0x2a2a30); put(8, h0 - 2, 0x2a2a30); put(15, h0 - 2, 0x2a2a30); put(7, h0 - 1, 0x2a2a30); put(16, h0 - 1, 0x2a2a30);
@@ -383,7 +462,7 @@ function render(L0, dir, frame) {
       for (let j = 0; j < len - lift; j++) {
         const t = (j + 1) / len;
         const x = legX + Math.round(swing * t) - (far && !swing ? 1 : 0);
-        const bare = (L.bottom === 'shorts' || L.bottom === 'skirt') && j >= 3;
+        const bare = (L.bottom === 'shorts' && j >= 3) || (skirted && j >= bareFrom);
         const c = bare ? Sk : P;
         rect(x, top + j, 3, 1, c.base); put(x, top + j, c.lo); put(x + 2, top + j, c.hi);
         lastX = x;
@@ -413,7 +492,7 @@ function render(L0, dir, frame) {
     // höft
     const hy = hipTop + (sit ? bob : 0);
     rect(9, hy, 7, hipH, pants.base); put(15, hy, pants.hi);
-    if (L.bottom === 'skirt') for (let j = 0; j < (K ? 3 : 5); j++) { const w = Math.min(2, (j + 1) >> 1); rect(9 - w, hy + j, 7 + w * 2, 1, pants.base); put(8 + w * 0 - w, hy + j, pants.lo); }
+    if (skirted) for (let j = 0; j < skirtLen; j++) { const w = Math.min(2, (j + 1) >> 1); rect(9 - w, hy + j, 7 + w * 2, 1, pants.base); put(8 + w * 0 - w, hy + j, pants.lo); }
     else if (!K) rect(9, hy, 7, 1, mix(pants.dk, 0x1c1814, 0.4));
     // ryggsäck bakom ryggen
     if (L.bag === 'backpack') {
@@ -428,6 +507,7 @@ function render(L0, dir, frame) {
     }
     if (L.top === 'hoodie') { rect(8, torsoTop, 3, 3, shirt.lo); put(9, torsoTop, shirt.base); }
     if (L.top === 'jacket') { rect(15, torsoTop, 1, hipTop - torsoTop, acc.base); }
+    if (L.top === 'shirt') { rect(13, torsoTop, 3, 1, acc.base); put(15, torsoTop + 1, acc.lo); }
     if (L.apron) { rect(14, torsoTop + 2, 3, legTop + 3 - torsoTop - 2, 0xf2eee4); for (let y = torsoTop + 2; y < legTop + 3; y++) put(14, y, 0xcfc8b8); put(12, torsoTop + 1, 0xf2eee4); put(13, torsoTop + 2, 0xf2eee4); }
     if (L.bag === 'backpack') { rect(10, torsoTop, 1, 5, bagc.dk); }
     if (L.bag === 'shoulder') { for (let i = 0; i < 7; i++) put(10 + (i >> 1), torsoTop + i, bagc.dk); rect(13, hipTop - 3, 4, 4, bagc.base); rect(13, hipTop - 3, 4, 1, bagc.hi); }
@@ -454,6 +534,7 @@ function render(L0, dir, frame) {
     if (L.beard === 'full') { rect(11, eyeRow + 2, 6, h0 + headH - eyeRow - 2, hair.base); put(16, eyeRow + 4, mix(skin.lo, 0xa0303a, 0.35)); rect(11, eyeRow + 2, 1, 2, hair.lo); }
     if (L.beard === 'mustache') rect(15, eyeRow + 3, 3, 1, hair.base);
     if (L.beard === 'stubble') for (let y = eyeRow + 3; y < h0 + headH; y++) for (let x = 11; x < 17; x++) if ((x + y) % 2 === 0) put(x, y, mix(skin.base, hair.base, 0.35));
+    if (L.beard === 'goatee') { rect(15, eyeRow + 3, 3, 1, hair.base); put(15, eyeRow + 4, hair.lo); rect(14, h0 + headH, 2, 1, hair.base); }
     if (L.glasses === 'sun') { rect(14, eyeRow - 1, 3, 2, 0x16161c); rect(11, eyeRow - 1, 3, 1, 0x16161c); put(15, eyeRow - 1, 0x8fa0b8); }
     else if (L.glasses) { const fc = L.glasses === 'round' ? 0x6b3e1e : 0x1f1f26; rect(12, eyeRow - 2, 5, 1, fc); put(16, eyeRow - 1, mix(fc, 0xd8f0ff, 0.3)); put(16, eyeRow, fc); put(14, eyeRow + 1, mix(fc, skin.base, 0.5)); put(15, eyeRow + 1, mix(fc, skin.base, 0.5)); }
 
@@ -479,10 +560,41 @@ function render(L0, dir, frame) {
         if (st === 'ponytail') { rect(8, h0 + 3, 3, 3, H.base); rect(5, eyeRow - 2, 3, 2, H.base); rect(5, eyeRow, 2, K ? 4 : 6, H.base); put(5, eyeRow + 1, H.lo); put(7, eyeRow - 2, 0xc9323a); }
         if (st === 'bun') { rect(6, h0 - 2, 4, 4, H.base); put(6, h0 - 2, H.hi); }
         if (st === 'spiky') { put(10, h0 - 2, H.base); put(12, h0 - 2, H.base); put(14, h0 - 2, H.base); put(11, h0 - 3, H.hi); }
+        if (st === 'wavy') {
+          rect(7, h0 + 1, 4, headH + 3, H.base);
+          for (let j = 0; j < headH + 3; j++) { const y = h0 + 1 + j, out = ((j + 1) >> 1) % 2 === 1; if (out) put(6, y, H.lo); else put(7, y, H.lo); if (j % 4 === 1) put(9, y, H.lo); }
+        }
+        if (st === 'braids') { // flätan hänger ner bakom örat
+          const end = h0 + headH + (K ? 2 : 4);
+          for (let y = h0 + 3; y < end; y++) { const o = (y - h0) % 2; put(8, y, o ? H.lo : H.base); put(9, y, o ? H.base : H.hi); }
+          rect(8, end, 2, 1, 0xc9323a); put(8, end + 1, H.lo); put(9, end + 1, H.base);
+        }
+        if (st === 'pigtails') { // tofs bakom huvudet
+          [[5], [4, 5], [3, 4, 5], [3, 4, 5], [3, 4], [3, 4], [4]].forEach((xs, j) => xs.forEach((x) => put(x + 2, h0 + j, j === 6 ? H.lo : H.base)));
+          put(8, h0 + 1, 0xc9323a); put(8, h0 + 2, 0xc9323a); put(5, h0 + 3, H.hi);
+        }
       }
     }
     if (L.hat === 'cap') { rect(9, h0 - 2, 7, 1, capc.base); rect(8, h0 - 1, 9, 3, capc.base); rect(9, h0 - 2, 3, 1, capc.hi); rect(16, h0 + 2, 4, 1, capc.lo); rect(8, h0 + 2, 9, 1, capc.lo); }
     if (L.hat === 'beanie') { rect(10, h0 - 3, 5, 1, capc.base); rect(9, h0 - 2, 7, 1, capc.base); rect(8, h0 - 1, 9, 2, capc.base); rect(8, h0 + 1, 9, 2, capc.lo); rect(11, h0 - 5, 2, 2, 0xf4f1ea); }
+    if (L.hat === 'headband') {
+      let a = 12, b = 12;
+      while (a > 0 && has(a - 1, h0)) a--;
+      while (b < SW - 1 && has(b + 1, h0)) b++;
+      rect(a, h0, b - a + 1, 1, capc.base); put(b, h0, capc.hi); put(a, h0, capc.lo);
+    }
+    if (L.hat === 'bow') {
+      const bx = 8, by = Math.max(1, topAt(10, h0) + 1);
+      put(bx, by - 1, capc.lo); put(bx + 1, by - 1, capc.base); put(bx + 3, by - 1, capc.base); put(bx + 4, by - 1, capc.hi);
+      rect(bx, by, 5, 1, capc.base); put(bx + 2, by, capc.dk); put(bx + 4, by, capc.hi);
+      put(bx, by + 1, capc.dk); put(bx + 1, by + 1, capc.lo); put(bx + 3, by + 1, capc.lo); put(bx + 4, by + 1, capc.lo);
+    }
+    if (L.hat === 'crown') {
+      const cy = Math.max(3, topAt(10, h0));
+      rect(9, cy - 1, 7, 2, capc.base); rect(9, cy - 1, 7, 1, capc.hi); put(9, cy, capc.lo);
+      put(9, cy - 2, capc.base); put(15, cy - 2, capc.hi); rect(12, cy - 3, 1, 2, capc.base);
+      put(13, cy, 0xd83a4a);
+    }
     if (L.phones) { const pc = ramp(toInt(L.phoneColor, 0x222228)); rect(11, h0 - 2, 2, eyeRow - h0, 0x2a2a30); rect(10, eyeRow - 2, 3, 4, pc.base); put(10, eyeRow - 2, pc.hi); }
   }
 

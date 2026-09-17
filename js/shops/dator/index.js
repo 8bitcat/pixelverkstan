@@ -51,6 +51,12 @@ export default {
   layout,
   Finale: Desk,
   start: orders.START,
+  // Startpaketet: delarna till de guidade kundernas datorer
+  starterKit(game) {
+    const kit = {};
+    for (const b of game.startInfo?.builds || []) for (const p of b || []) kit[p.id] = (kit[p.id] || 0) + 1;
+    return Object.entries(kit).map(([id, n]) => [id, Math.max(0, n - game.stockFree(id) - game.incoming(id))]).filter(([id, n]) => n > 0 && DB.part[id] && onSale(game.year).includes(DB.part[id]));
+  },
   startFor: orders.startFor,
   tutorialOrder: orders.tutorialOrder,
   tutorialCount: orders.TUTORIAL_COUNT,
