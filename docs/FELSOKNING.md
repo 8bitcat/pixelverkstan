@@ -59,7 +59,53 @@ Symptomtabellen som spelet lottar ur:
 | Bild men fel färger / ränder | bildkabel, böjda stift, kortet glappar |
 | Startar ibland | glapp, svällda kondensatorer, för svagt nätaggregat |
 
-## 3. Verktyg man kan köpa (hör ihop med [BUTIKSPLAN.md](BUTIKSPLAN.md))
+## 3. Animationer, rök och ljud
+
+Felsökning ska **synas**. Barnet ska kunna se vad som händer utan att läsa en rad text – och
+det ska vara kul att starta en trasig dator just för att något händer. Allt ritas i scenens
+egen pixelupplösning, med samma hårda kanter som resten av spelet.
+
+### Effektkatalog
+
+| Händelse | Vad man ser |
+|---|---|
+| **Man trycker på knappen** | knappen sjunker in med ett klick – alltid, även när datorn är död, så man vet att trycket gick fram |
+| **Helt dött** | ingenting rör sig; en liten dammpartikel singlar förbi i tystnaden |
+| **Nätaggregatet kortsluter** | fläkten rycker ett kvarts varv, en vit blixt inifrån gallret, sedan en **rökpuff** som stiger, breder ut sig och tunnas ut i fyra steg |
+| **Svällda kondensatorer** | brungul rök som kryper långsamt uppåt, en brun fläck på kortet, kondensatorernas toppar buktar synligt |
+| **Damm** | grå puff ur gallret vid start; med tryckluft en vit kon och ett moln av dammtussar som virvlar ut, singlar ner och **landar på golvet** (går att sopa) |
+| **Kylaren lös / pastan slut** | värmedaller ovanför kylaren som växer, processorn glöder allt rödare, och efter ~20 s slocknar allt med ett "klonk" |
+| **Fläktar** | tre rörelserutor: startar långsamt och accelererar; en döende fläkt gör ryck–ryck–stopp; en fläkt utan ström står blickstilla |
+| **Pip-mönstret** | pixelnoter flyger ut ur den lilla högtalaren i takt – en lång båge för långt pip, korta puffar för korta. Syns även med ljudet avstängt |
+| **Hårddisken** | lampan blinkar oregelbundet och ett litet "tick" hoppar ut; en döende disk klickar rytmiskt och skakar |
+| **Statisk urladdning** | blå gnista mellan hand och kort när man tar i utan armband, ett knäpp, och en liten rökprick om det tog skada |
+| **CRT-skärm** | vit linje som växer ut till en bild, degauss-wobble, rullande bild eller ränder när något är fel |
+| **LCD-skärm** | långsam intoning; "no signal"-rutan studsar sakta över svart |
+| **Slumpkrasch** | bilden fryser, pixelsnö, allt stannar |
+| **Lukt** | gröngrå vågiga linjer som stiger ur lådan med en 👃-ikon; håll musen över: "det luktar bränt" |
+| **Den startar!** | POST-pipet, texten rullar fram, och en grön hake poppar med små gnistor |
+
+### Verktygen rör sig också
+
+Skruvmejseln vrids och skruven sjunker. Tryckluften blåser en kon av damm. Multimeterns
+sladdar kopplas och siffrorna hoppar innan de stannar. Delen ur reservdelslådan lyfts upp
+och glider på plats. Kunden bär in datorn tungt, sätter ner den på disken med en dammpuff –
+och lyfter armarna när hen får tillbaka den lagad.
+
+### Teknik
+
+- Ny `js/core/fx.js`: ett litet partikelsystem i scenens pixelrutnät. Partikel =
+  `{ x, y, vx, vy, liv, pal, storlek }`, ritas efter rastreringen, utan kantutjämning.
+- **Rök** blir bäst som 2×2-blobbar som växer och byter palettsteg (ljusgrå → grå → mörkgrå →
+  borta) i stället för äkta genomskinlighet – det ser pixlat ut i stället för suddigt.
+- Utsläppspunkterna är delarnas befintliga ankare (`o.at`), så röken kommer ur rätt galler.
+- **Co-op:** värden skickar `ev`-meddelandet (finns redan) med `{ typ, ankare, seed }` så
+  att alla ser samma rök – ingen partikel räknas lokalt.
+- Tak på ~300 partiklar och en återanvänd array; uppdateras i samma tick som scenen.
+- **Allt som hörs ska också synas** (pip → noter, lukt → linjer), och en inställning
+  "mindre rörelse" som lugnar effekterna.
+
+## 4. Verktyg man kan köpa (hör ihop med [BUTIKSPLAN.md](BUTIKSPLAN.md))
 
 - **POST-kort** – visar en felkod i stället för bara pip.
 - **Multimeter** – mäter om nätaggregatet ger spänning alls.
@@ -69,7 +115,7 @@ Symptomtabellen som spelet lottar ur:
 
 ---
 
-## 4. Scenarierna
+## 5. Scenarierna
 
 Varje scenario: vad kunden säger, vad som händer på bänken, ledtrådstrappan (visas en i taget
 om man fastnar), felet, åtgärden, villospåret som kostar pengar, och vad man lär sig.
@@ -260,7 +306,7 @@ om man fastnar), felet, åtgärden, villospåret som kostar pengar, och vad man 
 
 ---
 
-## 5. Svårighet, ledtrådar och misstag
+## 6. Svårighet, ledtrådar och misstag
 
 - **★** syns utifrån innan man ens öppnat (R1, R2, R15). Lär ut "titta först".
 - **★★–★★★** kräver att man kopplar symptom till en del och öppnar (de flesta).
@@ -273,7 +319,7 @@ om man fastnar), felet, åtgärden, villospåret som kostar pengar, och vad man 
 - **Återfall:** åtgärdar man symptomet men inte orsaken (byter minne när moderkortet är
   trasigt) kommer kunden tillbaka efter några dagar, arg – minus rykte.
 
-## 6. Betalt
+## 7. Betalt
 
 ```
 lön = diagnosavgift + delar (med påslag) + arbete per steg + snabbhetsbonus
@@ -282,7 +328,7 @@ Ett dammjobb ger lite men går på en halv minut; ett moderkortsbyte ger mycket 
 och kräver delar i lager. Lyckade reparationer ger **stjärnor → rykte** (se BUTIKSPLAN.md),
 vilket gör att fler och rikare kunder kommer in.
 
-## 7. I co-op
+## 8. I co-op
 
 Reparationer är det bästa vi har för två spelare: **en sitter vid bänken och startar om,
 den andra har händerna i lådan.** "Prova nu!" i chatten, och man ser direkt om det blev
@@ -290,7 +336,7 @@ någon skillnad. Värden äger tillståndet; bänktestet är en op precis som et
 
 ---
 
-## 8. Vad som behövs i koden
+## 9. Vad som behövs i koden
 
 | Vad | Var |
 |---|---|
@@ -299,6 +345,7 @@ någon skillnad. Värden äger tillståndet; bänktestet är en op precis som et
 | Trasig maskin = giltigt bygge för året + en felmutation | `tools/`-generatorn som `era-logic` redan använder |
 | Bänktest utan föregående bygge (datorn börjar hopbyggd och urkopplad) | `js/shops/dator/desk.js` – ny ingång `openRepair(build, fault)` |
 | Nya symptom: värme över tid, slumpkrasch, "no boot device", lukt, lampor på moderkortet | `desk.js` – `info()` och POST-koderna finns redan att bygga vidare på |
+| Partikelsystem för rök, damm, gnistor, värmedaller och pipnoter | ny `js/core/fx.js` (se §3) |
 | Sinnesknapparna 👁👂🤚👃 på bänken | `desk.js` + `ui.js` |
 | Verktyg (POST-kort, multimeter, reservdelslåda, pärm) | hör ihop med `shopfit` i BUTIKSPLAN.md |
 | Test: kör alla fel, kolla att symptomet stämmer och att åtgärden gör datorn hel | ny `tools/repair.mjs` |
