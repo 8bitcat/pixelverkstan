@@ -1,0 +1,305 @@
+// Diskettstationer och optiska enheter 1983–2020.
+// Priser anges i USD (gatupris det året) och räknas om till kronor.
+// Rader: [namn, märke, år, till, usd, tier, färger ('beige' | 'beige/svart' …), iface?]
+// Flera färger → en variant per frontfärg, t.ex. "LG GH22NS50 (svart)".
+import { SEK_PER_USD } from './canon.js';
+
+const kr = (usd, year) => Math.max(10, Math.round((usd * SEK_PER_USD[year] * 1.25) / 10) * 10);
+const slug = (s) => s.toLowerCase().replace(/\+/g, '-plus').replace(/[^a-z0-9.]+/g, '-').replace(/^-+|-+$/g, '');
+const COLOR = { beige: 'beige', svart: 'black', vit: 'white', silver: 'grey' };
+const STYLE = { floppy525: 'floppy525', floppy35: 'floppy35' };
+
+const P = [];
+function M(kind, rows) {
+  for (const [base, brand, year, until, usd, tier, colors = 'beige', iface] of rows) {
+    const list = colors.split('/');
+    for (const c of list) {
+      const name = list.length > 1 ? `${base} (${c})` : base;
+      const io = kind.startsWith('floppy') ? 'floppy' : iface || (kind === 'bd' || year >= 2008 ? 'SATA' : 'IDE');
+      P.push({
+        id: 'med-' + slug(name), cat: 'media', name, brand, year, until, cost: kr(usd, year), tier,
+        kind, iface: io, look: { color: COLOR[c], style: STYLE[kind] || 'optical' },
+      });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 5,25"-diskettstationer 1983–1996
+M('floppy525', [
+  ['Tandon TM100-1A 160KB', 'Tandon', 1983, 1984, 180, 1],
+  ['Tandon TM100-2A 360KB', 'Tandon', 1983, 1986, 250, 3],
+  ['Shugart SA455 360KB', 'Shugart', 1983, 1986, 220, 2],
+  ['Qume QumeTrak 142 360KB', 'Qume', 1983, 1985, 230, 2],
+  ['Mitsubishi M4851 360KB', 'Mitsubishi', 1983, 1986, 210, 2],
+  ['TEAC FD-55B 360KB', 'TEAC', 1983, 1988, 200, 3],
+  ['YE-Data YD-380 360KB', 'YE-Data', 1984, 1987, 180, 2],
+  ['TEAC FD-55BR 360KB', 'TEAC', 1985, 1993, 120, 2],
+  ['TEAC FD-55GFR 1.2MB', 'TEAC', 1985, 1996, 150, 4],
+  ['Panasonic JU-455 360KB', 'Panasonic', 1985, 1990, 120, 2],
+  ['Chinon FZ-506 360KB', 'Chinon', 1985, 1990, 110, 1],
+  ['Mitsubishi M4853 360KB', 'Mitsubishi', 1985, 1990, 120, 2],
+  ['Epson SD-521L 360KB', 'Epson', 1985, 1990, 110, 1],
+  ['Panasonic JU-475 1.2MB', 'Panasonic', 1986, 1995, 140, 3],
+  ['Mitsubishi M4854 1.2MB', 'Mitsubishi', 1986, 1994, 150, 3],
+  ['Fujitsu M2553K 1.2MB', 'Fujitsu', 1986, 1992, 150, 3],
+  ['Epson SD-680L 1.2MB', 'Epson', 1987, 1994, 130, 3],
+  ['Toshiba ND-08DEG 1.2MB', 'Toshiba', 1987, 1993, 140, 3],
+  ['Mitsumi D509V3 1.2MB', 'Mitsumi', 1991, 1996, 55, 2, 'beige/svart'],
+  ['TEAC FD-55GFR 1.2MB svart front', 'TEAC', 1993, 1996, 60, 3, 'svart'],
+  ['TEAC FD-505 kombi 1.2MB + 1.44MB', 'TEAC', 1993, 1996, 120, 5],
+]);
+
+// ---------------------------------------------------------------------------
+// 3,5"-diskettstationer 1987–2007
+M('floppy35', [
+  ['Sony MP-F11W 720KB', 'Sony', 1987, 1990, 150, 3],
+  ['TEAC FD-235F 720KB', 'TEAC', 1987, 1992, 140, 3],
+  ['Mitsubishi MF355B 720KB', 'Mitsubishi', 1987, 1991, 130, 2],
+  ['TEAC FD-235HF 1.44MB', 'TEAC', 1989, 1995, 120, 4],
+  ['Epson SMD-340 1.44MB', 'Epson', 1990, 1995, 80, 3],
+  ['NEC FD1231H 1.44MB', 'NEC', 1990, 1998, 80, 3],
+  ['Panasonic JU-257A606P 1.44MB', 'Panasonic', 1990, 1996, 80, 2],
+  ['Chinon FZ-354 1.44MB', 'Chinon', 1990, 1995, 75, 2],
+  ['Mitsubishi MF355F 1.44MB', 'Mitsubishi', 1990, 1996, 80, 2],
+  ['Toshiba ND-356T 1.44MB', 'Toshiba', 1990, 1995, 85, 3],
+  ['Mitsumi D353M3 1.44MB', 'Mitsumi', 1991, 1997, 50, 2],
+  ['Alps DFP723D 1.44MB', 'Alps', 1992, 1998, 45, 2],
+  ['YE-Data YD-702D 1.44MB', 'YE-Data', 1993, 1999, 40, 1],
+  ['Sony MPF920 1.44MB', 'Sony', 1994, 2004, 30, 3],
+  ['TEAC FD-235HG 1.44MB', 'TEAC', 1995, 2002, 30, 3],
+  ['Mitsumi D353F3 1.44MB', 'Mitsumi', 1995, 2000, 30, 1],
+  ['Samsung SFD-321B 1.44MB', 'Samsung', 1995, 2005, 30, 2, 'beige/svart'],
+  ['NEC FD1138H 1.44MB', 'NEC', 1995, 2001, 28, 1],
+  ['Epson SMD-1340 1.44MB', 'Epson', 1996, 2002, 25, 2],
+  ['NEC FD1231T 1.44MB', 'NEC', 1996, 2006, 25, 2, 'beige/svart'],
+  ['Mitsumi D359M3 1.44MB', 'Mitsumi', 1998, 2003, 20, 1],
+  ['TEAC FD-235HF 1.44MB svart front', 'TEAC', 2000, 2005, 18, 3, 'svart'],
+  ['Mitsumi D359T5 1.44MB', 'Mitsumi', 2002, 2007, 12, 1, 'beige/svart'],
+  ['Samsung SFD-321J 1.44MB', 'Samsung', 2003, 2007, 12, 1, 'beige/svart/vit'],
+  ['Sony MPF920-Z 1.44MB', 'Sony', 2003, 2007, 15, 2, 'svart/silver'],
+]);
+
+// ---------------------------------------------------------------------------
+// CD-ROM 1992–2002
+M('cdrom', [
+  ['Mitsumi CRMC-LU005S', 'Mitsumi', 1992, 1994, 250, 3],
+  ['Sony CDU-31A', 'Sony', 1992, 1994, 350, 4],
+  ['Panasonic CR-521 (Creative)', 'Panasonic', 1992, 1993, 300, 3],
+  ['Panasonic CR-562B (Creative)', 'Panasonic', 1993, 1995, 250, 4],
+  ['Sony CDU-33A', 'Sony', 1993, 1995, 220, 3],
+  ['Mitsumi FX001D', 'Mitsumi', 1994, 1995, 150, 2],
+  ['Panasonic CR-563 (Creative)', 'Panasonic', 1994, 1996, 200, 3],
+  ['NEC CDR-260', 'NEC', 1994, 1996, 230, 4],
+  ['Aztech CDA 268-01A', 'Aztech', 1994, 1996, 160, 2],
+  ['Toshiba XM-5302B', 'Toshiba', 1995, 1996, 250, 4],
+  ['Sony CDU-55E', 'Sony', 1995, 1997, 170, 3],
+  ['Mitsumi FX400', 'Mitsumi', 1995, 1996, 130, 2],
+  ['Goldstar GCD-R540', 'Goldstar', 1995, 1997, 120, 1],
+  ['Toshiba XM-5602B', 'Toshiba', 1996, 1997, 170, 4],
+  ['Mitsumi FX810T', 'Mitsumi', 1996, 1997, 120, 2],
+  ['Hitachi CDR-7730', 'Hitachi', 1996, 1998, 120, 3],
+  ['Goldstar GCD-R580B', 'Goldstar', 1996, 1998, 100, 2],
+  ['Pioneer DR-A12X', 'Pioneer', 1996, 1998, 150, 4],
+  ['Creative Blaster CD 24x', 'Creative', 1997, 1999, 100, 3],
+  ['Toshiba XM-6102B', 'Toshiba', 1997, 1999, 90, 4],
+  ['Mitsumi FX120T', 'Mitsumi', 1997, 1998, 80, 2],
+  ['LG CRD-8322B', 'LG', 1997, 1999, 80, 3],
+  ['Samsung SCR-3232', 'Samsung', 1998, 2000, 60, 2],
+  ['Pioneer DR-A24X', 'Pioneer', 1998, 2000, 80, 4],
+  ['LG CRD-8400B', 'LG', 1998, 2000, 55, 3],
+  ['Toshiba XM-6402B', 'Toshiba', 1998, 2000, 65, 4],
+  ['Toshiba XM-6702B', 'Toshiba', 1999, 2001, 55, 4],
+  ['LG CRD-8522B', 'LG', 1999, 2002, 45, 3, 'beige/svart'],
+  ['ASUS CD-S500', 'ASUS', 1999, 2001, 50, 4],
+  ['ASUS CD-S520', 'ASUS', 2000, 2002, 40, 4, 'beige/svart'],
+  ['Samsung SC-152A', 'Samsung', 2000, 2002, 35, 2],
+  ['Creative Blaster CD 52x', 'Creative', 2000, 2002, 40, 3],
+  ['Mitsumi FX4830T', 'Mitsumi', 2000, 2002, 35, 1],
+  ['Lite-On LTN-486S', 'Lite-On', 2000, 2002, 35, 2],
+  ['Lite-On LTN-526S', 'Lite-On', 2001, 2002, 30, 2],
+]);
+
+// ---------------------------------------------------------------------------
+// CD-RW 1998–2006
+M('cdrw', [
+  ['HP CD-Writer Plus 7200i', 'HP', 1998, 1999, 400, 5],
+  ['HP CD-Writer Plus 8100i', 'HP', 1998, 2000, 350, 5],
+  ['Yamaha CRW4416E', 'Yamaha', 1998, 2000, 350, 5],
+  ['Ricoh MP7060A', 'Ricoh', 1998, 2000, 300, 4],
+  ['HP CD-Writer Plus 9100i', 'HP', 1999, 2001, 300, 5],
+  ['Yamaha CRW8424E', 'Yamaha', 1999, 2001, 250, 4],
+  ['Ricoh MP7083A', 'Ricoh', 1999, 2001, 220, 3],
+  ['Philips CDD3610', 'Philips', 1999, 2000, 200, 3],
+  ['Mitsumi CR-4804TE', 'Mitsumi', 1999, 2001, 180, 2],
+  ['Plextor PlexWriter 8/4/32A', 'Plextor', 1999, 2001, 280, 5],
+  ['HP CD-Writer Plus 9300i', 'HP', 2000, 2002, 200, 4],
+  ['Yamaha CRW2100E', 'Yamaha', 2000, 2002, 200, 5],
+  ['Sony CRX140E', 'Sony', 2000, 2002, 180, 3],
+  ['Plextor PlexWriter 12/10/32A', 'Plextor', 2000, 2001, 230, 5],
+  ['Lite-On LTR-12101B', 'Lite-On', 2000, 2001, 150, 2],
+  ['LG GCE-8160B', 'LG', 2000, 2002, 130, 3],
+  ['Plextor PlexWriter 16/10/40A', 'Plextor', 2001, 2002, 200, 5],
+  ['Plextor PlexWriter 24/10/40A', 'Plextor', 2001, 2003, 180, 5],
+  ['Plextor PlexWriter 40/12/40A', 'Plextor', 2001, 2003, 150, 5],
+  ['Lite-On LTR-24102B', 'Lite-On', 2001, 2002, 100, 2],
+  ['Yamaha CRW-F1E', 'Yamaha', 2002, 2004, 150, 5],
+  ['Plextor PlexWriter 48/24/48A', 'Plextor', 2002, 2004, 120, 5],
+  ['Lite-On LTR-40125S', 'Lite-On', 2002, 2003, 70, 2],
+  ['Lite-On LTR-48246S', 'Lite-On', 2002, 2004, 55, 2, 'beige/svart'],
+  ['LG GCE-8400B', 'LG', 2002, 2004, 60, 2],
+  ['Plextor PlexWriter Premium', 'Plextor', 2003, 2005, 120, 5],
+  ['Lite-On LTR-52246S', 'Lite-On', 2003, 2006, 45, 1, 'beige/svart'],
+  ['LG GCE-8527B', 'LG', 2003, 2006, 40, 2, 'beige/svart'],
+  ['Samsung SW-252', 'Samsung', 2003, 2006, 40, 2],
+]);
+
+// ---------------------------------------------------------------------------
+// DVD-ROM 1998–2009
+M('dvd', [
+  ['Creative PC-DVD Encore Dxr2', 'Creative', 1998, 1999, 250, 5],
+  ['Toshiba SD-M1002', 'Toshiba', 1998, 1999, 180, 4],
+  ['Pioneer DVD-A02', 'Pioneer', 1998, 2000, 170, 4],
+  ['Hitachi GD-2500', 'Hitachi', 1998, 1999, 150, 3],
+  ['Toshiba SD-M1212', 'Toshiba', 1999, 2000, 120, 4],
+  ['Pioneer DVD-A05', 'Pioneer', 1999, 2001, 130, 4],
+  ['Hitachi GD-7500', 'Hitachi', 1999, 2001, 90, 3],
+  ['Toshiba SD-M1502', 'Toshiba', 2000, 2001, 90, 4],
+  ['Pioneer DVD-A06', 'Pioneer', 2000, 2002, 90, 4],
+  ['LG GDR-8160B', 'LG', 2000, 2002, 80, 3],
+  ['Samsung SD-616', 'Samsung', 2000, 2002, 70, 2],
+  ['Toshiba SD-M1612', 'Toshiba', 2001, 2002, 70, 3],
+  ['LG GDR-8161B', 'LG', 2001, 2003, 55, 2],
+  ['Toshiba SD-M1802', 'Toshiba', 2002, 2004, 50, 3],
+  ['Pioneer DVD-120', 'Pioneer', 2002, 2004, 50, 3, 'beige/svart'],
+  ['LG GDR-8162B', 'LG', 2002, 2004, 40, 2],
+  ['LG GDR-8164B', 'LG', 2003, 2006, 30, 2, 'beige/svart'],
+  ['Samsung SH-D162C', 'Samsung', 2004, 2006, 30, 2, 'beige/svart'],
+  ['Lite-On SOHD-167T', 'Lite-On', 2004, 2007, 25, 2, 'beige/svart'],
+  ['Sony DDU1615', 'Sony', 2004, 2006, 25, 2, 'beige/svart'],
+  ['Samsung SH-D163B', 'Samsung', 2005, 2008, 22, 1, 'beige/svart'],
+  ['LG GDR-H30N', 'LG', 2006, 2008, 22, 1, 'beige/svart'],
+  ['ASUS DVD-E616P3', 'ASUS', 2006, 2008, 22, 2, 'beige/svart'],
+  ['ASUS DVD-E818A', 'ASUS', 2007, 2009, 20, 2, 'svart/vit'],
+  ['Lite-On iHDP118', 'Lite-On', 2008, 2009, 20, 1, 'svart', 'IDE'],
+  ['Lite-On iHDS118', 'Lite-On', 2008, 2009, 20, 1, 'svart/vit'],
+  ['LG DH16NS10', 'LG', 2008, 2009, 20, 1, 'svart'],
+  ['Sony Optiarc DDU1681S', 'Sony NEC Optiarc', 2008, 2009, 20, 2, 'svart'],
+  ['Samsung SH-118BB', 'Samsung', 2009, 2009, 18, 1, 'svart'],
+]);
+
+// ---------------------------------------------------------------------------
+// DVD±RW-brännare 2002–2016
+M('dvdrw', [
+  ['Pioneer DVR-A03', 'Pioneer', 2002, 2003, 350, 5],
+  ['Pioneer DVR-A05', 'Pioneer', 2002, 2004, 250, 5],
+  ['Sony DRU-500A', 'Sony', 2002, 2003, 300, 5],
+  ['Sony DRU-510A', 'Sony', 2003, 2004, 200, 4],
+  ['NEC ND-1300A', 'NEC', 2003, 2004, 150, 3],
+  ['NEC ND-2500A', 'NEC', 2003, 2005, 100, 3, 'beige/svart'],
+  ['Plextor PX-708A', 'Plextor', 2003, 2004, 220, 5],
+  ['Pioneer DVR-106', 'Pioneer', 2003, 2004, 150, 4],
+  ['Lite-On SOHW-812S', 'Lite-On', 2003, 2004, 120, 3],
+  ['LG GSA-4040B', 'LG', 2003, 2004, 150, 3],
+  ['Sony DRU-530A', 'Sony', 2004, 2005, 120, 4, 'beige/svart'],
+  ['NEC ND-3500A', 'NEC', 2004, 2005, 80, 4, 'beige/svart/vit'],
+  ['Plextor PX-712A', 'Plextor', 2004, 2005, 170, 5],
+  ['Plextor PX-716A', 'Plextor', 2004, 2006, 130, 5, 'beige/svart'],
+  ['Pioneer DVR-107', 'Pioneer', 2004, 2005, 110, 4],
+  ['Pioneer DVR-108', 'Pioneer', 2004, 2005, 90, 4, 'beige/svart'],
+  ['Lite-On SOHW-1633S', 'Lite-On', 2004, 2005, 70, 2, 'beige/svart'],
+  ['LG GSA-4163B', 'LG', 2004, 2005, 70, 2, 'beige/svart'],
+  ['Sony DRU-810A', 'Sony', 2005, 2006, 70, 3, 'beige/svart'],
+  ['NEC ND-3520A', 'NEC', 2005, 2006, 60, 3, 'beige/svart/vit'],
+  ['NEC ND-3540A', 'NEC', 2005, 2007, 50, 3, 'beige/svart/vit'],
+  ['Plextor PX-740A', 'Plextor', 2005, 2006, 80, 4, 'beige/svart'],
+  ['Pioneer DVR-109', 'Pioneer', 2005, 2006, 70, 4, 'beige/svart'],
+  ['Lite-On SOHW-1693S', 'Lite-On', 2005, 2006, 50, 2, 'beige/svart'],
+  ['LG GSA-4167B', 'LG', 2005, 2006, 50, 2, 'beige/svart'],
+  ['LG GSA-H10N', 'LG', 2005, 2006, 45, 2, 'beige/svart'],
+  ['Sony DRU-830A', 'Sony', 2006, 2007, 50, 3, 'beige/svart'],
+  ['NEC ND-3550A', 'NEC', 2006, 2007, 40, 3, 'beige/svart/vit'],
+  ['Plextor PX-760A', 'Plextor', 2006, 2007, 90, 5, 'beige/svart'],
+  ['Pioneer DVR-110', 'Pioneer', 2006, 2007, 50, 3, 'beige/svart'],
+  ['Pioneer DVR-111', 'Pioneer', 2006, 2007, 45, 3, 'beige/svart/vit'],
+  ['Lite-On SHM-165P6S', 'Lite-On', 2006, 2007, 35, 2, 'beige/svart'],
+  ['Samsung SH-S182D', 'Samsung', 2006, 2007, 40, 2, 'beige/svart'],
+  ['ASUS DRW-1814BLT', 'ASUS', 2006, 2007, 50, 3, 'beige/svart'],
+  ['Sony AD-7200S', 'Sony', 2007, 2009, 40, 2, 'svart/vit', 'SATA'],
+  ['Sony NEC Optiarc AD-7170S', 'Sony NEC Optiarc', 2007, 2008, 40, 3, 'svart/vit', 'SATA'],
+  ['Plextor PX-810SA', 'Plextor', 2007, 2009, 70, 5, 'svart', 'SATA'],
+  ['Pioneer DVR-212', 'Pioneer', 2007, 2009, 40, 3, 'svart/vit', 'SATA'],
+  ['Lite-On LH-20A1P', 'Lite-On', 2007, 2008, 30, 2, 'beige/svart'],
+  ['LG GSA-H62N', 'LG', 2007, 2008, 35, 2, 'beige/svart'],
+  ['LG GH20NS10', 'LG', 2007, 2008, 35, 2, 'svart/vit', 'SATA'],
+  ['Samsung SH-S183L', 'Samsung', 2007, 2008, 35, 2, 'svart/vit', 'SATA'],
+  ['Samsung SH-S203B', 'Samsung', 2007, 2008, 30, 2, 'svart/vit', 'SATA'],
+  ['ASUS DRW-2014L1T', 'ASUS', 2007, 2008, 40, 3, 'svart/vit'],
+  ['Sony NEC Optiarc AD-7203S', 'Sony NEC Optiarc', 2008, 2009, 30, 2, 'svart/vit'],
+  ['Pioneer DVR-215', 'Pioneer', 2008, 2010, 30, 3, 'svart/vit'],
+  ['Lite-On iHAS120', 'Lite-On', 2008, 2009, 25, 2, 'svart/vit'],
+  ['LG GH22NS30', 'LG', 2008, 2009, 30, 2, 'svart/vit'],
+  ['Samsung SH-S223F', 'Samsung', 2008, 2009, 28, 2, 'beige/svart/vit'],
+  ['Sony NEC Optiarc AD-7240S', 'Sony NEC Optiarc', 2009, 2012, 25, 2, 'svart/vit'],
+  ['Lite-On iHAS122', 'Lite-On', 2009, 2011, 22, 2, 'svart/vit'],
+  ['LG GH22NS50', 'LG', 2009, 2011, 25, 2, 'svart/vit'],
+  ['Samsung SH-S223L', 'Samsung', 2009, 2010, 25, 2, 'svart'],
+  ['ASUS DRW-22B1ST', 'ASUS', 2009, 2011, 30, 2, 'svart/vit'],
+  ['Plextor PX-880SA', 'Plextor', 2010, 2012, 60, 5, 'svart'],
+  ['LG GH22NS70', 'LG', 2010, 2012, 22, 1, 'svart'],
+  ['Samsung SH-222AB', 'Samsung', 2010, 2011, 22, 1, 'svart/vit'],
+  ['ASUS DRW-24B1ST', 'ASUS', 2010, 2014, 25, 2, 'svart/vit'],
+  ['Sony NEC Optiarc AD-7280S', 'Sony NEC Optiarc', 2011, 2014, 20, 1, 'svart/vit'],
+  ['Lite-On iHAS124', 'Lite-On', 2011, 2014, 20, 1, 'svart/vit'],
+  ['Lite-On iHAS324', 'Lite-On', 2011, 2014, 22, 2, 'svart'],
+  ['LG GH24NS90', 'LG', 2011, 2013, 20, 1, 'svart/vit'],
+  ['Samsung SH-224BB', 'Samsung', 2011, 2013, 20, 1, 'svart/vit'],
+  ['LG GH24NSB0', 'LG', 2012, 2014, 18, 1, 'svart/vit'],
+  ['Samsung SH-224DB', 'Samsung', 2013, 2016, 18, 1, 'svart/vit'],
+  ['ASUS DRW-24F1ST', 'ASUS', 2013, 2016, 22, 2, 'svart/vit'],
+  ['Lite-On iHAS124-14', 'Lite-On', 2013, 2016, 18, 1, 'svart'],
+  ['LG GH24NSC0', 'LG', 2014, 2016, 17, 1, 'svart/vit'],
+  ['LG GH24NSD1', 'LG', 2015, 2016, 17, 1, 'svart'],
+  ['ASUS DRW-24D5MT', 'ASUS', 2015, 2016, 20, 2, 'svart'],
+]);
+
+// ---------------------------------------------------------------------------
+// Blu-ray 2008–2020 (SATA)
+M('bd', [
+  ['LG GGW-H20L', 'LG', 2008, 2009, 300, 5, 'svart'],
+  ['LG GGC-H20L', 'LG', 2008, 2009, 150, 4, 'svart'],
+  ['Pioneer BDR-202', 'Pioneer', 2008, 2009, 350, 5, 'svart'],
+  ['Samsung SH-B083L', 'Samsung', 2008, 2010, 120, 3, 'svart'],
+  ['LG BH08LS20', 'LG', 2008, 2010, 250, 4, 'svart'],
+  ['Pioneer BDR-203', 'Pioneer', 2009, 2010, 220, 5, 'svart'],
+  ['LG BH10LS30', 'LG', 2009, 2011, 180, 4, 'svart'],
+  ['LG CH08LS10', 'LG', 2009, 2010, 100, 3, 'svart'],
+  ['Samsung SH-B123L', 'Samsung', 2009, 2012, 80, 2, 'svart'],
+  ['Pioneer BDR-205', 'Pioneer', 2010, 2011, 200, 5, 'svart/vit'],
+  ['LG CH10LS20', 'LG', 2010, 2012, 70, 2, 'svart'],
+  ['ASUS BW-12B1ST', 'ASUS', 2010, 2012, 150, 4, 'svart'],
+  ['ASUS BC-12B1ST', 'ASUS', 2010, 2012, 70, 2, 'svart'],
+  ['Lite-On iHBS112', 'Lite-On', 2010, 2012, 130, 3, 'svart'],
+  ['Sony Optiarc BD-5300S', 'Sony NEC Optiarc', 2010, 2012, 150, 4, 'svart'],
+  ['Pioneer BDR-206', 'Pioneer', 2011, 2012, 150, 5, 'svart'],
+  ['LG BH12LS38', 'LG', 2011, 2013, 100, 4, 'svart'],
+  ['LG CH12LS28', 'LG', 2011, 2014, 50, 2, 'svart'],
+  ['Lite-On iHOS104', 'Lite-On', 2011, 2014, 50, 2, 'svart'],
+  ['Pioneer BDR-207', 'Pioneer', 2012, 2013, 120, 4, 'svart/vit'],
+  ['LG BH14NS40', 'LG', 2012, 2014, 70, 3, 'svart'],
+  ['ASUS BW-16D1HT', 'ASUS', 2012, 2020, 90, 4, 'svart'],
+  ['Lite-On iHBS212', 'Lite-On', 2012, 2014, 90, 3, 'svart'],
+  ['Pioneer BDR-208', 'Pioneer', 2013, 2014, 100, 4, 'svart'],
+  ['LG CH12NS30', 'LG', 2013, 2016, 45, 2, 'svart'],
+  ['LG WH14NS40', 'LG', 2013, 2020, 60, 3, 'svart'],
+  ['Pioneer BDR-209', 'Pioneer', 2014, 2020, 90, 4, 'svart/vit'],
+  ['LG BH16NS40', 'LG', 2014, 2020, 70, 3, 'svart'],
+  ['LG WH16NS40', 'LG', 2014, 2020, 70, 3, 'svart'],
+  ['ASUS BC-12D2HT', 'ASUS', 2014, 2020, 55, 2, 'svart'],
+  ['Pioneer BDR-211', 'Pioneer', 2015, 2016, 90, 4, 'svart'],
+  ['LG CH12NS40', 'LG', 2015, 2020, 50, 2, 'svart'],
+  ['LG BH16NS55', 'LG', 2016, 2020, 80, 4, 'svart'],
+  ['Pioneer BDR-212', 'Pioneer', 2017, 2020, 100, 5, 'svart'],
+]);
+
+export default P;

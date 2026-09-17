@@ -11,11 +11,11 @@ const esc = U.esc;
 
 export class BuildView {
   constructor(game, hooks) {
-    this.game = game; this.shop = game.shop; this.L = game.shop.layout; this.hooks = hooks;
+    this.game = game; this.shop = game.shop; this.hooks = hooks;
     this.canvas = $('#board'); this.ctx = this.canvas.getContext('2d');
     // Kamera: zoom = css-px per enhet, (x,y) = var världens origo hamnar på skärmen.
     // Rastern ritas bara för det synliga området, med upp till MAX_K pixlar per enhet.
-    const V = this.L.VIEW, ratio = V.hz / V.k;
+    const V = this.shop.layout.VIEW, ratio = V.hz / V.k;
     this.P = { k: V.k, hz: V.hz, ox: 0, oy: 0, proj(u, v, z = 0) { return [this.ox + (u - v) * this.k, this.oy + (u + v) * this.k / 2 - z * this.hz]; } };
     this.hzRatio = ratio;
     this.s = 1; this.ox = 0; this.oy = 0;
@@ -42,8 +42,12 @@ export class BuildView {
   }
 
   // ---------- Öppna ----------
+  // Byggreglerna för just den här beställningen (butiken kan ge en rigg per order)
+  get L() { return this.rig || this.shop.layout; }
+
   open(order) {
     this.order = order;
+    this.rig = this.shop.layout.rigFor ? this.shop.layout.rigFor(order) : null;
     order.build ||= { placed: {}, acts: new Map(), cables: new Map(), errors: 0, time: 0, help: null, phase: 'build', seen: new Set() };
     this.selected = null; this.msg = null; this.guideKey = null; this.dirty = true; this.cablesDirty = true; this.userCam = false;
     $('#build-title').innerHTML = `<span class="r">${esc(order.title)}</span> åt ${esc(order.name)}`;
@@ -81,7 +85,7 @@ export class BuildView {
     });
     for (const it of o.items) {
       if (!it.choice || Object.values(b.placed).some((p) => p.cat === it.cat)) continue;
-      for (const p of this.shop.parts) if (p.cat === it.cat && this.game.stockFree(p.id) > 0) out.push({ key: `c${p.id}`, kind: 'part', part: p, name: p.name, choice: true, count: this.game.stockFree(p.id) });
+      for (const id of Object.keys(this.game.stock)) { const p = this.shop.part[id]; if (p && p.cat === it.cat && this.game.stockFree(p.id) > 0) out.push({ key: `c${p.id}`, kind: 'part', part: p, name: p.name, choice: true, count: this.game.stockFree(p.id) }); }
     }
     return out;
   }
@@ -89,7 +93,7 @@ export class BuildView {
     const b = this.b;
     return this.L.CABLES.filter((c) => this.L.cableReady(c, b) && !b.cables.has(c.id)).map((c) => {
       const conn = this.L.cableConn(c, b);
-      return { key: 'cable:' + c.id, kind: 'cable', cable: c, conn, name: c.name, sub: this.L.CONN[conn].name };
+      return { key: 'cable:' + c.id, kind: 'cable', cable: c, conn, name: c.name, sub: this.L.CONN[conn]?.name || conn };
     });
   }
   trayEntries() {
@@ -102,7 +106,7 @@ export class BuildView {
     return e.icon(W, H);
   }
   trayEmptyText() {
-    if (this.phase === 'desk') return 'Allt är inkopplat! Tryck på startknappen på datorn.';
+    if (this.phase === 'desk') return this.finale?.emptyText?.() || 'Allt är inkopplat! Tryck på startknappen på datorn.';
     return this.isBuilt() ? 'Allt sitter i! Tryck på 🖥️ Ställ upp datorn.' : 'Lådan är tom.';
   }
 
@@ -121,8 +125,9 @@ export class BuildView {
   sim() {
     const placed = {};
     for (const it of this.order.items) {
-      const part = it.part ? this.shop.part[it.part] : (this.shop.part[this.order.chosen[it.cat]] || this.shop.parts.find((p) => p.cat === it.cat));
-      const slot = this.L.slotsFor(part)[0];
+      const part = it.part ? this.shop.part[it.part] : (this.shop.part[this.order.chosen[it.cat]]
+        || this.shop.parts.find((p) => p.cat === it.cat && this.game.stockFree(p.id) > 0) || this.shop.parts.find((p) => p.cat === it.cat));
+      const slot = part && this.L.slotsFor(part).find((s) => !placed[s.id]);
       if (slot) placed[slot.id] = part;
     }
     return { placed, acts: new Map(), cables: new Map() };
@@ -134,7 +139,7 @@ export class BuildView {
     for (const key of L.STEPS) {
       const [kind, id] = key.split(':');
       if (kind === 'slot') {
-        if (!sim.placed[id]) continue;
+        if (!sim.placed[id] && !b.placed[id]) continue;
         const entry = tray.find((e) => L.slotsFor(e.part).some((s) => s.id === id));
         out.push({ key, kind, id, label: (b.placed[id] || sim.placed[id]).name, done: !!b.placed[id], ready: !!entry && !L.missingReq(L.SLOT[id].requires, b), entryKey: entry?.key });
       } else if (kind === 'act') {
@@ -144,7 +149,8 @@ export class BuildView {
         out.push({ key, kind, id, label: a.name + (n > 1 ? ` (${c}/${n})` : ''), done: L.actDone(b, id), ready: L.actionReady(a, b) });
       } else {
         const c = L.CABLE[id];
-        if (!c.requires.every((r) => sim.placed[r]) || !L.cableNeeded(c, { ...sim, placed: { ...sim.placed, ...b.placed } })) continue;
+        const merged = { ...sim, placed: { ...sim.placed, ...b.placed } };
+        if (!c.requires.every((r) => merged.placed[r]) || !L.cableNeeded(c, merged) || !L.cableConn(c, merged)) continue;
         out.push({ key, kind, id, label: c.name, done: b.cables.has(id), ready: L.cableReady(c, b) && !b.cables.has(id), entryKey: 'cable:' + id });
       }
     }
@@ -214,7 +220,7 @@ export class BuildView {
     b.cables.set(entry.cable.id, key);
     this.plugAnim = { id: entry.cable.id, t: 0 };
     this.cablesDirty = true; this.selected = null;
-    if (!b.seen.has(entry.conn)) {
+    if (!b.seen.has(entry.conn) && this.L.fact(entry.conn)) {
       b.seen.add(entry.conn);
       this.say(`<b>${esc(this.L.CONN[entry.conn].name)}:</b> ${esc(this.L.fact(entry.conn))}`, 'fact');
     } else this.say(`Klick! ${esc(entry.cable.name)} sitter i ${esc(this.L.portLabel(key))}.`, 'info');
@@ -315,6 +321,7 @@ export class BuildView {
       return this.connect(entry, best.key);
     }
     const hit = this.slotAt(pt, entry.part);
+    if (hit?.slot && this.b.placed[hit.slot.id]) { const free = this.L.slotsFor(entry.part).find((s) => !this.b.placed[s.id]); if (free) hit.slot = free; }
     if (!hit) return this.say(this.help ? 'Släpp delen på den gula markeringen.' : 'Släpp delen där den ska sitta.', 'err');
     if (hit.wrong) {
       const right = this.L.slotsFor(entry.part)[0];
@@ -425,6 +432,7 @@ export class BuildView {
     if (Math.floor(this.t * 2) !== Math.floor((this.t - dt) * 2)) { U.renderGuide(this); if (this.sheetTick = !this.sheetTick) U.renderSheet(this); }
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    document.querySelector('#zoom-ctl')?.classList.toggle('hidden', this.phase !== 'build');
     if (this.phase === 'desk') { this.finale.frame(dt); this.finale.draw(ctx); return; }
     if (this.flash) { this.flash.t -= dt; if (this.flash.t <= 0) this.flash = null; }
     if (this.toolAnim) { this.toolAnim.t += dt; if (this.toolAnim.t > 0.45) this.toolAnim = null; }
@@ -432,7 +440,6 @@ export class BuildView {
     if (!this.cam) this.resize();
     if (this.dirty || (this.renderDue && this.t >= this.renderDue)) this.render();
     if (this.cablesDirty) { this.L.drawCables(this.cableCtx, this.R, this.b, { plug: this.plugAnim }); this.cablesDirty = false; }
-    document.querySelector('#zoom-ctl')?.classList.toggle('hidden', this.phase !== 'build');
     this.draw(ctx);
   }
 

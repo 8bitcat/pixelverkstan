@@ -5,9 +5,10 @@ import { FIRST_NAMES, makeLook } from './people.js';
 const QUEUE_PATIENCE = 75;   // sekunder i kön
 const MAX_QUEUE = 3;
 const MAX_ORDERS = 3;
+export const XP_PER_YEAR = 30;   // erfarenhet per år som går
 
 export class Game {
-  constructor(shop) {
+  constructor(shop, opts = {}) {
     this.shop = shop;
     this.listeners = [];
     this.customers = [];
@@ -15,7 +16,7 @@ export class Game {
     this.nextId = 1;
     this.spawnTimer = 1.5;
     this.time = 0;
-    if (!this.load()) this.reset();
+    if (opts.fresh || !this.load()) this.reset(opts.startYear ?? shop.defaultStartYear ?? 2021);
   }
 
   on(fn) { this.listeners.push(fn); }
@@ -23,9 +24,11 @@ export class Game {
 
   // ---------- Sparning ----------
   get saveKey() { return 'pixelverkstan_' + this.shop.id; }
-  reset() {
-    const s = this.shop.start;
-    this.money = s.money; this.xp = 0; this.stock = { ...s.stock };
+  reset(startYear = 2021) {
+    this.startYear = startYear; this.xp = 0;
+    const s = this.shop.startFor ? this.shop.startFor(startYear) : this.shop.start;
+    this.startInfo = s;
+    this.money = s.money; this.stock = { ...s.stock };
     this.stats = { served: 0, declined: 0, lost: 0, earned: 0, stars: 0 };
     this.tutorialStep = 0;
     this.customers = []; this.orders = [];
@@ -40,37 +43,39 @@ export class Game {
     const money = this.money + pending.reduce((s, c) => s + c.payout.total, 0);
     const xp = this.xp + pending.reduce((s, c) => s + c.payout.xp, 0);
     const tutorialStep = this.tutorialStep + pending.filter((c) => c.order.tutorial !== undefined).length;
-    const data = { v: 1, money, xp, stock, stats: this.stats, tutorialStep };
+    const start = this.startInfo ? { template: this.startInfo.template, builds: (this.startInfo.builds || []).map((b) => (b || []).map((p) => p.id)) } : null;
+    const data = { v: 2, money, xp, stock, stats: this.stats, tutorialStep, startYear: this.startYear, start };
     try { localStorage.setItem(this.saveKey, JSON.stringify(data)); } catch { /* privat läge */ }
   }
   load() {
     try {
       const d = JSON.parse(localStorage.getItem(this.saveKey) || 'null');
-      if (!d || d.v !== 1) return false;
+      if (!d || (d.v !== 1 && d.v !== 2)) return false;
       const stock = Object.fromEntries(Object.entries(d.stock || {}).filter(([id]) => this.shop.part[id]));
-      Object.assign(this, { money: d.money, xp: d.xp, stock, stats: d.stats, tutorialStep: d.tutorialStep });
+      Object.assign(this, { money: d.money, xp: d.xp, stock, stats: d.stats, tutorialStep: d.tutorialStep, startYear: d.startYear ?? 2021 });
+      if (d.start?.builds) this.startInfo = { template: d.start.template, builds: d.start.builds.map((ids) => ids.map((id) => this.shop.part[id]).filter(Boolean)) };
       return true;
     } catch { return false; }
   }
   hasSave() { try { return !!localStorage.getItem(this.saveKey); } catch { return false; } }
 
-  // ---------- Nivå ----------
-  get level() {
-    const L = this.shop.levels;
-    let n = 1;
-    for (let i = 0; i < L.length; i++) if (this.xp >= L[i].xp) n = i + 1;
-    return n;
-  }
+  // ---------- Årtal ----------
+  get lastYear() { return this.shop.lastYear ?? 2026; }
+  get year() { return Math.min(this.lastYear, (this.startYear ?? 2021) + Math.floor(this.xp / XP_PER_YEAR)); }
+  get progress() { return (this.year - this.startYear) / Math.max(1, this.lastYear - this.startYear); }
+  get level() { return 1 + Math.min(4, Math.floor(this.progress * 5)); }
+  onSale(p) { return p.year <= this.year && (p.until ?? 9999) >= this.year; }
   levelInfo() {
-    const L = this.shop.levels, n = this.level;
-    const cur = L[n - 1], next = L[n];
-    return { level: n, title: cur.title, frac: next ? (this.xp - cur.xp) / (next.xp - cur.xp) : 1, next };
+    const y = this.year, era = this.shop.eraOf ? this.shop.eraOf(y) : { title: '' };
+    const done = y >= this.lastYear;
+    return { level: this.level, year: y, title: `${y} · ${era.title}`, era, frac: done ? 1 : (this.xp % XP_PER_YEAR) / XP_PER_YEAR, next: done ? null : { title: String(y + 1) } };
   }
 
   // ---------- Lager & grossist ----------
   stockFree(id) { return this.stock[id] || 0; }
   buy(id, n = 1) {
     const p = this.shop.part[id], cost = p.cost * n;
+    if (!this.onSale(p)) { this.emit('toast', { text: p.year > this.year ? `${p.name} finns inte förrän ${p.year}.` : `${p.name} säljs inte längre.`, kind: 'bad' }); return false; }
     if (this.money < cost) { this.emit('toast', { text: 'Inte tillräckligt med pengar!', kind: 'bad' }); return false; }
     this.money -= cost;
     this.stock[id] = (this.stock[id] || 0) + n;
@@ -89,7 +94,7 @@ export class Game {
     return out;
   }
   missingChoices(order) {
-    return order.items.filter((it) => it.choice && !this.shop.parts.some((p) => p.cat === it.cat && this.stockFree(p.id) > 0)).map((it) => it.cat);
+    return order.items.filter((it) => it.choice && !Object.keys(this.stock).some((id) => this.stock[id] > 0 && this.shop.part[id]?.cat === it.cat)).map((it) => it.cat);
   }
   buyMissing(order) {
     const miss = this.missingFor(order);
@@ -121,7 +126,7 @@ export class Game {
     if (this.spawnTimer <= 0) {
       if (this.tutorialStep < this.shop.tutorialCount) {
         const tutActive = this.customers.some((c) => c.order.tutorial !== undefined);
-        if (!tutActive && this.orders.length === 0) this.spawn(this.shop.tutorialOrder(this.tutorialStep));
+        if (!tutActive && this.orders.length === 0) this.spawn(this.shop.tutorialOrder(this.tutorialStep, this));
         this.spawnTimer = 2;
       } else {
         if (this.queue().length < MAX_QUEUE && this.orders.length < MAX_ORDERS && this.customers.length < 7) {
@@ -192,7 +197,7 @@ export class Game {
     return o.payout;
   }
   pay(p, c) {
-    const before = this.level;
+    const before = this.year;
     this.money += p.total; this.xp += p.xp;
     this.stats.served++; this.stats.earned += p.total; this.stats.stars += p.stars;
     if (c?.order.tutorial !== undefined) {
@@ -200,7 +205,7 @@ export class Game {
       if (this.tutorialStep === this.shop.tutorialCount) setTimeout(() => this.emit('toast', { text: 'Nu kör du på egen hand! Fyll på lagret hos 🛒 Grossisten.', kind: '' }), 3500);
     }
     this.emit('toast', { text: `+${fmt(p.total)} kr${p.tip ? ` (varav ${fmt(p.tip)} kr dricks)` : ''}`, kind: 'good' });
-    if (this.level > before) this.emit('levelup', this.levelInfo());
+    if (this.year > before) this.emit('levelup', { ...this.levelInfo(), from: before });
     this.save(); this.emit('change');
   }
 }

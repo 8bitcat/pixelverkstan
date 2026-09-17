@@ -39,7 +39,7 @@ export function renderHud(game, h) {
   const li = game.levelInfo();
   $('#hud').innerHTML = `
     <div class="chip money">💰 ${fmt(game.money)} kr</div>
-    <div class="chip" title="${li.next ? `Nästa nivå: ${esc(li.next.title)}` : 'Högsta nivån!'}">⭐ ${li.level}. ${esc(li.title)} <span class="xpbar"><i style="width:${Math.round(li.frac * 100)}%"></i></span></div>
+    <div class="chip" title="${li.next ? `Nästa år: ${esc(li.next.title)}` : 'Nutid!'}">📅 ${li.year ?? li.level} <small style="font-family:var(--font);font-size:15px">${esc(li.era?.title || li.title)}</small> <span class="xpbar"><i style="width:${Math.round(li.frac * 100)}%"></i></span></div>
     <div class="chip">😊 ${game.stats.served}</div>
     <div class="hud-spacer"></div>
     <button class="btn" data-h="shop">🛒 Grossist</button>
@@ -120,26 +120,61 @@ export function openOrderDialog(game, c, h) {
 }
 
 // ---------- Grossist ----------
+// Grossisten: tusentals delar → kategori, sökning, filter och sidor
+const SHOP_STATE = { tab: null, q: '', filter: 'sale', sort: 'new', page: 0 };
 export function openShop(game, tab = null, onClose = null) {
-  const shop = game.shop;
-  tab ||= shop.catOrder[0];
-  const render = () => {
-    const tabs = shop.catOrder.map((c) => `<button class="tab ${c === tab ? 'on' : ''}" data-tab="${c}">${shop.cats[c].icon} ${esc(shop.cats[c].name)}</button>`).join('');
+  const shop = game.shop, st = SHOP_STATE, PER = 20;
+  if (tab) { st.tab = tab; st.page = 0; }
+  st.tab ||= shop.catOrder[0];
+  const render = (keepFocus = false) => {
+    const y = game.year, q = st.q.trim().toLowerCase();
+    let list = shop.parts.filter((p) => p.cat === st.tab);
+    const counts = { sale: 0, soon: 0, own: 0 };
+    for (const p of list) { if (game.onSale(p)) counts.sale++; else if (p.year > y && p.year <= y + 2) counts.soon++; if (game.stockFree(p.id)) counts.own++; }
+    if (st.filter === 'sale') list = list.filter((p) => game.onSale(p));
+    if (st.filter === 'soon') list = list.filter((p) => p.year > y && p.year <= y + 2);
+    if (st.filter === 'own') list = list.filter((p) => game.stockFree(p.id) > 0);
+    if (q) list = list.filter((p) => (p.name + ' ' + p.brand + ' ' + shop.specLine(p)).toLowerCase().includes(q));
+    const sorters = { new: (a, b) => b.year - a.year || b.tier - a.tier, cheap: (a, b) => a.cost - b.cost, dear: (a, b) => b.cost - a.cost, name: (a, b) => a.name.localeCompare(b.name, 'sv') };
+    list.sort(sorters[st.sort]);
+    const pages = Math.max(1, Math.ceil(list.length / PER));
+    st.page = Math.min(st.page, pages - 1);
+    const shown = list.slice(st.page * PER, st.page * PER + PER);
+    const tabs = shop.catOrder.map((c) => `<button class="tab ${c === st.tab ? 'on' : ''}" data-tab="${c}">${shop.cats[c].icon} ${esc(shop.cats[c].name)}</button>`).join('');
     let rows = '';
-    for (const p of shop.parts.filter((x) => x.cat === tab)) {
-      const locked = p.lvl > game.level;
-      rows += `<div class="prow shoprow" style="${locked ? 'opacity:.55' : ''}"><span data-icon="${p.id}"></span>
-        <div><div class="nm">${esc(p.name)}</div><div class="sp">${esc(shop.specLine(p))}</div></div>
-        <div class="own">i lager<br><b>${game.stockFree(p.id)}</b></div>
-        ${locked ? `<button class="btn btn-small" disabled>🔒 Nivå ${p.lvl}</button>` : `<button class="btn btn-small btn-gold" data-buy="${p.id}" ${p.cost > game.money ? 'disabled' : ''}>Köp ${fmt(p.cost)} kr</button>`}</div>`;
+    for (const p of shown) {
+      const sale = game.onSale(p);
+      const btn = sale
+        ? `<button class="btn btn-small btn-gold" data-buy="${p.id}" ${p.cost > game.money ? 'disabled' : ''}>Köp ${fmt(p.cost)} kr</button>`
+        : `<button class="btn btn-small" disabled>${p.year > y ? `📅 ${p.year}` : 'Utgången'}</button>`;
+      rows += `<div class="prow shoprow" style="${sale ? '' : 'opacity:.55'}"><span data-icon="${p.id}"></span>
+        <div><div class="nm">${esc(p.name)}</div><div class="sp">${esc(shop.specLine(p))} · ${p.year}</div></div>
+        <div class="own">i lager<br><b>${game.stockFree(p.id)}</b></div>${btn}</div>`;
     }
-    const dlg = openModal(`🛒 Grossisten <small style="font-size:15px;margin-left:8px">💰 ${fmt(game.money)} kr</small>`,
-      `<div class="tabs">${tabs}</div><div class="plist">${rows}</div>
-       <p class="sp" style="color:var(--muted)">Nya delar låses upp när butiken går upp i nivå. Kunderna beställer helst sådant du har i lager.</p>`,
+    if (!shown.length) rows = `<p style="font-size:19px">Inga delar matchar.${st.filter === 'sale' ? ' Prova filtret "Kommande".' : ''}</p>`;
+    const chip = (f, label) => `<button class="tab ${st.filter === f ? 'on' : ''}" data-filter="${f}">${label}</button>`;
+    const body = `<div class="tabs">${tabs}</div>
+      <div class="shopbar">
+        <input id="shop-q" type="search" placeholder="Sök märke, modell, sockel …" value="${esc(st.q)}">
+        ${chip('sale', `Till salu ${y} (${counts.sale})`)}${chip('soon', `Kommande (${counts.soon})`)}${chip('own', `I lager (${counts.own})`)}${chip('all', 'Alla')}
+        <select id="shop-sort"><option value="new">Nyast</option><option value="cheap">Billigast</option><option value="dear">Dyrast</option><option value="name">Namn</option></select>
+      </div>
+      <div class="plist">${rows}</div>
+      <div class="pager"><button class="btn btn-small" data-page="-1" ${st.page ? '' : 'disabled'}>← Föregående</button><span>Sida ${st.page + 1} av ${pages} · ${list.length} delar</span><button class="btn btn-small" data-page="1" ${st.page < pages - 1 ? '' : 'disabled'}>Nästa →</button></div>`;
+    const dlg = openModal(`🛒 Grossisten ${y} <small style="font-size:15px;margin-left:8px">💰 ${fmt(game.money)} kr</small>`, body,
       [{ label: onClose ? '← Tillbaka till kunden' : 'Stäng', onClick: () => { closeModal(); onClose?.(); } }]);
-    dlg.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; render(); }));
+    dlg.classList.add('dlg-wide');
+    dlg.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { st.tab = b.dataset.tab; st.page = 0; render(); }));
+    dlg.querySelectorAll('[data-filter]').forEach((b) => (b.onclick = () => { st.filter = b.dataset.filter; st.page = 0; render(); }));
+    dlg.querySelectorAll('[data-page]').forEach((b) => (b.onclick = () => { st.page += +b.dataset.page; render(); dlg.scrollTop = 0; }));
     dlg.querySelectorAll('[data-buy]').forEach((b) => (b.onclick = () => { if (game.buy(b.dataset.buy)) { toast(`Köpt: ${shop.part[b.dataset.buy].name}`, 'good'); render(); } }));
     dlg.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(shop.icon(shop.part[el.dataset.icon], 44, 38)));
+    const sort = dlg.querySelector('#shop-sort'); sort.value = st.sort;
+    sort.onchange = () => { st.sort = sort.value; st.page = 0; render(); };
+    const input = dlg.querySelector('#shop-q');
+    let timer = null;
+    input.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { st.q = input.value; st.page = 0; render(true); }, 220); };
+    if (keepFocus) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
   };
   render();
 }
@@ -161,11 +196,15 @@ export function showResult(order, payout, result, onClose) {
 }
 
 export function showLevelUp(game, info) {
-  const fresh = game.shop.parts.filter((p) => p.lvl === info.level);
-  const body = `<p style="font-size:19px;margin-top:0">Butiken är nu en <b>${esc(info.title)}</b>! Nya kunder med större önskemål kommer in.</p>
-    ${fresh.length ? `<h3>Nytt hos grossisten</h3><div class="plist">${fresh.map((p) => `<div class="prow" style="grid-template-columns:44px 1fr"><span data-icon="${p.id}"></span><div><div class="nm">${esc(p.name)}</div><div class="sp">${esc(game.shop.specLine(p))}</div></div></div>`).join('')}</div>` : ''}`;
-  const dlg = openModal(`⭐ Nivå ${info.level}!`, body, [{ label: 'Grymt!', cls: 'btn-go', onClick: closeModal }]);
-  dlg.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(game.shop.icon(game.shop.part[el.dataset.icon], 44, 38)));
+  const shop = game.shop, y = info.year;
+  const fresh = shop.parts.filter((p) => p.year === y).sort((a, b) => b.tier - a.tier || b.cost - a.cost);
+  const top = [];
+  for (const cat of shop.catOrder) { const p = fresh.find((x) => x.cat === cat); if (p) top.push(p); }
+  const gone = shop.parts.filter((p) => p.until === y - 1).length;
+  const body = `<p style="font-size:21px;margin-top:0">Det har blivit <b>${y}</b>${info.era?.title ? ` – ${esc(info.era.title)}` : ''}! Grossisten har <b>${fresh.length}</b> nya delar${gone ? ` och ${gone} gamla har slutat säljas` : ''}.</p>
+    ${top.length ? `<h3>Nyheter i år</h3><div class="plist">${top.map((p) => `<div class="prow" style="grid-template-columns:44px 1fr"><span data-icon="${p.id}"></span><div><div class="nm">${esc(p.name)}</div><div class="sp">${esc(shop.cats[p.cat].name)} · ${esc(shop.specLine(p))}</div></div></div>`).join('')}</div>` : ''}`;
+  const dlg = openModal(`📅 Nytt år: ${y}`, body, [{ label: 'Grymt!', cls: 'btn-go', onClick: closeModal }]);
+  dlg.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(shop.icon(shop.part[el.dataset.icon], 44, 38)));
 }
 
 // ---------- Museivy: titta på delarna i en monter på nära håll ----------
@@ -179,9 +218,9 @@ export function openShowcase(game, what) {
     body = `<div class="museum"><span data-big="0"></span>
       <h3 style="margin:8px 0 2px">${esc(p.name)}</h3>
       <div class="sp" style="font-size:18px">${esc(shop.specLine(p))}</div>
-      <p style="font-size:19px;margin:8px 0 0">Butikens finaste grafikkort – bara till för att titta på. Kunder kan beställa det när butiken blivit en <b>${esc(shop.levels[p.lvl - 1]?.title || 'Megastore')}</b>.</p></div>`;
+      <p style="font-size:19px;margin:8px 0 0">Årets finaste grafikkort – bara till för att titta på. Det kom ut <b>${p.year}</b> och kostar ${fmt(p.cost)} kr hos grossisten.</p></div>`;
   } else {
-    const list = shop.parts.filter((p) => p.cat === what.cat && game.stockFree(p.id) > 0).sort((a, b) => b.cost - a.cost);
+    const list = Object.keys(game.stock).filter((id) => game.stock[id] > 0).map((id) => shop.part[id]).filter((p) => p && p.cat === what.cat).sort((a, b) => b.cost - a.cost);
     parts = list.map((p) => [p, 270, 170]);
     title = `🏛️ ${esc(what.title || shop.cats[what.cat].name)}`;
     body = list.length

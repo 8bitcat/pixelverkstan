@@ -1,5 +1,5 @@
 // Spelar en hel beställning via riktiga klick/drag: montering, skruvar, kablar,
-// skrivbord, inkoppling och start. node tools/fullbuild.mjs [kund-index 0-2] [prefix] [mode help|pro]
+// skrivbord, inkoppling, start, leverans och betalning. node tools/e2e.mjs [prefix]
 import { createRequire } from "module";
 const require = createRequire("D:/Qisy/QISYFrontend/QISYFrontend-1/package.json");
 const { chromium } = require("playwright");
@@ -10,9 +10,9 @@ const page = await browser.newPage({ viewport: { width: +W, height: +H } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(`[pageerror] ${e.message}\n${e.stack}`));
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
-await page.goto("http://localhost:8777/index.html");
+await page.goto("http://localhost:8777/index.html?year=2024");
 await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForTimeout(500);
-await page.click('[data-shop="dator"]'); await page.waitForTimeout(500);
+await page.click('[data-shop="dator"]'); await page.waitForFunction(() => window.PV?.game, null, { timeout: 30000 }); await page.waitForTimeout(300);
 // vänta på första kunden och klicka på den i butiken
 for (let i = 0; i < 80; i++) { if (await page.evaluate(() => { const c = PV.game.queue()[0]; return c && c.phase === 'queue' && !c.moving; })) break; await page.waitForTimeout(250); }
 const cpos = await page.evaluate(() => { const f = PV.floor, c = PV.game.queue()[0], r = f.canvas.getBoundingClientRect(); return { x: r.left + f.offX + c.x * f.scale, y: r.top + f.offY + (c.y - 12) * f.scale }; });
@@ -43,21 +43,18 @@ for (let step = 0; step < 90; step++) {
     } else {
       const f = v.finale;
       if (st.kind === 'plug') {
-        const { PLUGS } = f.constructor;
-        const plug = ({ pc_power: 'c13', hdmi: 'hdmi', kb: 'usb', mouse: 'usb', mon_power: 'mains' })[st.id];
-        if (plug === 'mains') { const [x, y] = f.proj(25, 11.1, 6.4); return { kind: 'drag', key: st.entryKey, t: abs([x, y]), label: st.id }; }
-        const want = st.id === 'hdmi' ? (v.b.placed.gpu ? 'HDMI_GPU' : 'HDMI_MB') : null;
-        const ports = window.__rear(v.b).filter((p) => p.type === plug && !Object.values(f.d.plugs).includes(p.key) && (!want || p.key === want));
+        const plug = f.PLUGS[st.id];
+        if (plug.target === 'strip') { const [x, y] = f.proj(...f.STRIP); return { kind: 'drag', key: st.entryKey, t: abs([x, y]), label: st.id }; }
+        const ports = f.ports().filter((p) => p.type === plug.type && !Object.values(f.d.plugs).includes(p.key) && (st.id !== 'video' || p.owner === (v.b.placed.gpu ? 'gpu' : 'mb')));
         const [x, y, w, h] = f.rearRect(ports[0]);
         return { kind: 'drag', key: st.entryKey, t: abs([x + w / 2, y + h / 2]), label: st.id };
       }
-      if (st.kind === 'switch') { const si = f.si; return { kind: 'click', t: abs([f.insetX + (30 + 4) * si, f.insetY + (131 + 6) * si]), label: 'switch' }; }
+      if (st.kind === 'switch') { const si = f.si, S = f.SWITCH; return { kind: f.era.at ? 'power' : 'click', t: abs([f.insetX + (S.x + S.w / 2) * si, f.insetY + (S.y + S.h / 2) * si]), label: 'switch' }; }
       if (st.kind === 'power') return { kind: 'power', t: abs(f.powerButton()) };
     }
     return { kind: 'unknown', st };
   });
   if (s.kind === 'none' || s.kind === 'unknown') { console.log('slut:', JSON.stringify(s)); break; }
-  if (step === 0) await page.evaluate(async () => { const m = await import('/js/shops/dator/desk-art.js'); window.__rear = m.rearPorts; });
   if (s.kind === 'drag') await drag(s.key, s.t);
   else if (s.kind === 'click') { await page.mouse.click(s.t.x, s.t.y); await page.waitForTimeout(90); }
   else if (s.kind === 'stand') { await page.screenshot({ path: OUT + prefix + '1-built.png' }); await page.click('#build-boot'); await page.waitForTimeout(400); }

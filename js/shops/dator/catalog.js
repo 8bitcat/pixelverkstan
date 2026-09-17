@@ -1,5 +1,6 @@
-// Datorbutikens delar – riktiga produktnamn, ungefärliga inköpspriser i kronor.
-// lvl = butiksnivå då delen dyker upp hos grossisten. rgb = har RGB-belysning.
+// Datorbutikens kategorier, epoker och beskrivningar.
+// Själva delarna (5000+, 1983–2026) ligger i parts/<kategori>.js och laddas av parts/index.js.
+// PARTS nedan är de ursprungliga moderna delarna – används som reserv om en kategorifil saknas.
 
 export const CATS = {
   case:    { name: 'Chassi', icon: '🗄️', color: '#6b7684' },
@@ -7,14 +8,31 @@ export const CATS = {
   cpu:     { name: 'Processor (CPU)', icon: '🧠', color: '#2c6fb7' },
   cooler:  { name: 'CPU-kylare', icon: '❄️', color: '#58a6c9' },
   ram:     { name: 'RAM-minne', icon: '📏', color: '#c9323a' },
-  storage: { name: 'Lagring', icon: '💾', color: '#7a5bc9' },
-  gpu:     { name: 'Grafikkort (GPU)', icon: '🎮', color: '#3f9b3a' },
-  psu:     { name: 'Nätaggregat (PSU)', icon: '🔌', color: '#e0a02a' },
+  storage: { name: 'Hårddisk/SSD', icon: '💾', color: '#7a5bc9' },
+  media:   { name: 'Diskett/CD/DVD', icon: '💿', color: '#b88a3e' },
+  gpu:     { name: 'Grafikkort', icon: '🎮', color: '#3f9b3a' },
+  sound:   { name: 'Ljudkort', icon: '🔊', color: '#c86a2a' },
+  psu:     { name: 'Nätaggregat', icon: '🔌', color: '#e0a02a' },
   fans:    { name: 'Chassifläktar', icon: '🌀', color: '#8fa3b8' },
 };
 
-export const CAT_ORDER = ['case', 'mb', 'cpu', 'cooler', 'ram', 'storage', 'gpu', 'psu', 'fans'];
+export const CAT_ORDER = ['case', 'mb', 'cpu', 'cooler', 'ram', 'storage', 'media', 'gpu', 'sound', 'psu', 'fans'];
 
+// Epoker (visas i HUD och när ett nytt år börjar)
+export const ERAS = [
+  { from: 1983, title: 'PC-klonernas tid', emoji: '💾' },
+  { from: 1987, title: '386 och VGA', emoji: '🖥️' },
+  { from: 1991, title: 'Multimedia och DOOM', emoji: '💿' },
+  { from: 1996, title: '3D-kort och internet', emoji: '🌐' },
+  { from: 2000, title: 'Gigahertz-kriget', emoji: '⚡' },
+  { from: 2005, title: 'Flera kärnor', emoji: '🧠' },
+  { from: 2010, title: 'SSD-revolutionen', emoji: '🚀' },
+  { from: 2017, title: 'Ryzen och RGB', emoji: '🌈' },
+  { from: 2021, title: 'AI och ray tracing', emoji: '🤖' },
+];
+export const eraOf = (y) => [...ERAS].reverse().find((e) => y >= e.from) || ERAS[0];
+
+// Äldre nivåsystem (behålls för sparfiler); spelet använder årtal
 export const LEVELS = [
   { xp: 0, title: 'Garagebutik' },
   { xp: 45, title: 'Kvartersbutik' },
@@ -108,20 +126,35 @@ add('fans', 'nf-a12x25-3', 'Noctua NF-A12x25 PWM (3 st)', 1000, 4, { count: 3, t
 export const PARTS = P;
 export const PART = Object.fromEntries(P.map((p) => [p.id, p]));
 
-const PWR_NAME = { pcie8: '8-pin PCIe', '12vhpwr': '12V-2x6 (16-pin)' };
+const PWR_NAME = { molex: 'Molex-ström', pcie6: '6-pin PCIe', pcie8: '8-pin PCIe', '2xpcie8': '2× 8-pin PCIe', '3xpcie8': '3× 8-pin PCIe', '12vhpwr': '12V-2x6 (16-pin)' };
+const SOCKET_NAME = { DIP40: 'DIP-40', S286: '286-sockel', S386: '386-sockel', S486: '486-sockel', AM3plus: 'AM3+', LGA1151v2: 'LGA1151 v2', LGA2011v3: 'LGA2011-3' };
+const MEDIA_NAME = { floppy525: '5,25"-diskett', floppy35: '3,5"-diskett', cdrom: 'CD-ROM', cdrw: 'CD-brännare', dvd: 'DVD-ROM', dvdrw: 'DVD-brännare', bd: 'Blu-ray' };
+const KIND_NAME = { hdd: 'hårddisk', ssd: 'SATA-SSD', nvme: 'M.2 NVMe' };
+
+export const socketName = (s) => SOCKET_NAME[s] || s.replace(/^Socket(\d)/, 'Socket $1').replace(/^Slot/, 'Slot ');
+export function sizeText(mb, decimal = false) {
+  if (mb < 1) return `${Math.round(mb * (decimal ? 1000 : 1024))} KB`;
+  const k = decimal ? 1000 : 1024;
+  if (mb < k) return `${+mb.toFixed(1)} MB`;
+  if (mb < k * k) return `${+(mb / k).toFixed(1)} GB`;
+  return `${+(mb / k / k).toFixed(1)} TB`;
+}
+const mhzText = (m) => m >= 1000 ? `${(m / 1000).toFixed(m % 1000 ? 1 : 0)} GHz` : `${+m.toFixed(2)} MHz`;
 
 export function specLine(p) {
   const rgb = p.rgb ? ' · RGB' : '';
   switch (p.cat) {
-    case 'cpu': return `${p.socket} · ${p.cores} kärnor · ${p.watt} W${p.igpu ? ' · inbyggd grafik' : ' · ingen inbyggd grafik'}`;
-    case 'mb': return `${p.socket} · ${p.ram} · ${p.size}${rgb}`;
-    case 'ram': return `${p.type} · ${p.gb} GB${p.sticks > 1 ? ` (${p.sticks} st)` : ''}${rgb}`;
-    case 'storage': return `${{ hdd: 'Hårddisk (SATA)', nvme: 'M.2 NVMe SSD', ssd: 'SATA SSD 2,5"' }[p.kind]} · ${p.gb >= 1000 ? p.gb / 1000 + ' TB' : p.gb + ' GB'}`;
-    case 'gpu': return `${p.watt} W · ${p.pwr ? PWR_NAME[p.pwr] : 'ingen extra ström'}${rgb}`;
-    case 'cooler': return `${p.look.type === 'aio' ? 'vattenkylning' : 'luftkylare'} · klarar ${p.maxW} W${rgb}`;
-    case 'psu': return `${p.watt} W`;
-    case 'case': return `passar ${p.fits.join(' + ')} · ${p.fans.length} fläktar${rgb}`;
-    case 'fans': return `${p.count} st 120 mm${rgb}`;
+    case 'cpu': return `${socketName(p.socket)} · ${mhzText(p.mhz)} · ${p.cores} ${p.cores === 1 ? 'kärna' : 'kärnor'} · ${p.watt} W${p.igpu ? ' · inbyggd grafik' : ''}`;
+    case 'mb': return `${socketName(p.socket)} · ${p.chipset ? p.chipset + ' · ' : ''}${p.ram} · ${p.form}${rgb}`;
+    case 'ram': return `${p.type} · ${sizeText(p.mb)}${p.sticks > 1 ? ` (${p.sticks} st)` : ''} · ${p.speed}${rgb}`;
+    case 'storage': return `${p.iface} · ${KIND_NAME[p.kind] || p.kind} · ${sizeText(p.mb, true)}`;
+    case 'media': return `${MEDIA_NAME[p.kind] || p.kind} · ${p.iface}`;
+    case 'gpu': return `${p.bus} · ${p.std} · ${sizeText(p.vram)} · ${p.watt} W${p.pwr ? ' · ' + PWR_NAME[p.pwr] : ''}${rgb}`;
+    case 'sound': return `${p.bus}-kort`;
+    case 'cooler': return `${{ heatsink: 'kylfläns', 'heatsink-fan': 'fläkt på kylfläns', low: 'låg kylare', tower: 'tornkylare', aio: 'vattenkylning' }[p.look.type] || 'kylare'} · klarar ${p.maxW} W${rgb}`;
+    case 'psu': return `${p.form} · ${p.watt} W${p.eff && p.eff !== 'none' ? ' · 80 PLUS ' + (p.eff === '80plus' ? '' : p.eff[0].toUpperCase() + p.eff.slice(1)) : ''}${p.modular ? ' · modulärt' : ''}`;
+    case 'case': return `${(p.forms || p.fits).join('/')} · ${{ desktop: 'skrivbordslåda', minitower: 'minitorn', tower: 'torn', midi: 'miditorn', full: 'fulltorn', sff: 'litet' }[p.style] || ''} · ${p.fans.length} fläktar${rgb}`;
+    case 'fans': return `${p.count} st ${p.size || 120} mm${rgb}`;
   }
   return '';
 }

@@ -58,9 +58,9 @@ export class Floor {
     this.street = SC.paintStreet();
     this.clouds = SC.paintClouds();
     // stjärnobjektet
-    const gpus = shop.parts.filter((p) => p.cat === 'gpu');
     const byCost = (a, b) => (b.cost || 0) - (a.cost || 0);
-    this.heroPart = shop.part?.[shop.hero] || [...gpus].sort(byCost)[0] || [...shop.parts].sort(byCost)[0];
+    this.heroYear = this.game.year;
+    this.heroPart = shop.heroFor?.(this.game) || shop.part?.[shop.hero] || [...shop.parts.filter((p) => p.cat === 'gpu')].sort(byCost)[0];
     const [title, sub] = heroTitle(this.heroPart ? this.heroPart.name : '');
     const hero = PR.makeHero(title, sub);
     this.heroUnder = hero.under; this.heroOver = hero.over;
@@ -400,13 +400,17 @@ export class Floor {
     out.drawImage(this.buf, this.offX, this.offY, W, H);
   }
 
+  // delar i lager (lagret är glest – snabbare än att gå igenom alla delar)
+  owned() { const g = this.game; return Object.keys(g.stock).filter((id) => g.stock[id] > 0).map((id) => this.shop.part[id]).filter(Boolean); }
+
   // lagret ändras → rita om montrar och vägghylla
   refreshStock() {
     this.sigT -= 1 / 60;
     if (this.sig !== null && this.sigT > 0) return;
     this.sigT = 0.25;
     const g = this.game, shop = this.shop;
-    const sig = shop.parts.map((p) => g.stockFree(p.id)).join(',');
+    if (g.year !== this.heroYear) { this.build(); this.sig = null; }
+    const sig = Object.entries(g.stock).filter(([, n]) => n > 0).map(([id, n]) => id + ':' + n).join(',');
     if (sig === this.sig) return;
     this.sig = sig;
     this.vits.forEach((vt) => { vt.img = this.renderVitrine(vt); });
@@ -419,7 +423,7 @@ export class Floor {
     const c = document.createElement('canvas'); c.width = W * RES; c.height = H * RES;
     const x = c.getContext('2d'); x.setTransform(RES, 0, 0, RES, 0, 0); x.imageSmoothingEnabled = false;
     x.drawImage(frame.under, 0, 0);
-    const parts = this.shop.parts.filter((p) => p.cat === sc.cat && g.stockFree(p.id) > 0).sort((a, b) => (b.cost || 0) - (a.cost || 0)).slice(0, 6);
+    const parts = this.owned().filter((p) => p.cat === sc.cat).sort((a, b) => (b.cost || 0) - (a.cost || 0)).slice(0, 6);
     const wide = W > 140;
     const [iw, ih] = wide ? [46, 30] : [34, 26];
     // upp till 3 i en rad, annars bakre rad (3) + främre rad förskjuten som tegel
@@ -465,7 +469,7 @@ export class Floor {
       const board = S.boards[i < 3 ? 0 : 1], gx = 4 + (i % 3) * gw;
       const col = shop.cats?.[cat]?.color || '#8a8f9c';
       x.fillStyle = col; x.fillRect(Math.round(gx + gw / 2 - 3), board + 2 - oy, 6, 2);
-      const parts = shop.parts.filter((p) => p.cat === cat && g.stockFree(p.id) > 0).sort((a, b) => (b.cost || 0) - (a.cost || 0));
+      const parts = this.owned().filter((p) => p.cat === cat).sort((a, b) => (b.cost || 0) - (a.cost || 0));
       const boxes = [];
       for (const p of parts) for (let n = 0; n < Math.min(2, g.stockFree(p.id)) && boxes.length < 3; n++) boxes.push(p);
       const [bw, bh] = SIZE[cat] || [10, 10];
@@ -698,15 +702,27 @@ export class Floor {
 
 // "ASUS ROG Astral GeForce RTX 5080 OC" → ["RTX 5080 OC", "ASUS ROG ASTRAL"]
 function heroTitle(name) {
-  const m = name.match(/\b(RTX|GTX|RX|ARC)\s*[A-Z]?\d{3,4}\w*(\s+(XTX|XT|TI|SUPER|OC))*/i);
-  if (m) {
-    const title = m[0].toUpperCase().slice(0, 12);
-    const sub = name.slice(0, m.index).replace(/\b(NVIDIA|GEFORCE|AMD|RADEON)\b/gi, '').replace(/\s+/g, ' ').trim().toUpperCase();
-    return [title, sub.length > 18 ? sub.slice(0, 18) : sub];
+  const up = name.toUpperCase().replace(/[()]/g, ' ');
+  const stop = new Set(['GRAPHICS', 'CARD', 'ADAPTER', 'DISPLAY', 'AND', 'PRINTER', 'THE', 'VIDEO', 'BOARD', 'BLASTER', 'NVIDIA', 'GEFORCE', 'AMD', 'RADEON', 'ATI', 'EDITION']);
+  const clean = (t) => t.split(/\s+/).filter((w) => w && !stop.has(w)).join(' ');
+  const pats = [
+    /\b(RTX|GTX|GTS|GT|RX|ARC)\s*[A-Z]?\d{3,4}\w*(\s+(XTX|XT|TI|SUPER|OC|ULTRA|GRE))*/,
+    /\b(HD|R9|R7|X|FX)\s*\d{3,4}\w*(\s+(XT|PRO|GTO|ULTRA))?/,
+    /\b\d{4}\s+(PRO|XT|SE|LE)\b/,
+    /\b(VOODOO\s*\d?|RIVA\s+TNT\d?|RADEON\s+\d{4}\w*(\s+(PRO|XT))?|G\d{3}(\s+MAX)?|MYSTIQUE|PARHELIA|VERITE\s*\w*|GEFORCE\s*\d?\s*\w+)/,
+  ];
+  for (const re of pats) {
+    const m = up.match(re);
+    if (m && m[0].trim().length <= 12) return [m[0].trim(), (clean(up.slice(0, m.index)) || up.slice(0, m.index).trim() || clean(up.slice(m.index + m[0].length))).slice(0, 18)];
   }
-  const words = name.toUpperCase().split(/\s+/).filter(Boolean);
-  const title = words.slice(-2).join(' ').slice(0, 12);
-  return [title || 'STJÄRNAN', words.slice(0, -2).join(' ').slice(0, 18)];
+  // äldre kort: förkortningen och tillverkaren
+  const ACR = [[/ENHANCED GRAPHICS ADAPTER/, 'EGA'], [/COLOR GRAPHICS ADAPTER/, 'CGA'], [/MONOCHROME DISPLAY/, 'MDA'], [/VIDEO GRAPHICS ARRAY/, 'VGA']];
+  const words = up.split(/\s+/).filter(Boolean), keep = words.filter((w) => !stop.has(w));
+  for (const [re, t] of ACR) if (re.test(up)) return [t, (keep[0] || '').slice(0, 18)];
+  const brand = keep[0] || words[0] || '', model = keep.slice(1).join(' ');
+  if (model && model.length <= 12) return [model, brand.slice(0, 18)];
+  if (brand.length <= 12) return [brand, model.slice(0, 18)];
+  return [(keep.slice(-1)[0] || 'STJÄRNAN').slice(0, 12), brand.slice(0, 18)];
 }
 
 // neonrör: kärna + glöd, förrenderat

@@ -1,0 +1,34 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Alla ikoner</title>
+<style>body{margin:0;background:#e9e3d8;font:11px monospace}h2{margin:8px}.row{display:flex;flex-wrap:wrap;gap:4px;padding:0 8px}
+.c{background:#fff;border:1px solid #222;width:196px}.c canvas{width:192px;height:160px;image-rendering:pixelated;display:block}.c div{height:26px;overflow:hidden;padding:1px}</style></head><body>
+<div id="out"></div>
+<script type="module">
+// Ritar ikoner för ALLA delar i databasen (fångar fel med riktig deldata) och visar ett urval:
+// en ikon per (kategori, stil) – ?cat=gpu begränsar, ?all=1 visar alla i kategorin.
+import { loadParts } from '../js/shops/dator/parts/index.js';
+import { iconCanvas } from '../js/shops/dator/art.js';
+const q = new URLSearchParams(location.search);
+const DB = await loadParts();
+const errs = [], shown = new Set(), stat = {};
+const out = document.getElementById('out');
+const rows = {};
+const t0 = performance.now();
+for (const p of DB.parts) {
+  if (p.cat === 'mb' || p.cat === 'case' && q.get('cat') !== 'case') { if (p.cat === 'mb') continue; }
+  let ic;
+  const t = performance.now();
+  try { ic = iconCanvas(p, 96, 80); } catch (e) { errs.push(`${p.id}: ${e.message}`); continue; }
+  const s = stat[p.cat] ||= { n: 0, ms: 0, max: 0 };
+  const dt = performance.now() - t; s.n++; s.ms += dt; s.max = Math.max(s.max, dt);
+  if (q.get('cat') && q.get('cat') !== p.cat) continue;
+  const L = p.look || {};
+  const key = p.cat + ':' + (L.style || L.pkg || L.type || L.front || '') + ':' + (L.color || L.brand || '') + (p.type || p.socket || p.kind || '');
+  if (!q.get('all') && shown.has(key)) continue;
+  shown.add(key);
+  if (!rows[p.cat]) { const h = document.createElement('h2'); h.textContent = p.cat; out.append(h); rows[p.cat] = document.createElement('div'); rows[p.cat].className = 'row'; out.append(rows[p.cat]); }
+  const c = document.createElement('div'); c.className = 'c'; c.append(ic);
+  const lab = document.createElement('div'); lab.textContent = p.name; c.append(lab); rows[p.cat].append(c);
+}
+window.result = { total: Math.round(performance.now() - t0), parts: DB.parts.length, errs, stat: Object.fromEntries(Object.entries(stat).map(([k, v]) => [k, `${v.n} st, ${Math.round(v.ms / v.n)} ms/st, max ${Math.round(v.max)}`])) };
+window.done = true;
+</script></body></html>

@@ -193,3 +193,10 @@ h3 { font: 22px var(--head); font-weight: 400; }
 .mcard .nm { font-size: 19px; line-height: 1; margin-top: 6px; }
 .mcard .sp { color: var(--muted); font-size: 16px; line-height: 1; }
 .mcard .own { text-align: left; margin-top: 4px; }
+
+/* Grossistens sök- och filterrad */
+.shopbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+.shopbar input { flex: 1 1 200px; font: 19px var(--font); border: 2px solid var(--ink); padding: 4px 8px; background: #fff; }
+.shopbar select { font: 17px var(--font); border: 2px solid var(--ink); padding: 3px 6px; background: var(--paper2); }
+.pager { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; font-size: 18px; }
+.dlg-wide { width: min(760px, 100%); }

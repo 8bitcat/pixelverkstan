@@ -1,0 +1,20 @@
+// Ikoner för alla delar i databasen: node tools/art-icons.mjs [kategori] [all]
+import { createRequire } from "module";
+const require = createRequire("D:/Qisy/QISYFrontend/QISYFrontend-1/package.json");
+const { chromium } = require("playwright");
+const OUT = "D:/GamesProjects/pixelverkstan/tools/out/";
+const cat = process.argv[2] || '', all = process.argv[3] === 'all';
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1640, height: 900 } });
+const errors = [];
+page.on("pageerror", (e) => errors.push(e.message + '\n' + e.stack));
+page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+await page.goto(`http://localhost:8777/tools/art-icons.html?cat=${cat}${all ? '&all=1' : ''}&v=${Date.now()}`);
+await page.waitForFunction(() => window.done === true, null, { timeout: 600000 });
+const r = await page.evaluate(() => window.result);
+console.log('delar:', r.parts, 'tid:', r.total, 'ms');
+for (const [k, v] of Object.entries(r.stat)) console.log(' ', k.padEnd(8), v);
+console.log(r.errs.length ? 'FEL:\n' + r.errs.slice(0, 40).join('\n') : 'inga ritfel');
+if (cat) await page.screenshot({ path: OUT + `ai-${cat}.png`, fullPage: true });
+console.log(errors.join("\n") || "inga sidfel");
+await browser.close();

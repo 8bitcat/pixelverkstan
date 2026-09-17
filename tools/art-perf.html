@@ -1,0 +1,49 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Delprestanda</title></head><body style="margin:0;background:#efe9df">
+<canvas id="c" style="image-rendering:pixelated"></canvas>
+<script type="module">
+// Jämför ritningstid för delarnas grafik (art-parts) mellan två källträd med samma chassi/moderkort.
+// ?parts=/js (nuvarande) eller /tools/out/head/js (git HEAD)  &scene=/tools/out/head/js  &show=gpu|cpu|fit|ram
+const q = new URLSearchParams(location.search);
+const PB = q.get('parts') || '/js', SB = q.get('scene') || '/tools/out/head/js';
+const { Raster } = await import('/js/core/raster.js');
+const AP = await import(PB + '/shops/dator/art-parts.js');
+const SC = await import(SB + '/shops/dator/art-base.js');
+const { PART } = await import('/tools/out/head/js/shops/dator/catalog.js');
+const ids = ['4000x-rgb', 'x870e-hero', 'r9-9950x3d', 'kraken-elite-360', 'tridentz5-64-ddr5', '990pro-2tb', 'astral-5080', 'dark-power-13'];
+const P = Object.fromEntries(ids.map((i) => [PART[i].cat, PART[i]]));
+const SL = { case: 1, mb: 2, cpu: 3, cooler: 4, ram: 5, m2: 6, bay: 7, gpu: 8, psu: 9, fans: 10 };
+const placed = { case: P.case, mb: P.mb, cpu: P.cpu, cooler: P.cooler, ram: P.ram, m2: P.storage, gpu: P.gpu, psu: P.psu };
+const base = { ids: SL, spin: 0.3, t: 1, paste: true, leverClosed: true, placed };
+function parts(R) {
+  const o = (slot) => ({ ...base, id: SL[slot] });
+  AP.drawCpu(R, P.cpu, o('cpu'));
+  AP.drawCooler(R, P.cooler, o('cooler'));
+  AP.drawRam(R, P.ram, o('ram'));
+  AP.drawStorage(R, P.storage, o('m2'));
+  AP.drawGpu(R, P.gpu, o('gpu'));
+  AP.drawPsu(R, P.psu, o('psu'));
+  for (const k of ['mb', 'gpu', 'psu', 'm2']) { AP.drawScrewHoles(R, k, new Set(), SL.mb); AP.drawScrews(R, k, new Set([0, 1, 2, 3, 4, 5]), SL.mb); }
+}
+function scene(R) {
+  SC.drawMat(R, 0);
+  SC.drawCase(R, P.case, { ...base, id: SL.case });
+  SC.drawBoard(R, P.mb, { ...base, id: SL.mb });
+}
+const views = { fit: [1130, 698, 15, 13, 12, 0], gpu: [1130, 698, 64, 6, 14.6, 3], cpu: [1130, 698, 64, 9.5, 5.5, 1.5], ram: [483, 298, 64, 11.6, 5, 2] };
+const out = {};
+for (const [name, [w, h, k, u, v, z]] of Object.entries(views)) {
+  const R = new Raster(w, h);
+  Object.assign(R, { k, hz: k * 13 / 16, edges: true });
+  R.ox = w / 2 - (u - v) * k; R.oy = h / 2 - (u + v) * k / 2 + z * R.hz;
+  const ts = [], tp = [];
+  for (let i = 0; i < 7; i++) {
+    R.clear();
+    let t0 = performance.now(); scene(R); const t1 = performance.now(); parts(R); const t2 = performance.now();
+    ts.push(t2 - t0); tp.push(t2 - t1);
+  }
+  const med = (a) => a.sort((x, y) => x - y)[a.length >> 1];
+  out[name] = { total: Math.round(med(ts)), parts: Math.round(med(tp)) };
+  if (q.get('show') === name) { const c = document.getElementById('c'); c.width = w; c.height = h; c.getContext('2d').drawImage(R.flush(), 0, 0); }
+}
+window.result = out; window.done = true;
+</script></body></html>

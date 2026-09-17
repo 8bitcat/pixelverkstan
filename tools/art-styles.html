@@ -1,0 +1,217 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Delstilar</title>
+<style>
+body{margin:0;background:#e9e3d8;font:12px monospace;color:#222}
+h2{margin:10px 8px 4px;font-size:15px}
+.row{display:flex;flex-wrap:wrap;gap:8px;padding:4px 8px}
+.card{background:#fff;border:2px solid #222;padding:4px;display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.card b{font-size:11px}
+canvas{image-rendering:pixelated;display:block}
+.ic{width:192px;height:160px;background:#f7f5f0;border:1px solid #ccc}
+.cu{background:#d9d4ca}
+</style></head><body>
+<div id="out"></div>
+<script type="module">
+import { Raster } from '../js/core/raster.js';
+import { VIEW } from '../js/shops/dator/geom.js';
+import { drawPart, iconCanvas, drawCaseStanding } from '../js/shops/dator/art.js';
+
+const q = new URLSearchParams(location.search);
+const K = +(q.get('k') || 40);
+const cats = (q.get('cat') || 'cpu,cooler,ram,storage,media,gpu,sound,psu,fans,case').split(',');
+const showIcons = q.get('icons') !== '0';
+const anchored = q.get('at') === '1';          // rita på ett annat ankare (testar positionsoberoende)
+
+let n = 0;
+const P = (cat, name, spec = {}, look = {}) => ({ id: 't' + (n++) + '-' + cat, cat, name, brand: name.split(' ')[0], year: 2000, cost: 1, tier: 3, rgb: false, ...spec, look });
+const S = {
+  cpu: [
+    P('cpu', 'Intel 8088', { socket: 'DIP40' }, { brand: 'intel', pkg: 'dip' }),
+    P('cpu', 'NEC V20 D70108C-8', { socket: 'DIP40' }, { brand: 'nec', pkg: 'dip' }),
+    P('cpu', 'Intel C8086-2 ceramic', { socket: 'DIP40' }, { brand: 'intel', pkg: 'dip' }),
+    P('cpu', 'Intel N80286-12', { socket: 'S286' }, { brand: 'intel', pkg: 'plcc' }),
+    P('cpu', 'AMD R80286-16', { socket: 'S286' }, { brand: 'amd', pkg: 'pga' }),
+    P('cpu', 'Intel A80386DX-33', { socket: 'S386' }, { brand: 'intel', pkg: 'pga' }),
+    P('cpu', 'Intel 80486DX2-66', { socket: 'S486' }, { brand: 'intel', pkg: 'pga' }),
+    P('cpu', 'AMD Am486DX4-100', { socket: 'S486' }, { brand: 'amd', pkg: 'pga' }),
+    P('cpu', 'Intel Pentium 133', { socket: 'Socket5' }, { brand: 'intel', pkg: 'pga' }),
+    P('cpu', 'AMD K6-2 300', { socket: 'Socket7' }, { brand: 'amd', pkg: 'am-pga' }),
+    P('cpu', 'Intel Pentium Pro 200', { socket: 'Socket8' }, { brand: 'intel', pkg: 'pga' }),
+    P('cpu', 'Intel Pentium II 350', { socket: 'Slot1' }, { brand: 'intel', pkg: 'slot' }),
+    P('cpu', 'Intel Celeron 300A', { socket: 'Slot1' }, { brand: 'intel', pkg: 'slot' }),
+    P('cpu', 'AMD Athlon 700', { socket: 'SlotA' }, { brand: 'amd', pkg: 'slot' }),
+    P('cpu', 'Intel Pentium III 800', { socket: 'Socket370' }, { brand: 'intel', pkg: 'pga' }),
+    P('cpu', 'AMD Athlon XP 2500+', { socket: 'SocketA' }, { brand: 'amd', pkg: 'am-pga' }),
+    P('cpu', 'Intel Pentium 4 2.8', { socket: 'Socket478' }, { brand: 'intel', pkg: 'pga' }),
+    P('cpu', 'AMD Athlon 64 X2 4400+', { socket: 'Socket939' }, { brand: 'amd', pkg: 'am-pga' }),
+    P('cpu', 'Intel Core 2 Duo E8400', { socket: 'LGA775' }, { brand: 'intel', pkg: 'lga' }),
+    P('cpu', 'AMD Ryzen 5 5600', { socket: 'AM4' }, { brand: 'amd', pkg: 'am-pga' }),
+    P('cpu', 'Intel Core i7-14700K', { socket: 'LGA1700' }, { brand: 'intel', pkg: 'lga' }),
+    P('cpu', 'AMD Ryzen 7 9800X3D', { socket: 'AM5' }, { brand: 'amd', pkg: 'am-lga' }),
+    P('cpu', 'Intel Core Ultra 9 285K', { socket: 'LGA1851' }, { brand: 'intel', ultra: true }),
+  ],
+  cooler: [
+    P('cooler', 'Generic 486 heatsink', { sockets: ['S486'], maxW: 10 }, { type: 'heatsink', fin: '#2a2a2c' }),
+    P('cooler', 'Silver 486 heatsink', { sockets: ['S486'], maxW: 10 }, { type: 'heatsink', fin: '#c8ccd0' }),
+    P('cooler', 'Sunon Socket 7 fan', { sockets: ['Socket7'], maxW: 30 }, { type: 'heatsink-fan', fan: '#1a1a1a', blade: '#2a2a2a', fin: '#c9cdd1' }),
+    P('cooler', 'Intel P4 boxed cooler', { sockets: ['Socket478'], maxW: 90 }, { type: 'heatsink-fan', fan: '#1a1a1a', blade: '#3a3a3a', fin: '#c9cdd1' }),
+    P('cooler', 'ARCTIC Freezer 7 X', { maxW: 100 }, { type: 'low', fan: '#1d1d1d', blade: '#d8d8d8', fin: '#c8ccd0' }),
+    { ...P('cooler', 'Cooler Master Hyper 212 RGB', { maxW: 150, rgb: true }, { type: 'tower', fan: '#1a1a1a', blade: '#3a3a3a', fin: '#2e2f33' }) },
+    { ...P('cooler', 'Noctua NH-D15', { maxW: 250 }, { type: 'tower', fan: '#d8c7a7', blade: '#8a4b34', fin: '#c8ccd0' }), id: 'nh-d15' },
+    P('cooler', 'NZXT Kraken Elite 360 RGB', { maxW: 300, rgb: true }, { type: 'aio', fan: '#e9e9e6', blade: '#f5f5f5', fin: '#e9e9e6', screen: true }),
+  ],
+  ram: [
+    P('ram', 'Texas Instruments TMS4256 (9 st)', { type: 'DIP', sticks: 9, speed: '150ns' }, { color: '#26262a', style: 'bare' }),
+    P('ram', 'Kingston SIMM30 1MB', { type: 'SIMM30', sticks: 1 }, { color: '#2e6b3c', style: 'bare' }),
+    P('ram', 'Samsung SIMM72 16MB', { type: 'SIMM72', sticks: 1 }, { color: '#2a6438', style: 'bare' }),
+    P('ram', 'Kingston SDR 128MB PC133', { type: 'SDR', sticks: 1 }, { color: '#2f7a45', style: 'bare' }),
+    P('ram', 'Corsair DDR 512MB XMS', { type: 'DDR', sticks: 1 }, { color: '#1b1b1b', accent: '#e8c030', style: 'spreader' }),
+    P('ram', 'Crucial Ballistix DDR2', { type: 'DDR2', sticks: 1 }, { color: '#b8262a', accent: '#1a1a1a', style: 'ballistix' }),
+    P('ram', 'Kingston HyperX DDR3', { type: 'DDR3', sticks: 1 }, { color: '#1d4f91', accent: '#e8e8e8', style: 'hyperx' }),
+    P('ram', 'G.Skill Ripjaws X DDR3', { type: 'DDR3', sticks: 1 }, { color: '#b82a2a', accent: '#1a1a1a', style: 'ripjaws' }),
+    P('ram', 'Corsair Dominator Platinum DDR4', { type: 'DDR4', sticks: 1, rgb: true }, { color: '#c4c8cd', accent: '#1a1a1a', style: 'dominator' }),
+    P('ram', 'Corsair Vengeance LPX DDR4', { type: 'DDR4', sticks: 1 }, { color: '#1b1b1b', accent: '#e8c030', style: 'lpx' }),
+    P('ram', 'Kingston FURY Beast RGB DDR4', { type: 'DDR4', sticks: 1, rgb: true }, { color: '#1e1e1e', accent: '#c9323a', style: 'fury' }),
+    P('ram', 'Samsung DDR4 ECC RDIMM', { type: 'DDR4', sticks: 1 }, { color: '#1f5a3a', style: 'ecc' }),
+    P('ram', 'Crucial DDR5 bare', { type: 'DDR5', sticks: 1 }, { color: '#1d3a2a', style: 'bare' }),
+    P('ram', 'Corsair Vengeance RGB DDR5', { type: 'DDR5', sticks: 1, rgb: true }, { color: '#e9e9e6', accent: '#9aa0a6', style: 'rgbbar' }),
+    P('ram', 'G.Skill Trident Z5 RGB DDR5', { type: 'DDR5', sticks: 1, rgb: true }, { color: '#bfc4c9', accent: '#222', style: 'trident' }),
+  ],
+  storage: [
+    P('storage', 'Seagate ST-412 10MB', { iface: 'MFM', kind: 'hdd', mb: 10 }, { label: '#2a2a2a', style: 'mfm-fh' }),
+    P('storage', 'Seagate ST-225 20MB', { iface: 'MFM', kind: 'hdd', mb: 20 }, { label: '#1d5a9a', style: 'hdd-hh' }),
+    P('storage', 'Quantum Fireball 1.2GB', { iface: 'IDE', kind: 'hdd', mb: 1200 }, { label: '#2a2a2a', style: 'hdd35' }),
+    P('storage', 'Seagate BarraCuda 1TB', { iface: 'SATA', kind: 'hdd', mb: 1000000 }, { label: '#3f9b3a', style: 'hdd35' }),
+    P('storage', 'Crucial MX500 1TB', { iface: 'SATA', kind: 'ssd', mb: 1000000 }, { label: '#6a6f76', style: 'ssd25' }),
+    P('storage', 'Kingston NV2 500GB', { iface: 'NVMe', kind: 'nvme', mb: 500000 }, { label: '#2c6fb7', style: 'm2' }),
+    P('storage', 'Samsung 990 PRO 2TB Heatsink', { iface: 'NVMe', kind: 'nvme', mb: 2000000, rgb: true }, { label: '#1d1d1d', style: 'm2-heatsink' }),
+  ],
+  media: [
+    P('media', 'TEAC FD-55BR 5.25', { kind: 'floppy525', iface: 'floppy' }, { color: 'beige', style: 'floppy525' }),
+    P('media', 'Panasonic JU-475 5.25', { kind: 'floppy525', iface: 'floppy' }, { color: 'black', style: 'floppy525' }),
+    P('media', 'Mitsumi D359 3.5', { kind: 'floppy35', iface: 'floppy' }, { color: 'beige', style: 'floppy35' }),
+    P('media', 'Sony MPF920 3.5', { kind: 'floppy35', iface: 'floppy' }, { color: 'black', style: 'floppy35' }),
+    P('media', 'Mitsumi FX400 CD-ROM', { kind: 'cdrom', iface: 'IDE' }, { color: 'beige', style: 'optical' }),
+    P('media', 'Plextor PlexWriter CD-RW', { kind: 'cdrw', iface: 'IDE' }, { color: 'white', style: 'optical' }),
+    P('media', 'LG GH24NSD5 DVD-RW', { kind: 'dvdrw', iface: 'SATA' }, { color: 'black', style: 'optical' }),
+    P('media', 'Pioneer BDR-209 Blu-ray', { kind: 'bd', iface: 'SATA' }, { color: 'grey', style: 'optical' }),
+  ],
+  gpu: [
+    P('gpu', 'Hercules Graphics Card', { bus: 'ISA8', std: 'HGC', out: ['DE9'] }, { brand: 'hercules', style: 'isa-full', pcb: '#2e6b3c' }),
+    P('gpu', 'Tseng ET4000AX 1MB', { bus: 'ISA16', std: 'SVGA', out: ['VGA'] }, { brand: 'tseng', style: 'isa-short', pcb: '#2e6b3c' }),
+    P('gpu', 'Diamond Stealth 24 VLB', { bus: 'VLB', std: 'SVGA', out: ['VGA'] }, { brand: 's3', style: 'vlb', pcb: '#2e6b3c' }),
+    P('gpu', 'S3 Trio64V+ 2MB', { bus: 'PCI', std: 'SVGA', out: ['VGA'] }, { brand: 's3', style: 'pci-bare', pcb: '#2a6a4a' }),
+    P('gpu', 'ATI Rage Pro 8MB AGP', { bus: 'AGP', std: '3D', out: ['VGA'] }, { brand: 'ati', style: 'agp-bare', pcb: '#2e6b3c' }),
+    P('gpu', '3dfx Voodoo3 3000', { bus: 'AGP', std: '3D', out: ['VGA'] }, { brand: '3dfx', style: 'agp-heatsink', pcb: '#1a3a7a', accent: '#1a1a1a' }),
+    P('gpu', 'ASUS GeForce4 Ti 4200', { bus: 'AGP', std: '3D', out: ['VGA', 'DVI'] }, { brand: 'nvidia', style: 'agp-fan', pcb: '#2a4a8a', accent: '#c8ccd0' }),
+    P('gpu', 'NVIDIA GeForce GTX 1650', { bus: 'PCIe', len: 1, pwr: null }, { brand: 'nvidia', style: 'single-fan', fans: 1, color: '#2d2f33' }),
+    P('gpu', 'NVIDIA GeForce GTX 1080 Founders', { bus: 'PCIe', len: 2, pwr: 'pcie8' }, { brand: 'nvidia', style: 'blower', color: '#3a3c40' }),
+    P('gpu', 'AMD Radeon RX 9060 XT', { bus: 'PCIe', len: 2, pwr: 'pcie8' }, { brand: 'amd', style: 'dual', fans: 2, color: '#303236' }),
+    P('gpu', 'MSI RTX 5070 Ti GAMING TRIO', { bus: 'PCIe', len: 3, pwr: '12vhpwr', rgb: true }, { brand: 'nvidia', style: 'triple', fans: 3, color: '#26282c', accent: '#b8bcc2' }),
+    P('gpu', 'NVIDIA GeForce RTX 5080 Founders Edition', { bus: 'PCIe', len: 2, pwr: '12vhpwr' }, { brand: 'nvidia', style: 'fe', fans: 2, color: '#a3a8ad' }),
+    P('gpu', 'ASUS ROG Astral RTX 5080', { bus: 'PCIe', len: 3, pwr: '12vhpwr', rgb: true }, { brand: 'nvidia', style: 'astral', fans: 3, color: '#15161a', accent: '#c9323a' }),
+  ],
+  sound: [
+    P('sound', 'AdLib Music Synthesizer Card', { bus: 'ISA8' }, { style: 'isa', pcb: '#2e6b3c' }),
+    P('sound', 'Creative Sound Blaster 16', { bus: 'ISA16' }, { style: 'isa', pcb: '#2e6b3c' }),
+    P('sound', 'Creative Sound Blaster AWE32', { bus: 'ISA16' }, { style: 'isa', pcb: '#2e6b3c' }),
+    P('sound', 'Creative Sound Blaster Live!', { bus: 'PCI' }, { style: 'pci', pcb: '#2e6b3c' }),
+    P('sound', 'Creative Sound Blaster Z', { bus: 'PCIe', rgb: true }, { style: 'pcie', pcb: '#1a1a1c', accent: '#c9323a' }),
+  ],
+  psu: [
+    P('psu', 'Astec AT 200W', { form: 'AT', watt: 200 }, { color: '#b7bcc0', accent: '#e8c030', style: 'at-silver' }),
+    P('psu', 'Delta AT 230W', { form: 'AT', watt: 230 }, { color: '#d8cfb4', accent: '#e8c030', style: 'at-beige' }),
+    P('psu', 'Enermax EG365 350W', { form: 'ATX', watt: 350 }, { color: '#b9bdc2', accent: '#8a9199', style: 'atx-silver' }),
+    P('psu', 'Corsair CV550', { form: 'ATX', watt: 550, eff: 'bronze' }, { color: '#1c1c1c', accent: '#e8c030', style: 'atx-black' }),
+    P('psu', 'be quiet! Dark Power 13 1000W', { form: 'ATX', watt: 1000, eff: 'titanium', modular: true }, { color: '#1b1b1d', accent: '#e07a2e', style: 'modular' }),
+  ],
+  fans: [
+    P('fans', 'Papst 8412 80mm', { count: 1, size: 80 }, { frame: '#1d1d1d', blade: '#2a2a2a' }),
+    P('fans', 'Corsair SP120 RGB', { count: 1, size: 120, rgb: true }, { frame: '#161616', blade: '#e9e9e9' }),
+    P('fans', 'Noctua NF-A14', { count: 1, size: 140 }, { frame: '#d8c7a7', blade: '#8a4b34' }),
+  ],
+  case: [
+    P('case', 'IBM PC 5150', { style: 'desktop', fans: [] }, { color: '#d8cfb4', front: 'beige-xt' }),
+    P('case', 'Compaq Deskpro 386', { style: 'desktop', fans: [] }, { color: '#d9d2bc', front: 'beige-at' }),
+    P('case', 'Chieftec AT Tower', { style: 'tower', fans: [] }, { color: '#dcd4bc', front: 'beige-tower' }),
+    P('case', 'Enlight ATX Midi', { style: 'midi', fans: [] }, { color: '#e0d9c4', front: 'beige-atx' }),
+    P('case', 'Antec Sonata', { style: 'midi', fans: ['rear'] }, { color: '#1c1c1e', inner: '#2a2a2e', front: 'black-atx', window: true }),
+    P('case', 'Lian Li PC-7', { style: 'midi', fans: [] }, { color: '#c4c8cc', front: 'silver-atx' }),
+    P('case', 'Fractal Pop Mini Silent', { style: 'midi', fans: ['front2', 'rear'] }, { color: '#26282c', inner: '#34373c', front: 'solid' }),
+    P('case', 'Lian Li LANCOOL 216 RGB', { style: 'midi', fans: ['front1', 'front3', 'rear'], rgb: true }, { color: '#1d1e21', inner: '#2b2d31', front: 'mesh' }),
+    P('case', 'Corsair iCUE 4000X RGB', { style: 'midi', fans: ['front1', 'front2', 'front3'], rgb: true }, { color: '#1a1b1e', inner: '#2a2c30', front: 'glass' }),
+    P('case', 'Fractal Pop Mini Air', { style: 'midi', fans: ['front1', 'front2', 'front3', 'rear'], rgb: true }, { color: '#2a2c30', inner: '#3a3d42', front: 'honeycomb' }),
+    P('case', 'Corsair 4000D Airflow', { style: 'midi', fans: ['front1', 'rear'] }, { color: '#e9e9e6', inner: '#d4d4d0', front: 'triangles' }),
+    P('case', 'NZXT H5 Flow', { style: 'midi', fans: ['front2', 'rear'] }, { color: '#1f2023', inner: '#2e3035', front: 'perforated' }),
+    P('case', 'Compaq AT tower', { style: 'tower', fans: [] }, { color: '#d9d2bc', front: 'beige-at' }),
+    P('case', 'Dell minitower', { style: 'minitower', fans: [] }, { color: '#e0d9c4', front: 'beige-atx' }),
+    P('case', 'Cooler Master Stacker full', { style: 'full', fans: ['rear'] }, { color: '#c4c8cc', front: 'silver-atx', window: true }),
+    P('case', 'Fractal Node sff', { style: 'sff', fans: ['front2'] }, { color: '#1f2023', inner: '#2e3035', front: 'mesh' }),
+  ],
+};
+
+// Nära bild: rita med K px/enhet och beskär till det som ritats
+function bbox(R) {
+  let x0 = R.w, y0 = R.h, x1 = -1, y1 = -1; const d = R.data;
+  for (let y = 0; y < R.h; y++) for (let x = 0; x < R.w; x++) if (d[(y * R.w + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+const ANCH = { cpu: [3, 30, 0.2], cooler: [3, 30, 0.2], ram: [4, 28, 0.1], storage: [2, 30, 0], media: [1, 29, 0.3], gpu: [4, 29, 0.1], sound: [4, 29, 0.1], psu: [1, 29, 0], fans: [2, 30, 0.1] };
+function draw(R, p, o) {
+  if (p.cat === 'case') return drawCaseStanding(R, p, o, [0, 0, 0]);
+  const oo = anchored && ANCH[p.cat] ? { ...o, at: ANCH[p.cat] } : o;
+  return drawPart(R, p, oo);
+}
+function closeup(p) {
+  const o = { ids: {}, id: 1, spin: 0.4, t: 1.2, showroom: true, loose: true, leverClosed: true };
+  const s = 4, Rq = new Raster(900, 900);
+  Object.assign(Rq, { k: s, hz: s * 13 / 16, ox: 450, oy: 300, edges: true }); Rq.clear();
+  draw(Rq, p, o);
+  const b = bbox(Rq); if (!b) return document.createElement('canvas');
+  const f = K / s, pad = 6;
+  const R = new Raster(Math.ceil(b.w * f) + pad * 2, Math.ceil(b.h * f) + pad * 2);
+  Object.assign(R, { k: K, hz: K * 13 / 16, ox: pad + (Rq.ox - b.x) * f, oy: pad + (Rq.oy - b.y) * f, edges: true });
+  R.clear();
+  const t0 = performance.now();
+  draw(R, p, o);
+  R.ms = performance.now() - t0;
+  const c = R.flush(); c.title = Math.round(R.ms) + ' ms'; c.dataset.ms = R.ms;
+  return c;
+}
+
+const out = document.getElementById('out');
+const times = {};
+for (const cat of cats) {
+  const h = document.createElement('h2'); h.textContent = cat + (anchored ? ' (o.at)' : ''); out.append(h);
+  const row = document.createElement('div'); row.className = 'row'; out.append(row);
+  for (const p of S[cat] || []) {
+    const card = document.createElement('div'); card.className = 'card';
+    const lab = document.createElement('b');
+    const st = p.look.style || p.look.pkg || p.look.type || p.look.front || '';
+    card.append(lab);
+    try {
+      if (showIcons) { const ic = iconCanvas(p, 96, 80); ic.className = 'ic'; card.append(ic); }
+      const cu = closeup(p); cu.className = 'cu'; card.append(cu);
+      times[p.id] = +cu.dataset.ms;
+      lab.textContent = `${p.name} [${st}] ${Math.round(cu.dataset.ms)}ms`;
+    } catch (e) { lab.textContent = `${p.name} FEL: ${e.message}`; console.error(e); }
+    row.append(card);
+  }
+}
+window.times = times;
+// Positionsoberoende: samma del på standardplats och på ett annat ankare ska ge lika stor bild
+window.checkAnchors = () => {
+  const out = [];
+  const size = (p, at) => {
+    const R = new Raster(1400, 1400); Object.assign(R, { k: 6, hz: 6 * 13 / 16, ox: 700, oy: 400, edges: true }); R.clear();
+    const o = { ids: {}, id: 1, spin: 0.4, t: 1.2, showroom: true, loose: true, leverClosed: true };
+    drawPart(R, p, at ? { ...o, at } : o);
+    const b = bbox(R); return b ? [b.w, b.h] : [0, 0];
+  };
+  for (const cat of Object.keys(ANCH)) for (const p of S[cat] || []) {
+    const a = size(p, null), b = size(p, ANCH[cat]);
+    if (Math.abs(a[0] - b[0]) > 2 || Math.abs(a[1] - b[1]) > 2) out.push(`${p.name}: ${a} vs ${b}`);
+  }
+  return out;
+};
+window.done = true;
+</script></body></html>

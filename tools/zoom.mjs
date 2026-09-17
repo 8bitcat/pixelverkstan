@@ -8,9 +8,9 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1400, height: 860 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
-await page.goto("http://localhost:8777/index.html");
+await page.goto("http://localhost:8777/index.html?year=2024");
 await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForTimeout(400);
-await page.click('[data-shop="dator"]'); await page.waitForTimeout(300);
+await page.click('[data-shop="dator"]'); await page.waitForFunction(() => window.PV?.game, null, { timeout: 30000 }); await page.waitForTimeout(300);
 await page.evaluate((ids) => {
   const g = PV.game; g.tutorialStep = 9; g.spawnTimer = 9999;
   for (const id of ids) g.stock[id] = 1;

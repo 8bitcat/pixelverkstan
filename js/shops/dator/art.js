@@ -2,11 +2,18 @@
 import { Raster } from '../../core/raster.js';
 import { VIEW, MAX_K } from './geom.js';
 import { drawMat, drawCase, drawBoard } from './art-base.js';
-import { drawCpu, drawCooler, drawRam, drawStorage, drawGpu, drawPsu, drawFans, drawScrews, drawScrewHoles } from './art-parts.js';
-import { drawCaseStanding } from './art-case.js';
+import {
+  drawCpu, drawCooler, drawRam, drawStorage, drawGpu, drawPsu, drawFans, drawScrews, drawScrewHoles,
+  drawMedia, drawSound, drawFanBox, mediaFront, cpuTop, cpuKind, gpuBox, cardLen, driveDims, psuDims,
+} from './art-parts.js';
+import { drawCaseStanding, standDims } from './art-case.js';
 
-export { drawMat, drawScrews, drawScrewHoles, drawCaseStanding };
+export {
+  drawMat, drawScrews, drawScrewHoles, drawCaseStanding, standDims,
+  drawMedia, drawSound, drawFanBox, mediaFront, cpuTop, cpuKind, gpuBox, cardLen, driveDims, psuDims,
+};
 
+// o.at = ankare i världskoordinater (se kommentaren överst i art-parts.js)
 export function drawPart(R, part, o) {
   switch (part.cat) {
     case 'case': return drawCase(R, part, o);
@@ -15,7 +22,9 @@ export function drawPart(R, part, o) {
     case 'cooler': return drawCooler(R, part, o);
     case 'ram': return drawRam(R, part, o);
     case 'storage': return drawStorage(R, part, o);
+    case 'media': return drawMedia(R, part, o);
     case 'gpu': return drawGpu(R, part, o);
+    case 'sound': return drawSound(R, part, o);
     case 'psu': return drawPsu(R, part, o);
     case 'fans': return drawFans(R, part, o);
   }
@@ -32,16 +41,17 @@ function makeRaster(scale = 1) {
 }
 function bbox(R) {
   let x0 = R.w, y0 = R.h, x1 = -1, y1 = -1;
-  for (let y = 0; y < R.h; y++) for (let x = 0; x < R.w; x++) {
-    if (R.data[(y * R.w + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const d = R.data, w = R.w;
+  for (let y = 0; y < R.h; y++) for (let x = 0, p = y * w * 4 + 3; x < w; x++, p += 4) {
+    if (d[p]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
   }
   return x1 < 0 ? { x: 0, y: 0, w: 1, h: 1 } : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
 function drawIconPart(R, part, o) {
   if (part.cat === 'case') return drawCaseStanding(R, part, o, [0, 0, 0]);
-  if (part.cat === 'ram') return drawRam(R, { ...part, sticks: 1 }, o);
+  if (part.cat === 'ram') return drawRam(R, { ...part, sticks: part.type === 'DIP' ? Math.min(part.sticks || 9, 9) : 1 }, o);
   if (part.cat === 'fans') return drawFans(R, { ...part, count: 1 }, o);
-  if (part.cat === 'cooler' && part.look.type === 'aio') return drawCooler(R, part, o);
+  // grafik- och ljudkort visas med kontaktfingrarna, lagring/media för sig
   return drawPart(R, part, o);
 }
 
@@ -51,7 +61,7 @@ export function iconCanvas(part, W = 64, H = 54) {
   const key = part.id + ':' + W + 'x' + H;
   let src = ICONS.get(key);
   if (!src) {
-    const o = { ids: {}, id: 0, spin: 0.4, t: 1.2, showroom: true, leverClosed: true };
+    const o = { ids: {}, id: 0, spin: 0.4, t: 1.2, showroom: true, loose: true, leverClosed: true };
     // mät storleken billigt i låg upplösning
     const q = 0.25, Rq = makeRaster(q);
     drawIconPart(Rq, part, o);

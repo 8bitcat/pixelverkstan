@@ -27,7 +27,11 @@ function renderMenu() {
   $('#menu').querySelectorAll('[data-shop]').forEach((b) => (b.onclick = () => {
     const s = SHOPS.find((x) => x.id === b.dataset.shop);
     if (!s.module) { UI.toast(`${s.name} kommer snart!`); return; }
-    start(s.module);
+    const hasSave = (() => { try { return !!localStorage.getItem('pixelverkstan_' + s.id); } catch { return false; } })();
+    const qYear = +new URLSearchParams(location.search).get('year');   // för tester: ?year=1990
+    if (hasSave || !s.module.startYears) start(s.module);
+    else if (qYear) start(s.module, { fresh: true, startYear: qYear });
+    else chooseStartYear(s.module);
   }));
   const r = $('#reset');
   if (r) r.onclick = () => {
@@ -38,8 +42,9 @@ function renderMenu() {
   };
 }
 
-function start(shopModule) {
-  game = new Game(shopModule);
+async function start(shopModule, opts = {}) {
+  if (shopModule.init) { UI.toast('Laddar delar …'); await shopModule.init(); }
+  game = new Game(shopModule, opts);
   floor = new Floor($('#floor'), game);
   build = new BuildView(game, {
     onExit: () => show('shop'),
@@ -70,6 +75,13 @@ function start(shopModule) {
     });
   };
   show('shop');
+}
+
+function chooseStartYear(mod) {
+  const body = `<p style="font-size:20px;margin-top:0">Vilket år öppnar du butiken? Åren går framåt när du bygger datorer – och grossisten säljer bara delar som fanns just då.</p>
+    <div class="plist">${mod.startYears.map((y) => `<button class="shop-opt" data-year="${y.year}" style="width:100%"><b>${y.year} – ${y.title}</b><small>${y.desc}</small></button>`).join('')}</div>`;
+  const dlg = UI.openModal('📅 Välj startår', body, [{ label: 'Avbryt', onClick: UI.closeModal }]);
+  dlg.querySelectorAll('[data-year]').forEach((b) => (b.onclick = () => { UI.closeModal(); start(mod, { fresh: true, startYear: +b.dataset.year }); }));
 }
 
 function openBuild(order) {

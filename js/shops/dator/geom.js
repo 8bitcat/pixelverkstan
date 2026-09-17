@@ -22,6 +22,10 @@ export const G = {
   psu:   { u0: 0.8, u1: 7.8, v0: 18.3, v1: 23.3, z0: 0.5, z1: 3.4 },
   bay:   { u0: 16.5, u1: 25, v0: 18.3, v1: 23.3 },
   shroud: { v0: 17.7, v1: 18.1 },
+  // Nya platser (1983–2026-utbyggnaden)
+  media: { u0: 18.0, u1: 25.3, v0: 1.8, v1: 3.5, z0: 0.6, z1: 5.4 },   // 5,25" extern plats (optisk enhet / 5,25"-diskett)
+  floppy: { u0: 20.8, u1: 25.3, v0: 3.9, v1: 5.1, z0: 1.2, z1: 4.8 }, // 3,5" extern plats (diskettstation)
+  snd: { u0: 1.0, v0: 11.9, v1: 12.5 },                                  // instickskort nr 2 (ljudkort), står upp i z
 };
 
 export const BOARD_TOP = G.board.z1;

@@ -9,9 +9,9 @@ const page = await browser.newPage({ viewport: { width: 1400, height: 860 }, dev
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
-await page.goto("http://localhost:8777/index.html");
+await page.goto("http://localhost:8777/index.html?year=2024");
 await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForTimeout(400);
-await page.click('[data-shop="dator"]'); await page.waitForTimeout(300);
+await page.click('[data-shop="dator"]'); await page.waitForFunction(() => window.PV?.game, null, { timeout: 30000 }); await page.waitForTimeout(300);
 await page.evaluate(() => {
   const g = PV.game; g.tutorialStep = 9; g.xp = 500; g.spawnTimer = 9999;
   for (const id of ['astral-5080', 'rtx-5070ti-trio', 'rx-9060xt', 'r7-9800x3d', 'ultra9-285k', 'i3-12100', 'tridentz5-64-ddr5', 'vengeance-rgb-32-ddr5', 'fury-16-ddr5']) g.stock[id] = 2;

@@ -1,0 +1,26 @@
+import { createRequire } from "module";
+const require = createRequire("D:/Qisy/QISYFrontend/QISYFrontend-1/package.json");
+const { chromium } = require("playwright");
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1400, height: 860 } });
+const errors = [];
+page.on("pageerror", (e) => errors.push(e.message));
+await page.goto("http://localhost:8777/index.html");
+await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForTimeout(300);
+await page.click('[data-shop="dator"]');
+const t0 = Date.now();
+await page.waitForSelector('[data-year]');
+await page.screenshot({ path: "D:/GamesProjects/pixelverkstan/tools/out/y0-startyear.png" });
+await page.click('[data-year="1983"]');
+await page.waitForFunction(() => window.PV?.game, null, { timeout: 30000 });
+console.log('start 1983 tog', Date.now() - t0, 'ms');
+await page.waitForTimeout(2500);
+await page.screenshot({ path: "D:/GamesProjects/pixelverkstan/tools/out/y1-shop1983.png" });
+const g = await page.evaluate(() => ({ year: PV.game.year, money: PV.game.money, stock: Object.keys(PV.game.stock).length, orders: PV.game.orders.length }));
+console.log(JSON.stringify(g));
+// grossisten
+await page.evaluate(async () => { const UI = await import('/js/core/ui.js'); UI.openShop(PV.game, 'gpu'); });
+await page.waitForTimeout(800);
+await page.screenshot({ path: "D:/GamesProjects/pixelverkstan/tools/out/y2-grossist1983.png" });
+console.log(errors.join('\n') || 'inga fel');
+await browser.close();

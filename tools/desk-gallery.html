@@ -1,0 +1,321 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Skrivbordsgalleri</title>
+<style>
+body{margin:0;background:#e9e3d8;font:12px monospace;color:#222}
+h2{margin:14px 8px 4px;font-size:15px}
+.sec{padding:4px 8px 12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start}
+.card{background:#fff;border:2px solid #222;padding:4px;display:flex;flex-direction:column;gap:3px}
+.card b{font-size:11px}
+canvas{image-rendering:pixelated;display:block}
+.dark{background:#2a2a2e}
+</style></head><body>
+<div id="out"></div>
+<script type="module">
+import { Raster } from '../js/core/raster.js';
+import { loadParts, DB } from '../js/shops/dator/parts/index.js';
+import { deskEra, plugsFor, rearPorts } from '../js/shops/dator/desk-era.js';
+import { drawMonitor, drawKeyboard, drawMouse, monitorFace, screenSize, drawDeskDecor } from '../js/shops/dator/desk-props.js';
+import { drawScreen, drawRear, drawPlugHead, plugIcon, drawInternals } from '../js/shops/dator/desk-art.js';
+import { Desk } from '../js/shops/dator/desk.js';
+
+const q = new URLSearchParams(location.search);
+const SECS = (q.get('sec') || 'screens,templates,tints,monitors,props,rear,icons,internals,scene').split(',');
+const out = document.getElementById('out');
+const section = (id, title) => { const s = document.createElement('div'); s.className = 'sec'; s.id = 'sec-' + id; s.innerHTML = `<h2>${title}</h2><div class="row"></div>`; out.appendChild(s); return s.querySelector('.row'); };
+const card = (row, label, canvas, zoom = 3, dark = false) => {
+  const c = document.createElement('div'); c.className = 'card' + (dark ? ' dark' : '');
+  const b = document.createElement('b'); b.textContent = label; c.appendChild(b);
+  canvas.style.width = canvas.width * zoom + 'px'; canvas.style.height = canvas.height * zoom + 'px';
+  c.appendChild(canvas); row.appendChild(c); return c;
+};
+const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+const INFO = (o) => ({ template: 'kontor', year: 2020, os: 'win11', monitor: 'lcd169', ramKB: 16384 * 1024, clock: '14:37', era: { videoType: 'hdmi' },
+  postLines: ['CPU: INTEL CORE I5-12400 2.5 GHZ', 'MINNE: 16 GB DDR4 OK', 'LAGRING: KINGSTON NV2 500GB', 'GRAFIK: GEFORCE RTX 3060', 'NÄTAGG: 650 W'], ...o });
+const OSY = { dos: [1986, 'cga'], win31: [1993, 'crt14'], win95: [1996, 'crt14'], win98: [1999, 'crt17'], xp: [2005, 'lcd43'], vista: [2008, 'lcd43'], win7: [2011, 'lcd169'], win10: [2017, 'lcd169'], win11: [2023, 'lcd-slim'] };
+const POST80 = ['CPU: INTEL 8088 4.77 MHZ', 'MINNE: 640 KB DIP OK', 'LAGRING: SEAGATE ST-225 20MB', 'GRAFIK: IBM CGA', 'NÄTAGG: 130 W'];
+const POST90 = ['CPU: INTEL 80486DX2-66 66 MHZ', 'MINNE: 8 MB SIMM72 OK', 'LAGRING: WD CAVIAR 540MB', 'GRAFIK: S3 TRIO64', 'NÄTAGG: 200 W'];
+const POST00 = ['CPU: ATHLON XP 2500+ 1.8 GHZ', 'MINNE: 512 MB DDR OK', 'LAGRING: SEAGATE 80GB', 'GRAFIK: RADEON 9600 PRO', 'NÄTAGG: 350 W'];
+function screen(row, label, st, info, zoom = 3) {
+  const sz = screenSize({ monitor: info.monitor });
+  const c = mk(sz.w, sz.h);
+  const x = c.getContext('2d');
+  drawScreen(x, { t: 0, mouse: true, ...st }, INFO(info), st.tt ?? 3.3);
+  card(row, label, c, zoom);
+}
+
+async function main() {
+  await loadParts();
+  if (SECS.includes('screens')) {
+    const r1 = section('screens', 'BIOS / POST / fel');
+    screen(r1, 'xt post 1985 cga', { screen: 'post', t: 1.6 }, { year: 1985, monitor: 'cga', os: 'dos', ramKB: 640, postLines: POST80 });
+    screen(r1, 'xt error kbd', { screen: 'error', errorText: 'KEYBOARD ERROR OR NO KEYBOARD PRESENT' }, { year: 1985, monitor: 'mono', os: 'dos', ramKB: 640, postLines: POST80 });
+    screen(r1, 'award post 1995', { screen: 'post', t: 1.5 }, { year: 1995, monitor: 'crt14', os: 'win95', ramKB: 8192, postLines: POST90 });
+    screen(r1, 'award error 1995', { screen: 'error', errorText: 'NON-SYSTEM DISK OR DISK ERROR' }, { year: 1995, monitor: 'crt14', os: 'win95', ramKB: 8192, postLines: POST90 });
+    screen(r1, 'award2k splash', { screen: 'post', t: 0.5 }, { year: 2003, monitor: 'crt17', os: 'xp', ramKB: 512000, postLines: POST00 });
+    screen(r1, 'award2k text', { screen: 'post', t: 2.0 }, { year: 2003, monitor: 'crt17', os: 'xp', ramKB: 524288, postLines: POST00 });
+    screen(r1, 'award2k fan err', { screen: 'error', errorText: 'CPU FAN ERROR! PRESS F1' }, { year: 2006, monitor: 'lcd43', os: 'xp', ramKB: 1048576, postLines: POST00 });
+    screen(r1, 'uefi post', { screen: 'post', t: 1.2 }, { year: 2021, monitor: 'lcd-slim', os: 'win11' });
+    screen(r1, 'uefi error', { screen: 'error', errorText: 'NO BOOT DEVICE FOUND' }, { year: 2021, monitor: 'lcd-slim', os: 'win11' });
+    const r2 = section('loading', 'Uppstart per OS');
+    for (const [os, [y, m]] of Object.entries(OSY)) screen(r2, 'loading ' + os, { screen: 'loading', lt: os === 'win31' ? 1.5 : os === 'dos' ? 1.9 : 1.7 }, { year: y, monitor: m, os, template: os === 'dos' ? 'dos-kontor' : 'kontor' });
+    const r3 = section('states', 'Av / svart / ingen signal / överhettning');
+    screen(r3, 'off crt14', { screen: 'off' }, { monitor: 'crt14' });
+    screen(r3, 'off lcd169', { screen: 'off' }, { monitor: 'lcd169' });
+    screen(r3, 'black mono', { screen: 'black' }, { monitor: 'mono' });
+    screen(r3, 'nosignal mono', { screen: 'nosignal' }, { monitor: 'mono', year: 1985 });
+    screen(r3, 'nosignal crt17', { screen: 'nosignal' }, { monitor: 'crt17', year: 1999 });
+    screen(r3, 'nosignal lcd43', { screen: 'nosignal' }, { monitor: 'lcd43', year: 2006, era: { videoType: 'dvi' } });
+    screen(r3, 'nosignal lcd-slim', { screen: 'nosignal' }, { monitor: 'lcd-slim', year: 2022, era: { videoType: 'dp' } });
+    screen(r3, 'overheat dos', { screen: 'overheat', lt: 0.5 }, { year: 1993, monitor: 'crt14', os: 'dos' });
+    screen(r3, 'overheat win98', { screen: 'overheat', lt: 0.5 }, { year: 1999, monitor: 'crt17', os: 'win98' });
+    screen(r3, 'overheat xp', { screen: 'overheat', lt: 0.5 }, { year: 2005, monitor: 'lcd43', os: 'xp' });
+    screen(r3, 'overheat win10', { screen: 'overheat', lt: 0.5 }, { year: 2017, monitor: 'lcd169', os: 'win10' });
+    screen(r3, 'desktop win98 generic', { screen: 'desktop', lt: 2 }, { year: 1999, monitor: 'crt17', os: 'win98', template: 'okänd' });
+    screen(r3, 'desktop dos prompt', { screen: 'desktop', lt: 2 }, { year: 1987, monitor: 'ega', os: 'dos', template: 'okänd' });
+  }
+  if (SECS.includes('templates')) {
+    const r = section('templates', 'Kundens program');
+    const T = [['dos-kontor', 1987, 'ega', 'dos'], ['lotus', 1986, 'cga', 'dos'], ['hemdator', 1989, 'ega', 'dos'], ['cad', 1990, 'ega', 'dos'],
+      ['win31', 1993, 'crt14', 'win31'], ['doom', 1994, 'crt14', 'dos'], ['multimedia', 1995, 'crt14', 'win95'], ['win95', 1996, 'crt14', 'win95'],
+      ['quake', 1997, 'crt17', 'win95'], ['internet', 1999, 'crt17', 'win98'], ['cs', 2002, 'crt17', 'xp'], ['kontor2000', 2003, 'crt17', 'xp'],
+      ['kontor2000', 2008, 'lcd43', 'vista'], ['wow', 2006, 'lcd43', 'xp'], ['htpc', 2010, 'lcd169', 'win7'], ['crysis', 2010, 'lcd169', 'win7'],
+      ['kontor', 2016, 'lcd169', 'win10'], ['skola', 2023, 'lcd-slim', 'win11'], ['minecraft', 2015, 'lcd169', 'win10'], ['gaming', 2022, 'lcd-slim', 'win11'],
+      ['stream', 2022, 'lcd-slim', 'win11'], ['vr', 2021, 'lcd-slim', 'win11'], ['ai', 2024, 'lcd-slim', 'win11'], ['drom', 2025, 'lcd-slim', 'win11'], ['internet', 2003, 'crt17', 'xp']];
+    let rr = r;
+    T.forEach(([tpl, y, m, os], i) => { if (i && i % 8 === 0) rr = section('templates' + i / 8, 'Kundens program ' + (i / 8 + 1)); screen(rr, `${tpl} ${y} ${os}`, { screen: 'desktop', lt: +(q.get('lt') || 4.2) }, { template: tpl, year: y, monitor: m, os }); });
+  }
+  if (SECS.includes('combos')) {
+    const r = section('combos', 'Fler kombinationer av OS och skärm');
+    const C = [['kontor2000', 2011, 'lcd169', 'win7'], ['crysis', 2008, 'lcd43', 'vista'], ['cs', 2007, 'lcd43', 'vista'], ['wow', 2010, 'lcd169', 'win7'], ['htpc', 2015, 'lcd169', 'win10'],
+      ['skola', 2011, 'lcd169', 'win7'], ['drom', 2008, 'lcd43', 'vista'], ['internet', 2004, 'lcd43', 'xp'], ['multimedia', 1993, 'crt14', 'win31'], ['win31', 1995, 'crt14', 'win95'], ['kontor', 2013, 'lcd169', 'win7'], ['stream', 2016, 'lcd169', 'win10']];
+    for (const [tpl, y, m, os] of C) screen(r, `${tpl} ${y} ${os}`, { screen: 'desktop', lt: +(q.get('lt') || 7.3) }, { template: tpl, year: y, monitor: m, os });
+  }
+  if (SECS.includes('tints')) {
+    const r = section('tints', 'Skärmtyper: mono / CGA / EGA / VGA');
+    for (const m of ['mono', 'cga', 'ega', 'crt14']) screen(r, 'hemdator ' + m, { screen: 'desktop', lt: 3 }, { template: 'hemdator', year: 1988, monitor: m, os: 'dos' });
+    screen(r, 'dos-kontor mono', { screen: 'desktop', lt: 5 }, { template: 'dos-kontor', year: 1985, monitor: 'mono', os: 'dos' });
+    screen(r, 'lotus mono', { screen: 'desktop', lt: 3 }, { template: 'lotus', year: 1985, monitor: 'mono', os: 'dos' });
+    screen(r, 'lotus graph cga', { screen: 'desktop', lt: 12 }, { template: 'lotus', year: 1985, monitor: 'cga', os: 'dos' });
+    screen(r, 'cad mono', { screen: 'desktop', lt: 3 }, { template: 'cad', year: 1986, monitor: 'mono', os: 'dos' });
+    screen(r, 'win95 startmeny', { screen: 'desktop', lt: 6.5 }, { template: 'win95', year: 1998, monitor: 'crt17', os: 'win98' });
+    screen(r, 'internet uppringning', { screen: 'desktop', lt: 1.5 }, { template: 'internet', year: 1998, monitor: 'crt14', os: 'win95' });
+    screen(r, 'htpc film', { screen: 'desktop', lt: 10 }, { template: 'htpc', year: 2012, monitor: 'lcd169', os: 'win7' });
+  }
+  const fixtures = FIX.filter((f) => !q.get('era') || q.get('era').split(',').includes(f.id));
+  if (SECS.includes('monitors')) {
+    const r = section('monitors', 'Skärmar, tangentbord, mus och prylar per epok (skala 2)');
+    for (const fx of fixtures) { const { b, rig } = build(fx); card(r, fx.id + ' ' + fx.template, propScene(b, rig, fx), 2); }
+  }
+  if (SECS.includes('props')) {
+    const r = section('props', 'Närbild: tangentbord och möss (k=54)');
+    const kinds = [['pc-83', null], ['model-m', 'ball-beige'], ['beige-104', 'ball-grey'], ['black-104', 'optical'], ['rgb-mech', 'gaming']];
+    for (const [kb, ms] of kinds) {
+      const R = new Raster(760, 330); Object.assign(R, { k: 54, hz: 42, ox: 560, oy: -420, edges: true });
+      R.clear(0xe9e1d2);
+      R.box(2, 20, 5, 11, 5.6, 6, () => 0xa06a3f, 0, { noEdges: true });
+      const era = { keyboard: kb, mouseKind: ms, mouse: ms ? 'usb' : null, year: 2000 };
+      drawKeyboard(R, era, true, 1.3);
+      if (ms) drawMouse(R, era, true, 1.3);
+      R.flush();
+      card(r, kb + ' + ' + (ms || 'ingen mus'), R.canvas, 1);
+    }
+  }
+  if (SECS.includes('rear')) {
+    const r = section('rear', 'Baksidan (urkopplad och inkopplad, skala 4)');
+    for (const fx of fixtures) {
+      const { b, rig } = build(fx);
+      const era = deskEra(rig, b.placed), plugs = plugsFor(era), ports = rearPorts(b, era, rig);
+      for (const plugged of [false, true]) {
+        const c = mk(90, 160), x = c.getContext('2d');
+        const map = plugged ? plugAll(plugs, ports, b) : {};
+        drawRear(x, b, { powered: plugged, psuOn: plugged, lit: { case: true }, screen: 'off' }, 1.1, map, { ports, plugs, era, rig });
+        card(r, `${fx.id} ${plugged ? 'inkopplad' : 'tom'}`, c, 4);
+      }
+    }
+  }
+  if (SECS.includes('icons')) {
+    const r = section('icons', 'Kontakter i lådan (plugIcon) och kontakthuvuden');
+    const list = [['pc_power', 'c13'], ['mon_power', 'mains'], ['video', 'de9'], ['video', 'vga'], ['video', 'dvi'], ['video', 'hdmi'], ['video', 'dp'], ['kb', 'din5'], ['kb', 'ps2k'], ['kb', 'usb'], ['mouse', 'serial'], ['mouse', 'ps2m'], ['mouse', 'usb']];
+    for (const [id, type] of list) card(r, id + ' ' + type, plugIcon(id, 96, 81, type), 2);
+    const types = ['c13', 'de9', 'vga', 'dvi', 'hdmi', 'dp', 'din5', 'ps2k', 'ps2m', 'serial', 'usb'];
+    const c = mk(types.length * 26, 30), x = c.getContext('2d');
+    x.fillStyle = '#6a6e74'; x.fillRect(0, 0, c.width, c.height);
+    types.forEach((ty, i) => drawPlugHead(x, ty, 13 + i * 26, 12));
+    card(r, 'drawPlugHead: ' + types.join(' '), c, 4);
+  }
+  if (SECS.includes('internals')) {
+    const r = section('internals', 'Insidan bakom glaset');
+    for (const fx of fixtures) {
+      const { b } = build(fx);
+      if (!b.placed.case.look?.window && !q.get('allwin')) continue;
+      for (const on of [false, true]) {
+        const c = mk(200, 214), x = c.getContext('2d');
+        drawInternals(x, b, { powered: on, lit: { cooler: true, case: true, fans: true, ram: true, gpu: true, mb: true } }, 2.2);
+        card(r, `${fx.id} ${on ? 'på' : 'av'}`, c, 2);
+      }
+    }
+  }
+  if (SECS.includes('perf')) {
+    const r = section('perf', 'Prestanda (ms per anrop, snitt av 60)');
+    const lines = [];
+    const time = (label, fn, n = 60) => { fn(); const t0 = performance.now(); for (let i = 0; i < n; i++) fn(i); const ms = (performance.now() - t0) / n; lines.push(`${label.padEnd(34)} ${ms.toFixed(2)} ms`); };
+    const T = [['hemdator', 1988, 'cga', 'dos'], ['doom', 1994, 'crt14', 'dos'], ['quake', 1998, 'crt17', 'win98'], ['wow', 2006, 'lcd43', 'xp'], ['crysis', 2010, 'lcd169', 'win7'], ['stream', 2022, 'lcd-slim', 'win11'], ['ai', 2024, 'lcd-slim', 'win11'], ['drom', 2025, 'lcd-slim', 'win11'], ['vr', 2022, 'lcd-slim', 'win11']];
+    for (const [tpl, y, m, os] of T) {
+      const sz = screenSize({ monitor: m }), c = mk(sz.w, sz.h), x = c.getContext('2d');
+      time(`drawScreen ${tpl}`, (i = 0) => drawScreen(x, { screen: 'desktop', mouse: true, lt: 3 + i / 60 }, INFO({ template: tpl, year: y, monitor: m, os }), 3 + i / 60));
+    }
+    for (const kb of ['model-m', 'rgb-mech']) {
+      const R = new Raster(DV.w, DV.h); Object.assign(R, DV, { edges: true });
+      time(`drawKeyboard ${kb}`, (i = 0) => drawKeyboard(R, { keyboard: kb }, true, i / 15));
+      time(`drawMouse+pad ${kb === 'rgb-mech' ? 'gaming' : 'ball'}`, (i = 0) => drawMouse(R, { mouseKind: kb === 'rgb-mech' ? 'gaming' : 'ball-beige' }, true, i / 15));
+    }
+    for (const fx of FIX.filter((f) => ['at94', 'mod22', 'atx06'].includes(f.id))) {
+      const { b, rig } = build(fx);
+      const era = deskEra(rig, b.placed), plugs = plugsFor(era), ports = rearPorts(b, era, rig), map = plugAll(plugs, ports, b);
+      const c = mk(90, 160), x = c.getContext('2d');
+      time(`drawRear ${fx.id}`, (i = 0) => drawRear(x, b, { powered: true, psuOn: true, lit: { case: true } }, i / 30, map, { ports, plugs, era, rig }));
+      const c2 = mk(200, 214), x2 = c2.getContext('2d');
+      time(`drawInternals ${fx.id}`, (i = 0) => drawInternals(x2, b, { powered: true, lit: { cooler: true, case: true, fans: true, ram: true, gpu: true, mb: true } }, i / 30));
+      const R = new Raster(DV.w, DV.h); Object.assign(R, DV, { edges: true });
+      time(`drawMonitor+decor ${fx.id} (statiskt)`, () => { drawMonitor(R, era, { monPower: true, powered: true }); drawDeskDecor(R, era, 0, fx.template); }, 5);
+    }
+    const pre = document.createElement('pre'); pre.textContent = lines.join('\n'); r.appendChild(pre);
+    console.log('PERF\n' + lines.join('\n'));
+  }
+  if (SECS.includes('scene')) {
+    if (q.get('decor') !== '0') {
+      const orig = Desk.prototype.drawStatic;
+      Desk.prototype.drawStatic = function (R) { orig.call(this, R); drawDeskDecor(R, this.era, this.t, this.view.order?.template); };
+    }
+    for (const fx of fixtures) {
+      const r = section('scene-' + fx.id, 'Hela skrivbordet ' + fx.id + ' (' + fx.template + ')');
+      const { b, rig } = build(fx);
+      const c = mk(1700, 1000), x = c.getContext('2d');
+      const view = { b, L: rig, order: { template: fx.template, name: 'Test' }, cw: c.width, ch: c.height, dpr: 1, help: false, selected: null, say() {}, refresh() {}, fail() {}, trayEntries: () => [] };
+      const desk = new Desk(view);
+      desk.enter();
+      const plugs = desk.PLUGS, ports = desk.ports();
+      Object.assign(desk.d.plugs, plugAll(plugs, ports, b), { mon_power: 'STRIP' });
+      desk.d.psuOn = true;
+      const lt = +(q.get('lt') || 5);
+      desk.state = { powered: true, lit: { cooler: true, case: true, fans: true, ram: true, gpu: true, mb: true, power: true }, screen: q.get('screen') || 'desktop', mouse: true, t: 1.5, lt };
+      desk.t = lt;
+      desk.draw(x);
+      card(r, fx.id, c, 1);
+    }
+  }
+  window.extra?.();
+  window.done = true;
+}
+// ---------- Syntetiska epoker ----------
+const RAM = (type, mb, sticks, color = '#26262a') => ({ type, mb, sticks, name: `${mb} MB ${type}`, look: { color, accent: '#b9bcc0', style: 'bare' } });
+const FIX = [
+  { id: 'xt84', year: 1984, template: 'hemdator', profile: 'AT', front: 'beige-xt', ctrl: true,
+    mb: { form: 'XT', year: 1983, video: false, audio: false, slots: { isa8: 5 }, storage: [], floppy: false, look: { pcb: '#2e6b3c', accent: '#1a4a2a' } },
+    cpu: { name: 'Intel 8088', mhz: 4.77 }, ram: RAM('DIP', 0.64, 1), psu: { name: 'IBM 130W', watt: 130, form: 'AT', look: { color: '#b9bdc2', style: 'at-silver' } },
+    gpu: { name: 'IBM Color Graphics Adapter', std: 'CGA', out: ['DE9'], bus: 'ISA8', len: 3, look: { brand: 'ibm', style: 'isa-full', color: '#2e6b3c', pcb: '#2e6b3c', fans: 0 } },
+    bay: { name: 'Seagate ST-225 20MB', iface: 'MFM', kind: 'hdd', look: { style: 'mfm-fh' } } },
+  { id: 'mono86', year: 1986, template: 'dos-kontor', profile: 'AT', front: 'beige-at', ctrl: true,
+    mb: { form: 'XT', year: 1985, video: false, audio: false, slots: { isa8: 8 }, storage: [], floppy: false, look: { pcb: '#2e6b3c', accent: '#1a4a2a' } },
+    cpu: { name: 'NEC V20', mhz: 8 }, ram: RAM('DIP', 0.64, 1), psu: { name: 'Clone 150W', watt: 150, form: 'AT' },
+    gpu: { name: 'Hercules Graphics Card', std: 'HGC', out: ['DE9'], bus: 'ISA8', len: 3, look: { brand: 'hercules', style: 'isa-full', color: '#2e6b3c', pcb: '#2e6b3c', fans: 0 } },
+    bay: { name: 'Seagate ST-238R 30MB', iface: 'MFM', kind: 'hdd' } },
+  { id: 'ega89', year: 1989, template: 'lotus', profile: 'AT', front: 'beige-at',
+    mb: { form: 'AT', year: 1988, video: false, audio: false, slots: { isa16: 6, isa8: 2 }, storage: [], floppy: false, look: { pcb: '#2e6b3c', accent: '#1a4a2a' } },
+    cpu: { name: 'Intel 80286-12', mhz: 12 }, ram: RAM('SIMM30', 2, 4), psu: { name: 'AT 200W', watt: 200, form: 'AT' },
+    gpu: { name: 'IBM Enhanced Graphics Adapter', std: 'EGA', out: ['DE9'], bus: 'ISA8', len: 3, look: { brand: 'ibm', style: 'isa-full', color: '#2e6b3c', pcb: '#2e6b3c', fans: 0 } },
+    bay: { name: 'Seagate ST-251 40MB', iface: 'MFM', kind: 'hdd' }, ctrl: true },
+  { id: 'at94', year: 1994, template: 'doom', profile: 'AT', front: 'beige-tower', ctrl: true,
+    mb: { form: 'BabyAT', year: 1993, video: false, audio: false, slots: { vlb: 2, isa16: 4, isa8: 1 }, storage: [], floppy: false, look: { pcb: '#2e6b3c', accent: '#1a4a2a' } },
+    cpu: { name: 'Intel 80486DX2-66', mhz: 66 }, ram: RAM('SIMM72', 8, 2), psu: { name: 'AT 230W', watt: 230, form: 'AT' },
+    gpu: { name: 'Diamond Stealth 24 VLB', std: 'SVGA', out: ['VGA'], bus: 'VLB', len: 2, look: { brand: 's3', style: 'vlb', color: '#1f5a36', pcb: '#1f5a36', fans: 0 } },
+    snd: { name: 'Sound Blaster 16', bus: 'ISA16', look: { style: 'isa', pcb: '#2a5a2a', accent: '#c8a040' } },
+    bay: { name: 'WD Caviar 540MB', iface: 'IDE', kind: 'hdd' } },
+  { id: 'atx99', year: 1999, template: 'quake', profile: 'ATX', front: 'beige-atx',
+    mb: { form: 'ATX', year: 1998, video: false, audio: false, slots: { agp: 1, pci: 5, isa16: 1 }, storage: ['IDE'], floppy: true, power: 'ATX20', look: { pcb: '#2a6a3a', accent: '#1a4a2a' } },
+    cpu: { name: 'Intel Pentium II 400', mhz: 400 }, ram: RAM('SDR', 128, 2, '#1a5a2a'), psu: { name: 'ATX 300W', watt: 300, form: 'ATX' },
+    cooler: { name: 'Slot 1 fläkt', look: { type: 'heatsink-fan', fan: '#1a1a1a', blade: '#2a2a2a', fin: '#c9cdd1' } },
+    gpu: { name: '3dfx Voodoo3 3000', std: '3D', out: ['VGA'], bus: 'AGP', len: 2, look: { brand: '3dfx', style: 'agp-heatsink', color: '#2a2a2a', pcb: '#1a1a1a', fans: 0 } },
+    snd: { name: 'Sound Blaster Live!', bus: 'PCI', look: { style: 'pci', pcb: '#1a4a8a', accent: '#c8a040' } },
+    bay: { name: 'IBM Deskstar 13GB', iface: 'IDE', kind: 'hdd' } },
+  { id: 'atx06', year: 2006, template: 'wow', profile: 'ATX', front: 'black-atx', window: true,
+    mb: { form: 'ATX', year: 2005, video: false, audio: true, slots: { pcie: 1, pci: 3 }, storage: ['IDE', 'SATA'], floppy: true, power: 'ATX24', cpuPower: 'ATX12V4', look: { pcb: '#1a3a7a', accent: '#c8a040' } },
+    cpu: { name: 'AMD Athlon 64 X2 4400+', mhz: 2200 }, ram: RAM('DDR', 2048, 2, '#1a1a1a'), psu: { name: 'Antec 450W', watt: 450, form: 'ATX' },
+    cooler: { name: 'Zalman CNPS9500', look: { type: 'tower', fan: '#1a1a1a', blade: '#2a2a2a', fin: '#c87533' } },
+    gpu: { name: 'NVIDIA GeForce 7900 GT', std: '3D', out: ['DVI', 'VGA'], bus: 'PCIe', len: 2, pwr: 'pcie6', look: { brand: 'nvidia', style: 'single-fan', color: '#1a3a1a', pcb: '#1a4a1a', fans: 1 } },
+    bay: { name: 'Seagate 250GB SATA', iface: 'SATA', kind: 'hdd' } },
+  { id: 'mod12', year: 2012, template: 'crysis', profile: 'ATX', front: 'mesh', window: true,
+    mb: { form: 'ATX', year: 2011, video: false, audio: true, slots: { pcie: 2, pci: 1 }, storage: ['SATA'], power: 'ATX24', cpuPower: 'EPS8', look: { pcb: '#1a1a1a', accent: '#3a6ad0' } },
+    cpu: { name: 'Intel Core i7-3770K', mhz: 3500 }, ram: RAM('DDR3', 8192, 2, '#2a4ab0'), psu: { name: 'Corsair 650W', watt: 650, form: 'ATX' },
+    cooler: { name: 'Hyper 212', look: { type: 'tower', fan: '#1a1a1a', blade: '#3a3a3a', fin: '#c8ccd0' } },
+    gpu: { name: 'NVIDIA GeForce GTX 670', std: '3D', out: ['DVI', 'HDMI', 'DP'], bus: 'PCIe', len: 2, pwr: 'pcie6', look: { brand: 'nvidia', style: 'blower', color: '#2a2a2a', pcb: '#1a1a1a', fans: 1 } },
+    bay: { name: 'Samsung 840 SSD', iface: 'SATA', kind: 'ssd' } },
+  { id: 'mod22', year: 2022, template: 'gaming', profile: 'ATX', front: 'glass', window: true, rgb: true,
+    mb: { form: 'ATX', year: 2021, video: false, audio: true, rgb: true, slots: { pcie: 2 }, storage: ['SATA', 'NVMe'], power: 'ATX24', cpuPower: 'EPS8', look: { pcb: '#1a1a1c', accent: '#3a3a40' } },
+    cpu: { name: 'AMD Ryzen 7 5800X', mhz: 3800 }, ram: { ...RAM('DDR4', 16384, 2, '#1a1a1a'), rgb: true }, psu: { name: 'Corsair RM750', watt: 750, form: 'ATX' },
+    cooler: { name: 'NZXT Kraken', rgb: true, look: { type: 'aio', fan: '#1a1a1a', blade: '#2a2a2a', fin: '#1a1a1a' } },
+    gpu: { name: 'NVIDIA GeForce RTX 3070', std: '3D', out: ['HDMI', 'DP', 'DP', 'DP'], bus: 'PCIe', len: 3, pwr: 'pcie8', rgb: true, look: { brand: 'nvidia', style: 'triple', color: '#2a2a2e', pcb: '#1a1a1a', fans: 3 } },
+    m2: { name: 'Samsung 980 PRO 1TB', iface: 'NVMe', kind: 'nvme' }, fans: { rgb: true, look: { frame: '#1a1a1a' } } },
+];
+function pickCase(fx) {
+  const all = DB.parts.filter((p) => p.cat === 'case' && p.look?.front === fx.front);
+  const win = all.filter((p) => !!p.look.window === !!fx.window && (!fx.rgb || p.rgb));
+  const list = win.length ? win : all;
+  const best = list.sort((a, b) => Math.abs(a.year - fx.year) - Math.abs(b.year - fx.year))[0];
+  if (best) return best;
+  const beige = fx.front.startsWith('beige');
+  return { id: 'fake-' + fx.front, cat: 'case', name: 'Test Case', brand: 'Test', style: fx.front === 'beige-xt' || fx.front === 'beige-at' ? 'desktop' : 'midi', fans: fx.year > 1998 ? ['front1', 'rear'] : [], rgb: !!fx.rgb,
+    look: { color: beige ? '#d9d2bc' : '#1c1c1e', inner: beige ? '#b8b09a' : '#101012', front: fx.front, window: !!fx.window } };
+}
+function build(fx) {
+  const kind = fx.profile === 'AT' || fx.mb.year < 2009 ? 'classic' : 'modern';
+  const rows = kind === 'modern' ? [14.5, 12.4] : [14.2, 15.5, 16.8, 18.1, 19.4, 20.7, 22.0];
+  const at = fx.profile === 'AT';
+  const rowIdx = { gpu: 0, snd: kind === 'modern' ? 1 : 2, ctrl: kind === 'modern' ? 1 : at ? 4 : 3 };
+  const rig = {
+    year: fx.year, profile: fx.profile, kind, mb: fx.mb, order: { template: fx.template },
+    geo: { kind, rows }, rowOf: (slot) => ({ v: rows[rowIdx[slot] ?? 0] }),
+    ACTION: fx.ctrl ? { ctrl_card: { row: { v: rows[rowIdx.ctrl] } } } : {}, actDone: (bb, id) => id === 'ctrl_card',
+    cableOk: () => true, CABLE: {}, PORTS: {},
+  };
+  const placed = { case: pickCase(fx), mb: { cat: 'mb', ...fx.mb }, cpu: fx.cpu, ram: fx.ram, psu: fx.psu, gpu: fx.gpu, snd: fx.snd, cooler: fx.cooler, bay: fx.bay, m2: fx.m2, fans: fx.fans };
+  for (const k of Object.keys(placed)) if (!placed[k]) delete placed[k];
+  const cables = new Map([['main_pwr', 'ATX_PWR'], ['p8', 'P8'], ['p9', 'P9'], ['cpu_pwr', 'CPU_PWR'], ['gpu_pwr', 'GPU_PWR'], ['bay_data', 'IDE1'], ['bay_pwr', 'BAY_PWR'], ['case_fans', 'SYS_FAN1'], ['cpu_fan', 'CPU_FAN'], ['media_data', 'IDE2'], ['media_pwr', 'M']]);
+  const b = { placed, cables, acts: new Map(), errors: 0 };
+  return { b, rig };
+}
+function plugAll(plugs, ports, b) {
+  const out = {};
+  for (const [id, plug] of Object.entries(plugs)) {
+    if (plug.target !== 'rear') continue;
+    const cand = ports.filter((p) => p.type === plug.type && !Object.values(out).includes(p.key));
+    const port = id === 'video' ? cand.find((p) => p.owner === (b.placed.gpu ? 'gpu' : 'mb')) || cand[0] : cand[0];
+    if (port) out[id] = port.key;
+  }
+  return out;
+}
+const DV = { w: 840, h: 612, k: 18, hz: 14, ox: 256, oy: 200 };
+function propScene(b, rig, fx) {
+  const era = deskEra(rig, b.placed);
+  const R = new Raster(DV.w, DV.h); Object.assign(R, DV, { edges: true });
+  R.clear(0xe9e1d2);
+  R.box(0, 32, 0, 13, 0, 6, (f) => (f === 'top' ? 0xa06a3f : 0x7d4f2c), 0, { noEdges: true });
+  R.box(1.2, 2.4, 9.6, 10.8, 6, 7.1, () => 0xf0ece4);
+  drawMonitor(R, era, { monPower: true, powered: true });
+  drawDeskDecor(R, era, 1, fx.template);
+  drawKeyboard(R, era, true, 1.2);
+  if (era.mouse) drawMouse(R, era, true, 1.2);
+  R.flush();
+  const out = mk(560, 330), x = out.getContext('2d');
+  x.drawImage(R.canvas, -20, -10);
+  const sz = screenSize(era), sc = mk(sz.w, sz.h);
+  drawScreen(sc.getContext('2d'), { screen: 'desktop', mouse: true, lt: 5, t: 2 }, INFO({ template: fx.template, year: era.year, os: era.os, monitor: era.monitor, era }), 5);
+  const [p00, p10, p01] = monitorFace(era).map(([u, v, z]) => [DV.ox + (u - v) * DV.k - 20, DV.oy + (u + v) * DV.k / 2 - z * DV.hz - 10]);
+  x.save(); x.imageSmoothingEnabled = false;
+  x.transform((p10[0] - p00[0]) / sc.width, (p10[1] - p00[1]) / sc.width, (p01[0] - p00[0]) / sc.height, (p01[1] - p00[1]) / sc.height, p00[0], p00[1]);
+  x.drawImage(sc, 0, 0); x.restore();
+  return out;
+}
+window.gallery = { section, card, mk, screen, INFO, FIX, build };
+main().catch((e) => { console.error(e); document.body.insertAdjacentHTML('afterbegin', `<pre style="color:red">${e.stack}</pre>`); window.done = true; });
+</script></body></html>

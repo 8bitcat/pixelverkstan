@@ -8,12 +8,12 @@ const ctx = await browser.newContext({ ...devices["iPhone 13"] });
 const page = await ctx.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
-await page.goto("http://localhost:8777/index.html");
+await page.goto("http://localhost:8777/index.html?year=2024");
 await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForTimeout(500);
-await page.tap('[data-shop="dator"]'); await page.waitForTimeout(400);
+await page.tap('[data-shop="dator"]'); await page.waitForFunction(() => window.PV?.game, null, { timeout: 30000 });
 await page.evaluate(() => {
   const g = PV.game; g.tutorialStep = 9; g.spawnTimer = 9999;
-  const c = g.spawn(g.shop.tutorialOrder(0)); c.phase = 'queue';
+  const c = g.spawn(g.shop.tutorialOrder(0, g)); c.phase = 'queue';
   PV.openBuild(g.accept(c));
 });
 await page.waitForTimeout(500);
@@ -28,7 +28,7 @@ await page.screenshot({ path: OUT + "m3-build.png" });
 // gör klart via API och gå till skrivbordet
 await page.evaluate(() => {
   const v = PV.build, L = v.L, b = v.b;
-  for (const e of v.partEntries()) b.placed[L.slotsFor(e.part)[0].id] = e.part;
+  for (const e of v.partEntries()) { const sl = L.slotsFor(e.part).find((x) => !b.placed[x.id]); if (sl) b.placed[sl.id] = e.part; }
   for (const a of L.ACTIONS) if (!L.missingReq(a.requires.filter((r) => !r.startsWith('act:')), b)) b.acts.set(a.id, new Set(a.points.map((_, i) => i)));
   for (const c of L.CABLES) if (L.cableReady(c, b)) b.cables.set(c.id, c.wants[0]);
   v.dirty = true; v.topAction();
