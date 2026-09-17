@@ -13,21 +13,30 @@ export class BuildView {
   constructor(game, hooks) {
     this.game = game; this.shop = game.shop; this.L = game.shop.layout; this.hooks = hooks;
     this.canvas = $('#board'); this.ctx = this.canvas.getContext('2d');
-    const V = this.L.VIEW;
-    this.R = new Raster(V.w, V.h); Object.assign(this.R, { k: V.k, hz: V.hz, ox: V.ox, oy: V.oy, edges: true });
+    // Kamera: zoom = css-px per enhet, (x,y) = var världens origo hamnar på skärmen.
+    // Rastern ritas bara för det synliga området, med upp till MAX_K pixlar per enhet.
+    const V = this.L.VIEW, ratio = V.hz / V.k;
+    this.P = { k: V.k, hz: V.hz, ox: 0, oy: 0, proj(u, v, z = 0) { return [this.ox + (u - v) * this.k, this.oy + (u + v) * this.k / 2 - z * this.hz]; } };
+    this.hzRatio = ratio;
+    this.s = 1; this.ox = 0; this.oy = 0;
+    this.R = new Raster(2, 2);
     this.cableCanvas = document.createElement('canvas');
-    this.cableCanvas.width = V.w; this.cableCanvas.height = V.h;
     this.cableCtx = this.cableCanvas.getContext('2d');
+    this.ptrs = new Map();
+    this.zoomUI();
     this.t = 0; this.spin = 0; this.order = null;
     this.finale = this.shop.Finale ? new this.shop.Finale(this) : null;
     $('#build-back').onclick = () => this.hooks.onExit();
     $('#build-boot').onclick = () => this.topAction();
-    this.canvas.addEventListener('pointerdown', (e) => this.onCanvasDown(e));
-    this.canvas.addEventListener('pointermove', (e) => {
-      this.hover = this.local(e);
-      const over = this.order && this.b.help !== null && this.phase === 'build' && this.actionAt(this.hover);
-      this.canvas.style.cursor = over ? 'pointer' : '';
-    });
+    this.canvas.addEventListener('pointerdown', (e) => this.onPtrDown(e));
+    this.canvas.addEventListener('pointermove', (e) => this.onPtrMove(e));
+    this.canvas.addEventListener('pointerup', (e) => this.onPtrUp(e));
+    this.canvas.addEventListener('pointercancel', (e) => this.ptrs.delete(e.pointerId));
+    this.canvas.addEventListener('wheel', (e) => {
+      if (!this.order || this.phase !== 'build') return;
+      e.preventDefault();
+      this.zoomAt(this.local(e), Math.exp(-e.deltaY * 0.0016));
+    }, { passive: false });
     window.addEventListener('pointermove', (e) => this.onDragMove(e));
     window.addEventListener('pointerup', (e) => this.onDragEnd(e));
   }
@@ -36,7 +45,7 @@ export class BuildView {
   open(order) {
     this.order = order;
     order.build ||= { placed: {}, acts: new Map(), cables: new Map(), errors: 0, time: 0, help: null, phase: 'build', seen: new Set() };
-    this.selected = null; this.msg = null; this.guideKey = null; this.dirty = true; this.cablesDirty = true;
+    this.selected = null; this.msg = null; this.guideKey = null; this.dirty = true; this.cablesDirty = true; this.userCam = false;
     $('#build-title').innerHTML = `<span class="r">${esc(order.title)}</span> åt ${esc(order.name)}`;
     if (order.build.help === null) {
       if (order.guided) order.build.help = true;
@@ -332,7 +341,8 @@ export class BuildView {
         return this.say(`<b>${esc(this.L.CABLE[id].name)}</b> sitter i ${esc(this.L.portLabel(key))}. <button class="btn btn-small" data-act="unplug">Dra ur</button>`, 'info');
       }
     }
-    const id = this.R.idAt((pt[0] - this.ox) / this.s, (pt[1] - this.oy) / this.s, 1);
+    if (this.renderDue) this.render();
+    const id = this.R.idAt(pt[0] / this.buf.px, pt[1] / this.buf.px, 1);
     const slot = this.L.SLOTS.find((s) => s.n === id);
     if (slot && this.b.placed[slot.id]) {
       const p = this.b.placed[slot.id];
@@ -398,11 +408,12 @@ export class BuildView {
     this.labelW = cw >= 900 ? Math.min(210, cw * 0.17) : 0;
     const narrow = window.innerWidth <= 760;
     const availW = cw - (this.labelW ? this.labelW * 2 - 70 : 12), availH = ch - (narrow ? 62 : 70);
-    let s = Math.min(availW / V.w, availH / V.h);
-    if (s >= 2) s = Math.floor(s * 4) / 4;
-    this.s = s;
-    this.ox = Math.round((cw - V.w * s) / 2);
-    this.oy = Math.round((narrow ? 58 : 6) + (availH - V.h * s) / 2);
+    const s = Math.min(availW / V.w, availH / V.h);
+    const ox = Math.round((cw - V.w * s) / 2), oy = Math.round((narrow ? 58 : 6) + (availH - V.h * s) / 2);
+    this.fit = { zoom: V.k * s, x: ox + V.ox * s, y: oy + V.oy * s };
+    if (!this.userCam || !this.cam) this.cam = { ...this.fit };
+    this.applyCam();
+    this.dirty = true;
     this.finale?.resize(cw, ch, narrow);
   }
 
@@ -418,9 +429,107 @@ export class BuildView {
     if (this.flash) { this.flash.t -= dt; if (this.flash.t <= 0) this.flash = null; }
     if (this.toolAnim) { this.toolAnim.t += dt; if (this.toolAnim.t > 0.45) this.toolAnim = null; }
     if (this.plugAnim) { this.plugAnim.t += dt * 3; this.cablesDirty = true; if (this.plugAnim.t >= 1) { this.plugAnim = null; } }
-    if (this.dirty) { this.R.clear(); this.L.drawScene(this.R, this.b, { spin: this.spin, t: this.t }); this.R.flush(); this.dirty = false; this.cablesDirty = true; }
+    if (!this.cam) this.resize();
+    if (this.dirty || (this.renderDue && this.t >= this.renderDue)) this.render();
     if (this.cablesDirty) { this.L.drawCables(this.cableCtx, this.R, this.b, { plug: this.plugAnim }); this.cablesDirty = false; }
+    document.querySelector('#zoom-ctl')?.classList.toggle('hidden', this.phase !== 'build');
     this.draw(ctx);
+  }
+
+  // ---------- Kamera & zoom ----------
+  applyCam() {
+    const c = this.cam;
+    this.P.k = c.zoom; this.P.hz = c.zoom * this.hzRatio; this.P.ox = c.x; this.P.oy = c.y;
+  }
+  zoomAt(pt, f) {
+    const c = this.cam, maxZ = this.L.MAX_K * 3, minZ = this.fit.zoom * 0.85;
+    const z = Math.max(minZ, Math.min(maxZ, c.zoom * f));
+    const r = z / c.zoom;
+    c.x = pt[0] - (pt[0] - c.x) * r; c.y = pt[1] - (pt[1] - c.y) * r; c.zoom = z;
+    this.userCam = Math.abs(z - this.fit.zoom) > 0.5;
+    if (!this.userCam) Object.assign(c, this.fit);
+    this.clampCam(); this.applyCam();
+    this.renderDue = this.t + 0.15;
+  }
+  zoomBy(f) { this.zoomAt([this.cw / 2, this.ch / 2], f); }
+  zoomFit() { this.userCam = false; this.cam = { ...this.fit }; this.applyCam(); this.renderDue = this.t; }
+  clampCam() {
+    // håll chassits mitt inom skärmen
+    const [mx, my] = this.P.proj.call({ ...this.P, k: this.cam.zoom, hz: this.cam.zoom * this.hzRatio, ox: this.cam.x, oy: this.cam.y }, 13, 12, 0);
+    if (mx < 0) this.cam.x -= mx; if (mx > this.cw) this.cam.x -= mx - this.cw;
+    if (my < 0) this.cam.y -= my; if (my > this.ch) this.cam.y -= my - this.ch;
+  }
+  render() {
+    const c = this.cam, V = this.L.VIEW;
+    // rita i skärmens upplösning (upp till 2× på retina), men håll bufferten under ~1,4 Mpx
+    const q = Math.min(this.dpr || 1, 2);
+    let K = Math.min(this.L.MAX_K, c.zoom * q);
+    const maxPx = 1.4e6, area = (this.cw * this.ch) * (K / c.zoom) ** 2;
+    if (area > maxPx) K = Math.max(Math.min(this.L.MAX_K, c.zoom), K * Math.sqrt(maxPx / area));
+    const px = c.zoom / K;
+    const W = Math.max(2, Math.ceil(this.cw / px)), H = Math.max(2, Math.ceil(this.ch / px));
+    if (this.R.w !== W || this.R.h !== H) {
+      this.R = new Raster(W, H);
+      this.cableCanvas.width = W; this.cableCanvas.height = H;
+    }
+    Object.assign(this.R, { k: K, hz: K * this.hzRatio, ox: c.x / px, oy: c.y / px, edges: true });
+    this.R.clear();
+    this.L.drawScene(this.R, this.b, { spin: this.spin, t: this.t });
+    this.R.flush();
+    this.buf = { zoom: c.zoom, x: c.x, y: c.y, px };
+    this.dirty = false; this.renderDue = null; this.cablesDirty = true;
+  }
+  zoomUI() {
+    const stage = $('#build-stage');
+    if (!stage || $('#zoom-ctl')) return;
+    const box = document.createElement('div');
+    box.id = 'zoom-ctl';
+    box.innerHTML = '<button class="btn btn-small" data-z="in" title="Zooma in">＋</button><button class="btn btn-small" data-z="out" title="Zooma ut">－</button><button class="btn btn-small" data-z="fit" title="Visa hela">⤢</button>';
+    box.querySelector('[data-z="in"]').onclick = () => this.zoomBy(1.6);
+    box.querySelector('[data-z="out"]').onclick = () => this.zoomBy(1 / 1.6);
+    box.querySelector('[data-z="fit"]').onclick = () => this.zoomFit();
+    stage.append(box);
+  }
+
+  // ---------- Pekare: klick, panorering, nypzoom ----------
+  onPtrDown(e) {
+    if (!this.order || modalOpen()) return;
+    if (this.phase === 'desk') return this.onCanvasDown(e);
+    this.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY });
+    this.canvas.setPointerCapture?.(e.pointerId);
+    this.gesture = { moved: false, pinch: this.ptrs.size >= 2 ? null : undefined };
+  }
+  onPtrMove(e) {
+    this.hover = this.local(e);
+    const p = this.ptrs.get(e.pointerId);
+    if (!p) {
+      const over = this.order && this.b.help !== null && this.phase === 'build' && this.actionAt(this.hover);
+      this.canvas.style.cursor = over ? 'pointer' : (this.userCam ? 'grab' : '');
+      return;
+    }
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    p.x = e.clientX; p.y = e.clientY;
+    if (this.ptrs.size >= 2) {
+      const [a, b] = [...this.ptrs.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      const r = this.canvas.getBoundingClientRect();
+      const mid = [(a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top];
+      if (this.gesture.pinchD) this.zoomAt(mid, d / this.gesture.pinchD);
+      this.gesture.pinchD = d; this.gesture.moved = true;
+      return;
+    }
+    if (!this.gesture.moved && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < 7) return;
+    this.gesture.moved = true;
+    this.cam.x += dx; this.cam.y += dy; this.userCam = true;
+    this.clampCam(); this.applyCam();
+    this.renderDue = this.t + 0.15;
+    this.canvas.style.cursor = 'grabbing';
+  }
+  onPtrUp(e) {
+    const p = this.ptrs.get(e.pointerId);
+    this.ptrs.delete(e.pointerId);
+    if (!p) return;
+    if (!this.gesture?.moved && this.ptrs.size === 0) this.onCanvasDown(e);
   }
 
   draw(ctx) {
@@ -429,9 +538,11 @@ export class BuildView {
     const sx = this.shake > 0 ? Math.round(Math.sin(this.t * 80) * 5) : 0;
     ctx.save(); ctx.translate(sx, 0);
     // skarpa pixlar när bilden förstoras; mjuk nedskalning på små skärmar
-    ctx.imageSmoothingEnabled = this.s * this.dpr < 1;
-    ctx.drawImage(this.R.canvas, this.ox, this.oy, V.w * this.s, V.h * this.s);
-    ctx.drawImage(this.cableCanvas, this.ox, this.oy, V.w * this.s, V.h * this.s);
+    const bc = this.buf, sc = this.cam.zoom / bc.zoom;
+    const dx = this.cam.x - bc.x * sc, dy = this.cam.y - bc.y * sc, dw = this.R.w * bc.px * sc, dh = this.R.h * bc.px * sc;
+    ctx.imageSmoothingEnabled = bc.px * sc < 1;
+    ctx.drawImage(this.R.canvas, dx, dy, dw, dh);
+    ctx.drawImage(this.cableCanvas, dx, dy, dw, dh);
 
     const entry = this.selected && this.trayEntries().find((x) => x.key === this.selected);
     const next = this.help ? this.nextStep() : null;
@@ -460,7 +571,7 @@ export class BuildView {
     }
     if (this.toolAnim) { const [x, y] = D.proj(this, ...this.toolAnim.pt); D.drawScrewdriver(ctx, x, y, this.toolAnim.t); }
     // etiketter för monterade delar
-    if (this.labelW) {
+    if (this.labelW && this.cam.zoom <= this.fit.zoom * 1.15) {
       const labels = this.L.SLOTS.filter((s) => this.b.placed[s.id] && s.cat !== 'case').map((s) => {
         const p = this.b.placed[s.id], pt = D.proj(this, ...s.anchor);
         return { title: this.shop.cats[p.cat].name, text: p.name, pt, side: pt[0] < this.cw / 2 ? 'left' : 'right' };

@@ -55,6 +55,7 @@ function start(shopModule) {
     if (type === 'toast') UI.toast(data.text, data.kind);
     if (type === 'levelup') setTimeout(() => UI.showLevelUp(game, data), 900);
   });
+  floor.onShowcaseClick = (what) => { if (!UI.modalOpen()) UI.openShowcase(game, what); };
   floor.onCustomerClick = (c) => {
     if (!floor.clickable(c) || UI.modalOpen()) return;
     UI.openOrderDialog(game, c, {

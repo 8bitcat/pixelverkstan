@@ -167,3 +167,33 @@ export function showLevelUp(game, info) {
   const dlg = openModal(`⭐ Nivå ${info.level}!`, body, [{ label: 'Grymt!', cls: 'btn-go', onClick: closeModal }]);
   dlg.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(game.shop.icon(game.shop.part[el.dataset.icon], 44, 38)));
 }
+
+// ---------- Museivy: titta på delarna i en monter på nära håll ----------
+export function openShowcase(game, what) {
+  const shop = game.shop, dpr = Math.min(3, window.devicePixelRatio || 1);
+  let title, body, parts;
+  if (what.hero) {
+    const p = shop.part[what.hero];
+    parts = [[p, 580, 340]];
+    title = '⭐ Stjärnobjektet';
+    body = `<div class="museum"><span data-big="0"></span>
+      <h3 style="margin:8px 0 2px">${esc(p.name)}</h3>
+      <div class="sp" style="font-size:18px">${esc(shop.specLine(p))}</div>
+      <p style="font-size:19px;margin:8px 0 0">Butikens finaste grafikkort – bara till för att titta på. Kunder kan beställa det när butiken blivit en <b>${esc(shop.levels[p.lvl - 1]?.title || 'Megastore')}</b>.</p></div>`;
+  } else {
+    const list = shop.parts.filter((p) => p.cat === what.cat && game.stockFree(p.id) > 0).sort((a, b) => b.cost - a.cost);
+    parts = list.map((p) => [p, 270, 170]);
+    title = `🏛️ ${esc(what.title || shop.cats[what.cat].name)}`;
+    body = list.length
+      ? `<div class="museum grid">${list.map((p, i) => `<div class="mcard"><span data-big="${i}"></span><div class="nm">${esc(p.name)}</div><div class="sp">${esc(shop.specLine(p))}</div><div class="own">i lager: <b>${game.stockFree(p.id)}</b></div></div>`).join('')}</div>`
+      : '<p style="font-size:20px">Montern är tom – köp in delar hos 🛒 grossisten så hamnar de här.</p>';
+  }
+  const dlg = openModal(title, body, [{ label: 'Stäng', onClick: closeModal }]);
+  dlg.classList.add('dlg-wide');
+  dlg.querySelectorAll('[data-big]').forEach((el) => {
+    const [p, w, h] = parts[+el.dataset.big];
+    const c = shop.icon(p, Math.round(w * dpr), Math.round(h * dpr));
+    c.style.width = w + 'px'; c.style.maxWidth = '100%'; c.style.height = 'auto';
+    el.replaceWith(c);
+  });
+}

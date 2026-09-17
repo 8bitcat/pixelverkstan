@@ -26,6 +26,7 @@ export class Floor {
     this.t = 0;
     this.offX = 0; this.offY = 0; this.scale = 1; this.dpr = 1;
     this.icons = new Map();
+    this.RES = 1;  // buffertens pixlar per logisk pixel (följer skärmen)
     this.door = 0;
     this.keeper = { x: LY.KEEPER_HOME[0], y: LY.KEEPER_HOME[1], dir: 'down', walk: 0, moving: false, lookT: 3, look: 'down' };
     this.cars = []; this.carT = 1.5;
@@ -34,7 +35,7 @@ export class Floor {
     this.build();
     if (canvas._floorOff) canvas._floorOff();
     const down = (e) => this.click(e);
-    const move = (e) => { const c = this.hit(e); canvas.style.cursor = c && this.clickable(c) ? 'pointer' : 'default'; };
+    const move = (e) => { const c = this.hit(e); canvas.style.cursor = (c && this.clickable(c)) || this.showcaseAt(e) ? 'pointer' : 'default'; };
     canvas.addEventListener('pointerdown', down);
     canvas.addEventListener('pointermove', move);
     canvas._floorOff = () => { canvas.removeEventListener('pointerdown', down); canvas.removeEventListener('pointermove', move); };
@@ -282,7 +283,22 @@ export class Floor {
   clickable(c) { return c.phase === 'queue' && this.game.queue()[0] === c; }
   click(e) {
     const c = this.hit(e);
-    if (c && this.onCustomerClick) this.onCustomerClick(c);
+    if (c && this.onCustomerClick) return this.onCustomerClick(c);
+    const sc = this.showcaseAt(e);
+    if (sc && this.onShowcaseClick) this.onShowcaseClick(sc);
+  }
+  // Monter eller stjärnobjekt under pekaren → { cat, title } | { hero }
+  showcaseAt(e) {
+    const [x, y] = this.toLocal(e);
+    for (const vt of this.vits) {
+      const y0 = vt.v.base - PR.VIT.H + 1;
+      if (x >= vt.v.x0 && x < vt.v.x1 && y >= y0 && y <= vt.v.base + 2) return { cat: vt.sc.cat, title: vt.sc.title };
+    }
+    if (this.heroPart && this.heroUnder) {
+      const B = PR.HERO_BOX, hx = LY.HERO.cx - B.ax, hy = LY.HERO.base - B.ay;
+      if (x >= hx && x < hx + this.heroUnder.width && y >= hy && y < hy + this.heroUnder.height) return { hero: this.heroPart.id };
+    }
+    return null;
   }
 
   // ---------- Skalning ----------
@@ -302,11 +318,20 @@ export class Floor {
     this.offY = Math.round(top + Math.max(0, availH - FH * sc) / 2);
     if (wide) this.offX = Math.max(10, Math.min(this.offX, w - 320 - FW * sc));
     this.dpr = dpr;
+    const res = Math.max(1, Math.min(4, Math.round(sc * dpr)));
+    if (res !== this.RES) {
+      this.RES = res;
+      this.buf.width = FW * res; this.buf.height = FH * res;
+      this.ctx = this.buf.getContext('2d');
+      this.sig = null;
+      this.heroIcon = this.heroPart ? this.icon(this.heroPart, 78 * res, 52 * res) : null;
+    }
   }
 
   // ---------- Rendering ----------
   draw() {
     const ctx = this.ctx, g = this.game, t = this.t;
+    ctx.setTransform(this.RES, 0, 0, this.RES, 0, 0);
     ctx.imageSmoothingEnabled = false;
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
     this.refreshStock();
@@ -338,7 +363,7 @@ export class Floor {
     const k = this.keeper;
     S.push([k.y, () => drawPerson(ctx, k.x, k.y, SHOPKEEPER, k.dir, k.moving ? WALK_SEQ[Math.floor(k.walk) % 4] : (Math.sin(t * 2.1) > 0.7 ? 4 : 0))]);
     S.push([LY.COUNTER.base, () => this.drawCounter(ctx)]);
-    this.vits.forEach((vt) => S.push([vt.v.base, () => ctx.drawImage(vt.img, vt.v.x0, vt.v.base - PR.VIT.H + 1)]));
+    this.vits.forEach((vt) => S.push([vt.v.base, () => ctx.drawImage(vt.img, vt.v.x0, vt.v.base - PR.VIT.H + 1, vt.img.width / this.RES, vt.img.height / this.RES)]));
     S.push([LY.ROPE.back, () => ctx.drawImage(this.ropeBack.img, this.ropeBack.x, this.ropeBack.y)]);
     S.push([LY.HERO.base, () => this.drawHero(ctx)]);
     S.push([LY.ROPE.front, () => ctx.drawImage(this.ropeFront.img, this.ropeFront.x, this.ropeFront.y)]);
@@ -390,8 +415,9 @@ export class Floor {
 
   renderVitrine(vt) {
     const { sc, v, frame } = vt, g = this.game, W = v.x1 - v.x0, { GH, D, H } = PR.VIT;
-    const c = document.createElement('canvas'); c.width = W; c.height = H;
-    const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+    const RES = this.RES;
+    const c = document.createElement('canvas'); c.width = W * RES; c.height = H * RES;
+    const x = c.getContext('2d'); x.setTransform(RES, 0, 0, RES, 0, 0); x.imageSmoothingEnabled = false;
     x.drawImage(frame.under, 0, 0);
     const parts = this.shop.parts.filter((p) => p.cat === sc.cat && g.stockFree(p.id) > 0).sort((a, b) => (b.cost || 0) - (a.cost || 0)).slice(0, 6);
     const wide = W > 140;
@@ -407,7 +433,7 @@ export class Floor {
     for (const it of placed) {
       x.fillStyle = 'rgba(8,4,14,.45)';
       x.fillRect(Math.round(it.cx - iw * 0.3), Math.round(it.bottom - 3), Math.round(iw * 0.6), 2);
-      x.drawImage(this.icon(it.p, iw, ih), Math.round(it.cx - iw / 2), Math.round(it.bottom - ih + 1));
+      x.drawImage(this.icon(it.p, iw * RES, ih * RES), Math.round(it.cx - iw / 2), Math.round(it.bottom - ih + 1), iw, ih);
     }
     for (const it of placed) {
       const label = '×' + g.stockFree(it.p.id), tw = textW(SMALL, label) + 3;
@@ -488,9 +514,9 @@ export class Floor {
     const [x0, y0, x1, y1] = SC.TV, w = x1 - x0, h = y1 - y0, t = this.t, scene = Math.floor(t / 5) % 3, lt = t % 5;
     for (let y = 0; y < h; y++) { ctx.fillStyle = css(mix(0x0c1030, scene === 1 ? 0x4a0f1c : 0x1f3a2a, y / h)); ctx.fillRect(x0, y0 + y, w, 1); }
     if (scene === 0 && this.heroPart) {
-      const ic = this.icon(this.heroPart, 30, 20), sx = Math.round(x0 + w / 2 - 15 + Math.max(0, 1 - lt * 1.5) * 30);
+      const ic = this.icon(this.heroPart, 30 * this.RES, 20 * this.RES), sx = Math.round(x0 + w / 2 - 15 + Math.max(0, 1 - lt * 1.5) * 30);
       ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
-      ctx.drawImage(ic, sx, y0 + 1);
+      ctx.drawImage(ic, sx, y0 + 1, 30, 20);
       ctx.restore();
       const title = this.heroTitle.split(' ').slice(0, 2).join(' ');
       ctxText(ctx, SMALL, title, x0 + Math.round((w - textW(SMALL, title)) / 2), y1 - 7, lt % 0.8 < 0.6 ? '#76ff4a' : '#ffffff');
@@ -583,7 +609,7 @@ export class Floor {
     ctx.globalAlpha = 1;
     if (this.heroIcon) {
       const bob = Math.round(Math.sin(t * 1.6) * 1.2);
-      ctx.drawImage(this.heroIcon, x + Math.round((c0 + c1 - this.heroIcon.width) / 2), y + cb - this.heroIcon.height - 3 + bob);
+      ctx.drawImage(this.heroIcon, x + Math.round((c0 + c1 - 78) / 2), y + cb - 52 - 3 + bob, 78, 52);
     }
     ctx.drawImage(this.heroOver, x, y);
     // kanter i rgb

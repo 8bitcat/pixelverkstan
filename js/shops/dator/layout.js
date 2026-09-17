@@ -1,12 +1,12 @@
 // Byggregler för datorbutiken: platser, handgrepp (spak/kylpasta/skruvar), kablar
 // till uttag, kompatibilitet och kontroll innan datorn ställs upp.
 // core/build.js är generisk och frågar bara detta API.
-import { G, VIEW, PORTS, SCREWS, driveBox } from './geom.js';
+import { G, VIEW, MAX_K, PORTS, SCREWS, driveBox } from './geom.js';
 import { drawPart, drawMat, drawScrews, drawScrewHoles } from './art.js';
 import { gpuBox } from './art-parts.js';
 import { CONN, connectorIcon, drawCablePixels, cableCurve } from './connectors.js';
 
-export { VIEW, CONN, connectorIcon };
+export { VIEW, MAX_K, CONN, connectorIcon };
 
 export const SLOTS = [
   { id: 'case', cat: 'case', name: 'Chassi', requires: [], anchor: [13, 23, 1], hl: [0, 26, 0, 24, 0.5] },

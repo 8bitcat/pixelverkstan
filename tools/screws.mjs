@@ -27,7 +27,7 @@ await page.evaluate(() => {
 await page.waitForTimeout(600);
 await page.screenshot({ path: OUT + "sw0.png" });
 for (const id of ['gpu_screw', 'psu_screws', 'm2_screw']) {
-  const pts = await page.evaluate((id) => { const v = PV.build, a = v.L.ACTION[id], r = v.canvas.getBoundingClientRect(); return a.points.map((p) => { const [x, y] = v.R.proj(...p); return { x: r.left + v.ox + x * v.s, y: r.top + v.oy + y * v.s }; }); }, id);
+  const pts = await page.evaluate((id) => { const v = PV.build, a = v.L.ACTION[id], r = v.canvas.getBoundingClientRect(); return a.points.map((p) => { const [x, y] = v.P.proj(...p); return { x: r.left + v.ox + x * v.s, y: r.top + v.oy + y * v.s }; }); }, id);
   for (const p of pts) { await page.mouse.click(p.x, p.y); await page.waitForTimeout(150); }
   const res = await page.evaluate((id) => ({ done: PV.build.L.actDone(PV.build.b, id), count: PV.build.L.actCount(PV.build.b, id), msg: PV.build.msg?.html.replace(/<[^>]+>/g, '').slice(0, 90) }), id);
   console.log(id, JSON.stringify(pts.map((p) => [Math.round(p.x), Math.round(p.y)])), JSON.stringify(res));

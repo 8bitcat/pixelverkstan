@@ -1,6 +1,6 @@
 // Samlar pixelgrafiken + gör ikoner till menyer, lådan och montrarna.
 import { Raster } from '../../core/raster.js';
-import { VIEW } from './geom.js';
+import { VIEW, MAX_K } from './geom.js';
 import { drawMat, drawCase, drawBoard } from './art-base.js';
 import { drawCpu, drawCooler, drawRam, drawStorage, drawGpu, drawPsu, drawFans, drawScrews, drawScrewHoles } from './art-parts.js';
 import { drawCaseStanding } from './art-case.js';
@@ -46,21 +46,29 @@ function drawIconPart(R, part, o) {
 }
 
 // Ritar delen isolerat (RGB tänt som i en butiksmonter) och beskär till W×H.
+// Stora ikoner ritas med upp till MAX_K pixlar per enhet (full detalj).
 export function iconCanvas(part, W = 64, H = 54) {
   const key = part.id + ':' + W + 'x' + H;
   let src = ICONS.get(key);
   if (!src) {
     const o = { ids: {}, id: 0, spin: 0.4, t: 1.2, showroom: true, leverClosed: true };
-    // mät storleken billigt i låg upplösning, rita sedan exakt i rätt skala
-    const q = 0.25;
-    let R = makeRaster(q); drawIconPart(R, part, o);
-    let bb = bbox(R);
-    const f = Math.min((W - 2) / (bb.w / q), (H - 2) / (bb.h / q)) * 0.97;
-    R = makeRaster(Math.min(1, f)); drawIconPart(R, part, o); R.flush(); bb = bbox(R);
-    const s = f >= 2 ? Math.min(4, Math.floor(f)) : 1;
+    // mät storleken billigt i låg upplösning
+    const q = 0.25, Rq = makeRaster(q);
+    drawIconPart(Rq, part, o);
+    const bq = bbox(Rq);
+    const s = Math.min(MAX_K / VIEW.k, (W - 2) / (bq.w / q), (H - 2) / (bq.h / q)) * 0.98;
+    // tät raster precis runt delen i skala s
+    const pad = 4 + Math.ceil(2 * s / q);
+    const R = new Raster(Math.ceil(bq.w * s / q) + pad * 2, Math.ceil(bq.h * s / q) + pad * 2);
+    Object.assign(R, { k: VIEW.k * s, hz: VIEW.hz * s, edges: true, ox: pad - (bq.x - Rq.ox) * s / q, oy: pad - (bq.y - Rq.oy) * s / q });
+    R.clear(); drawIconPart(R, part, o); R.flush();
+    const bb = bbox(R);
+    const f = Math.min((W - 2) / bb.w, (H - 2) / bb.h);
+    const up = f >= 2 ? Math.min(4, Math.floor(f)) : 1;
+    const dw = Math.min(W, bb.w * up), dh = Math.min(H, bb.h * up);
     src = document.createElement('canvas'); src.width = W; src.height = H;
-    const cx = src.getContext('2d'); cx.imageSmoothingEnabled = false;
-    cx.drawImage(R.canvas, bb.x, bb.y, bb.w, bb.h, Math.round((W - bb.w * s) / 2), Math.round((H - bb.h * s) / 2), bb.w * s, bb.h * s);
+    const cx = src.getContext('2d'); cx.imageSmoothingEnabled = f < 1;
+    cx.drawImage(R.canvas, bb.x, bb.y, bb.w, bb.h, Math.round((W - dw) / 2), Math.round((H - dh) / 2), dw, dh);
     ICONS.set(key, src);
   }
   const c = document.createElement('canvas'); c.width = W; c.height = H;

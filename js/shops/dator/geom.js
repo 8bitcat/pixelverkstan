@@ -4,6 +4,8 @@
 
 // Upplösning: 16 px per enhet (dubbelt så detaljerat som från början)
 export const VIEW = { w: 872, h: 504, k: 16, hz: 13, ox: 424, oy: 80 };
+// Högsta detaljnivå: 64 pixlar per enhet (syns när man zoomar in)
+export const MAX_K = 64;
 
 export const G = {
   mat:   { u0: -1, u1: 26.5, v0: -1, v1: 25 },

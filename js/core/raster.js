@@ -98,8 +98,8 @@ export class Raster {
     if (H > 0) {
       const [xa] = this.proj(u0, v1), [xb] = this.proj(u1, v1);
       const yTop = this.proj(u0, v1, z1)[1], yBot = this.proj(u1, v1, z0)[1];
-      for (let y = Math.floor(yTop); y <= Math.ceil(yBot); y++)
-        for (let x = Math.floor(xa); x < Math.ceil(xb); x++) {
+      for (let y = Math.max(0, Math.floor(yTop)); y <= Math.min(this.h - 1, Math.ceil(yBot)); y++)
+        for (let x = Math.max(0, Math.floor(xa)); x < Math.min(this.w, Math.ceil(xb)); x++) {
           const u = (x + 0.5 - ox) / k + v1;
           if (u < u0 || u >= u1) continue;
           const z = (oy + (u + v1) * k / 2 - (y + 0.5)) / hz;
@@ -110,8 +110,8 @@ export class Raster {
       // höger yta (u = u1)
       const [xc] = this.proj(u1, v1), [xd] = this.proj(u1, v0);
       const yTop2 = this.proj(u1, v0, z1)[1], yBot2 = this.proj(u1, v1, z0)[1];
-      for (let y = Math.floor(yTop2); y <= Math.ceil(yBot2); y++)
-        for (let x = Math.floor(xc); x < Math.ceil(xd); x++) {
+      for (let y = Math.max(0, Math.floor(yTop2)); y <= Math.min(this.h - 1, Math.ceil(yBot2)); y++)
+        for (let x = Math.max(0, Math.floor(xc)); x < Math.min(this.w, Math.ceil(xd)); x++) {
           const v = u1 - (x + 0.5 - ox) / k;
           if (v < v0 || v >= v1) continue;
           const z = (oy + (u1 + v) * k / 2 - (y + 0.5)) / hz;
@@ -123,8 +123,8 @@ export class Raster {
     // topp (z = z1)
     const xs = [this.proj(u0, v1)[0], this.proj(u1, v0)[0]];
     const ys = [this.proj(u0, v0, z1)[1], this.proj(u1, v1, z1)[1]];
-    for (let y = Math.floor(ys[0]); y <= Math.ceil(ys[1]); y++)
-      for (let x = Math.floor(xs[0]); x < Math.ceil(xs[1]); x++) {
+    for (let y = Math.max(0, Math.floor(ys[0])); y <= Math.min(this.h - 1, Math.ceil(ys[1])); y++)
+      for (let x = Math.max(0, Math.floor(xs[0])); x < Math.min(this.w, Math.ceil(xs[1])); x++) {
         const a = (x + 0.5 - ox) / k;
         const b = (y + 0.5 - oy + z1 * hz) * 2 / k;
         const u = (a + b) / 2, v = (b - a) / 2;

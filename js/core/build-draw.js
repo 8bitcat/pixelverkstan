@@ -5,9 +5,9 @@ const RED = '#9e1b22', INK = '#17151a', PAPER = '#f1ebe0';
 export const FONT = '"VT323", ui-monospace, monospace';
 export const HEAD = '"Jersey 10", "VT323", sans-serif';
 
+// värld → skärm (css-px) via byggvyns kamera
 export function proj(view, u, v, z) {
-  const [x, y] = view.R.proj(u, v, z);
-  return [view.ox + x * view.s, view.oy + y * view.s];
+  return view.P.proj(u, v, z);
 }
 
 export function slotPoly(view, slot) {

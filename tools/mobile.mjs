@@ -19,7 +19,7 @@ await page.evaluate(() => {
 await page.waitForTimeout(500);
 // tryck-välj: del i lådan → plats
 for (let i = 0; i < 4; i++) {
-  const st = await page.evaluate(() => { const v = PV.build, s = v.nextStep(), r = v.canvas.getBoundingClientRect(); if (s.kind !== 'slot') return { kind: s.kind }; const [u0, u1, v0, v1, z] = v.L.SLOT[s.id].hl; const [x, y] = v.R.proj((u0 + u1) / 2, (v0 + v1) / 2, z); return { kind: 'slot', idx: v.trayEntries().findIndex((e) => e.key === s.entryKey), x: r.left + v.ox + x * v.s, y: r.top + v.oy + y * v.s }; });
+  const st = await page.evaluate(() => { const v = PV.build, s = v.nextStep(), r = v.canvas.getBoundingClientRect(); if (s.kind !== 'slot') return { kind: s.kind }; const [u0, u1, v0, v1, z] = v.L.SLOT[s.id].hl; const [x, y] = v.P.proj((u0 + u1) / 2, (v0 + v1) / 2, z); return { kind: 'slot', idx: v.trayEntries().findIndex((e) => e.key === s.entryKey), x: r.left + v.ox + x * v.s, y: r.top + v.oy + y * v.s }; });
   if (st.kind !== 'slot') { await page.evaluate(() => { const v = PV.build, s = v.nextStep(); if (s.kind === 'act') { const a = v.L.ACTION[s.id]; a.points.forEach((_, i) => v.doAction(a, i)); } }); continue; }
   await page.tap(`.tray-item >> nth=${st.idx}`, { force: true }); await page.waitForTimeout(120);
   await page.touchscreen.tap(st.x, st.y); await page.waitForTimeout(200);

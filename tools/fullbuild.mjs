@@ -38,7 +38,7 @@ for (let step = 0; step < 90; step++) {
   const s = await page.evaluate(() => {
     const v = PV.build, st = v.nextStep(), r = v.canvas.getBoundingClientRect();
     const abs = (p) => ({ x: r.left + p[0], y: r.top + p[1] });
-    const P = (u, vv, z) => { const [x, y] = v.R.proj(u, vv, z); return abs([v.ox + x * v.s, v.oy + y * v.s]); };
+    const P = (u, vv, z) => { const [x, y] = v.P.proj(u, vv, z); return abs([v.ox + x * v.s, v.oy + y * v.s]); };
     if (!st) return { kind: 'none', phase: v.phase, msg: v.msg?.html };
     if (v.phase === 'build') {
       if (st.kind === 'slot') { const [u0, u1, v0, v1, z] = v.L.SLOT[st.id].hl; return { kind: 'drag', key: st.entryKey, t: P((u0 + u1) / 2, (v0 + v1) / 2, z), label: st.label }; }
