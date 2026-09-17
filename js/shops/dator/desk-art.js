@@ -7,8 +7,18 @@ import { GPU_LEN } from './geom.js';
 const css = (c) => '#' + (c >>> 0).toString(16).padStart(6, '0').slice(-6);
 const R = (x, a, b, w, h, c) => { x.fillStyle = typeof c === 'number' ? css(c) : c; x.fillRect(a | 0, b | 0, w | 0, h | 0); };
 
-// ---------- Insidan (sidovy bakom glaset), 100×107 px ----------
+// fin pixel (halva enheter i 2×-canvasen)
+const F = (x, a, b, w, h, c) => { x.fillStyle = typeof c === 'number' ? css(c) : c; x.fillRect(a, b, w, h); };
+const hash2 = (a, b) => { let h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >> 13)) * 1274126177; return ((h ^ (h >> 16)) >>> 0) / 4294967295; };
+
+// ---------- Insidan (sidovy bakom glaset), ritas i 100×107 enheter på en 200×214-canvas ----------
 export function drawInternals(x, b, st, t) {
+  x.save();
+  x.setTransform(x.canvas.width / 100, 0, 0, x.canvas.height / 107, 0, 0);
+  drawInternalsBase(x, b, st, t);
+  x.restore();
+}
+function drawInternalsBase(x, b, st, t) {
   const p = b.placed, W = 100, H = 107;
   const cs = p.case, inner = hex(cs.look.inner), col = hex(cs.look.color);
   const on = st.powered;
@@ -87,6 +97,39 @@ export function drawInternals(x, b, st, t) {
     if (c) { R(x, 92, fy + 1, 1, 20, c); glow.push([92, fy + 11, 22, c]); }
   }
   if (cs.fans.includes('rear')) { R(x, 0, 26, 5, 22, '#151515'); const c = cs.rgb ? rgbAt('case', 9) : null; if (c) { R(x, 4, 27, 1, 20, c); glow.push([4, 37, 16, c]); } }
+
+  // ---- finare detaljer i halv-pixlar ----
+  if (p.mb) {
+    for (let i = 0; i < 40; i++) {                       // ytmonterade komponenter
+      const sx = 18 + hash2(i, 1) * 48, sy = 44 + hash2(i, 2) * 10;
+      F(x, Math.round(sx * 2) / 2, Math.round(sy * 2) / 2, 1, 0.5, hash2(i, 3) > 0.5 ? '#c9ccd0' : '#1b1b1e');
+    }
+    for (let i = 0; i < 12; i++) F(x, 20 + i * 2.5, 9.5, 0.5, 2.5, 'rgba(255,255,255,.18)');   // VRM-fenor
+    for (const dx of [53, 57, 61]) F(x, dx, 11, 0.5, 30, '#0c0c0e');                            // RAM-slots
+    for (let i = 0; i < 14; i++) F(x, 20 + i * 0.5 * 3, 42.5, 0.5, 0.5, '#d8b24a');           // kretsbanor
+    F(x, 62.5, 57.5, 1.5, 3, '#e9e9e6');                                                       // PCIe-spärr
+    F(x, 66, 20, 2, 12, '#161616'); for (let i = 0; i < 12; i++) F(x, 66.5, 20.5 + i, 0.5, 0.5, '#3a3a3a'); // 24-pin-uttag
+  }
+  if (p.cooler?.look.type === 'tower') {
+    for (let i = 0; i < 4; i++) { F(x, 27 + i * 5, 12.5, 2, 1.5, '#c87533'); F(x, 27.5 + i * 5, 12.5, 0.5, 0.5, '#f0a060'); } // värmerör
+    for (let i = 0; i < 30; i++) F(x, 24, 16 + i, 22, 0.5, 'rgba(255,255,255,.07)');
+  }
+  if (p.ram) for (const rx of [54, 58].slice(0, p.ram.sticks)) {
+    for (let i = 0; i < 5; i++) F(x, rx + 0.5, 16 + i * 5, 2, 3, 'rgba(0,0,0,.35)');          // kretsar
+    F(x, rx, 39.5, 3, 0.5, '#d8b24a');                                                        // guldkant
+  }
+  if (p.gpu) {
+    const len = [40, 62, 84][p.gpu.len - 1];
+    for (let i = 0; i < len - 4; i += 1.5) F(x, 6 + i, 68.5, 0.5, 1, 'rgba(0,0,0,.5)');        // kylflänsar
+    F(x, 0.5, 57, 1, 1, '#1a1a1a'); F(x, 0.5, 60, 1, 1.5, '#1a1a1a'); F(x, 0.5, 64, 1, 1, '#1a1a1a'); // uttag i brackets
+    if (p.gpu.pwr && b.cables.has('gpu_pwr')) { F(x, len - 12, 53.5, 4, 1.5, '#0c0c0c'); for (let i = 0; i < 4; i++) F(x, len - 11.5 + i, 54, 0.5, 0.5, '#e8c030'); }
+  }
+  if (b.cables.has('atx24')) for (let i = 0; i < 64; i += 1) F(x, 70, 20 + i, 4, 0.5, i % 3 ? 'rgba(255,255,255,.05)' : 'rgba(255,255,255,.14)');
+  for (let i = 2; i < W - 2; i += 2.5) F(x, i, 86, 1, 1, 'rgba(0,0,0,.35)');                   // perforering på kåpan
+  for (const [k, fy] of [['front1', 12], ['front2', 36], ['front3', 60]]) {
+    if (!cs.fans.includes(k)) continue;
+    for (let i = 0; i < 20; i += 2) F(x, 93.5, fy + 1 + i, 3, 0.5, '#2a2a2e');                 // fläktblad i profil
+  }
 
   // RGB-sken
   if (glow.length) {

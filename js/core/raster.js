@@ -38,6 +38,8 @@ export class Raster {
     this.ids = new Int16Array(w * h);
     // isometrisk projektion: k px per enhet, hz px per höjdenhet
     this.k = 8; this.hz = 6.5; this.ox = w / 2; this.oy = 20;
+    // edges: automatisk pixelkonst-skuggning (ljusa överkanter, mörka underkanter, toning)
+    this.edges = false;
   }
   clear(color = -1) {
     const d = this.data;
@@ -82,6 +84,16 @@ export class Raster {
     const H = z1 - z0;
     const alpha = opt.alpha ?? 1;
     const noShade = opt.flat;
+    const pu = 1.001 / k, pz = 1.001 / hz;
+    const edges = this.edges && !opt.noEdges;
+    // skuggfaktor för sidoytor: s = position längs ytan, d = avstånd från toppen, len/H = mått
+    const sideShade = (s, d, len) => {
+      if (!edges) return 1;
+      if (d < pz && H * hz >= 3) return 1.22;                 // ljus överkant
+      if (H - d < pz && H * hz >= 4) return 0.62;             // mörk underkant
+      if (s < pu && len * k >= 4) return 0.78;                // hörnlinje
+      return 1.06 - 0.16 * (d / H);                           // toning uppifrån
+    };
     // vänster yta (v = v1)
     if (H > 0) {
       const [xa] = this.proj(u0, v1), [xb] = this.proj(u1, v1);
@@ -93,7 +105,7 @@ export class Raster {
           const z = (oy + (u + v1) * k / 2 - (y + 0.5)) / hz;
           if (z < z0 || z >= z1) continue;
           const c = tex('left', u - u0, z1 - z, u1 - u0, H);
-          if (c >= 0) this.px(x, y, noShade ? c : shade(c, FACE_SHADE.left), id, alpha);
+          if (c >= 0) this.px(x, y, noShade ? c : shade(c, FACE_SHADE.left * sideShade(u - u0, z1 - z, u1 - u0)), id, alpha);
         }
       // höger yta (u = u1)
       const [xc] = this.proj(u1, v1), [xd] = this.proj(u1, v0);
@@ -105,7 +117,7 @@ export class Raster {
           const z = (oy + (u1 + v) * k / 2 - (y + 0.5)) / hz;
           if (z < z0 || z >= z1) continue;
           const c = tex('right', v - v0, z1 - z, v1 - v0, H);
-          if (c >= 0) this.px(x, y, noShade ? c : shade(c, FACE_SHADE.right), id, alpha);
+          if (c >= 0) this.px(x, y, noShade ? c : shade(c, FACE_SHADE.right * sideShade(v1 - v, z1 - z, v1 - v0) * (edges && v1 - v < pu && (v1 - v0) * k >= 4 ? 1.25 : 1)), id, alpha);
         }
     }
     // topp (z = z1)
@@ -118,7 +130,13 @@ export class Raster {
         const u = (a + b) / 2, v = (b - a) / 2;
         if (u < u0 || u >= u1 || v < v0 || v >= v1) continue;
         const c = tex('top', u - u0, v - v0, u1 - u0, v1 - v0);
-        if (c >= 0) this.px(x, y, c, id, alpha);
+        if (c < 0) continue;
+        let f = 1;
+        if (edges && (u1 - u0) * k >= 3 && (v1 - v0) * k >= 3) {
+          if (u - u0 < pu || v - v0 < pu) f = 1.18;               // bakre kanter fångar ljuset
+          else if (u1 - u < pu || v1 - v < pu) f = 1.1;           // främre kanter
+        }
+        this.px(x, y, f === 1 ? c : shade(c, f), id, alpha);
       }
   }
 }

@@ -2,7 +2,7 @@
 import { hex, shade, mix } from '../../core/raster.js';
 import { textBitmap } from '../../core/pixfont.js';
 import { G, BOARD_TOP, GPU_LEN, SCREWS, driveBox } from './geom.js';
-import { C, fan, honeycomb, hash, led, isLit, screwHead } from './art-common.js';
+import { C, fan, honeycomb, hash, led, isLit, screwHead, brushed, smd, barcode, fineLines } from './art-common.js';
 import { drawFanUnit } from './art-base.js';
 
 const TXT = (s) => textBitmap(s);
@@ -23,6 +23,7 @@ export function drawCpu(R, p, o) {
       : am5 && ((x < e + 0.45 || x > W - e - 0.45) && y > 0.75 && y < H - 0.75);
     if (sub || cut) {
       if (x < 0.42 && y < 0.42) return C.gold;
+      const sm = smd(x, y, 0.5, 0.16); if (sm >= 0) return sm;
       if (cut && hash(x * 9 | 0, y * 9 | 0) > 0.6) return 0x8a6a3a;
       return intel ? 0x2a5a36 : 0x2f6f3e;
     }
@@ -30,8 +31,9 @@ export function drawCpu(R, p, o) {
     if (brand.on(((x - 0.6) / 0.11) | 0, ((y - 0.62) / 0.11) | 0)) return intel ? 0x2c6fb7 : 0x1b1b1b;
     if (model.on(((x - 0.6) / 0.09) | 0, ((y - 1.3) / 0.09) | 0)) return 0x5d6167;
     if (y > 1.95 && y < 2.05 && x > 0.6 && x < W - 0.6) return 0x8d9197;
+    if (fineLines(x, y, 0.6, 2.2, W * 0.55, 3, 0.12)) return 0x7d8187;
     const sheen = ((x - y) % 1.6 + 1.6) % 1.6 < 0.15 ? 1.08 : 1;
-    return shade(mix(0xe2e5e8, 0xa9adb2, (x + y) / (W + H)), sheen);
+    return brushed(shade(mix(0xe2e5e8, 0xa9adb2, (x + y) / (W + H)), sheen), x, y);
   }, o.id);
 }
 
@@ -40,7 +42,7 @@ export function drawCooler(R, p, o) {
   const { cu, cv } = G.cpu, L = p.look, z0 = BOARD_TOP + 0.53;
   const fanC = hex(L.fan), blade = hex(L.blade), fin = hex(L.fin);
   const spin = o.spin || 0, ring = p.rgb ? led(o, 'cooler') : -1;
-  const fins = (f, x, y) => f === 'top' ? ((x * 5 | 0) % 2 ? fin : shade(fin, 0.55)) : ((y * 5 | 0) % 2 ? fin : shade(fin, 0.62));
+  const fins = (f, x, y) => f === 'top' ? ((x * 9 | 0) % 2 ? brushed(fin, x, y, 'y') : shade(fin, 0.5)) : ((y * 9 | 0) % 2 ? (((y * 9) % 1) < 0.2 ? shade(fin, 1.15) : fin) : shade(fin, 0.55));
   if (L.type === 'low') {
     R.box(cu - 2, cu + 2, cv - 2, cv + 2, z0, z0 + 0.9, (f, x, y) => ((f === 'top' ? x : y) * 6 | 0) % 2 ? fin : shade(fin, 0.6), o.id);
     const logo = TXT('ARCTIC');
@@ -117,7 +119,10 @@ export function drawRam(R, p, o) {
         if (p.rgb && y < prof + 0.3) return led(o, 'ram', sx + si);
       }
       if (p.rgb && L.style !== 'fury' && y < 0.45) return led(o, 'ram', sx + si);
-      if (y > H - 0.3) return y > H - 0.12 ? C.gold : C.pcbGreen;
+      if (y > H - 0.34) {
+        if (y > H - 0.12) return ((sx * 20) | 0) % 2 ? C.gold : 0x8a6a28;
+        return ((sx * 1.6) % 1) < 0.62 && y < H - 0.16 ? 0x1b1b1e : C.pcbGreen;
+      }
       if (L.style === 'trident') {
         if (y > 0.45 && y < 0.7) return ((sx * 5) | 0) % 2 ? 0xd8dce0 : 0x9aa0a6;
         if (y > 1.1 && y < 1.6) return 0x1b1b1b;
@@ -127,7 +132,8 @@ export function drawRam(R, p, o) {
       if (y > 0.55 && y < 0.72 && L.style !== 'rgbbar') return acc;
       if (f === 'right' && word.on(((sx - 1.0) / 0.12) | 0, ((y - 1.0) / 0.12) | 0)) return L.style === 'rgbbar' ? 0x4a4a4a : acc;
       if (L.style === 'fury' && ((sx * 2.5) | 0) % 5 === 0 && y > 0.8) return shade(col, 1.6);
-      return col;
+      if (f === 'right' && fineLines(sx, y, 3.4, 1.35, 1.8, 3, 0.12)) return shade(col, 2.2);
+      return brushed(col, sx, y);
     }, o.id);
   }
 }
@@ -144,6 +150,8 @@ export function drawStorage(R, p, o) {
       if (x > W - 0.28) return ((y * 9) | 0) % 2 ? C.gold : 0x1a2a20;
       if (x > 0.35 && x < W - 0.5 && y > 0.1 && y < H - 0.1) {
         if (name.on(((x - 0.8) / 0.11) | 0, ((y - 0.28) / 0.11) | 0)) return 0xf2f2f2;
+        const bc = barcode(x, y, W - 1.9, 0.55, 1.2, 0.22); if (bc >= 0) return bc;
+        if (fineLines(x, y, 0.8, 0.62, 1.8, 2, 0.1)) return shade(lab, 1.6);
         return x < 1.2 && y > 0.55 ? shade(lab, 0.7) : lab;
       }
       return 0x1a2a20;
@@ -165,7 +173,9 @@ export function drawStorage(R, p, o) {
       if (x > 0.5 && x < W - 1.2 && y > 0.45 && y < H - 0.45) {
         if (y < 1) return lab;
         if (name.on(((x - 0.8) / 0.13) | 0, ((y - 1.3) / 0.13) | 0)) return 0x222222;
-        return ((y * 3) | 0) % 4 === 0 && x < 3 ? 0xb4b4b4 : 0xf0f0ec;
+        const bc = barcode(x, y, 0.8, H - 1.25, 2.2, 0.45); if (bc >= 0) return bc;
+        if (fineLines(x, y, 0.8, 2.2, 3.2, 5, 0.16)) return 0x8a8a8a;
+        return 0xf0f0ec;
       }
       const dd = Math.hypot(x - (W - 1.5), y - H / 2);
       if (Math.abs(dd - 0.9) < 0.1) return 0x9a9ea3;
@@ -217,10 +227,12 @@ export function drawGpu(R, p, o) {
         const px0 = W - 2.1, px1 = p.pwr === '12vhpwr' ? W - 1.35 : W - 0.95;
         if (x > px0 && x < px1 && y > 0.45 && y < 1.15) return ((((x * 7) | 0) + ((y * 7) | 0)) % 2) ? 0x050505 : 0x1e1e1e;
       }
-      return ((x * 3) | 0) % 6 === 0 ? shade(col, 0.9) : shade(col, 0.75);
+      if (y > 1.2 && x > 3.8 && x < W - 2.4 && ((x * 6) % 1) < 0.5 && ((y * 10) | 0) % 2 === 0) return 0x0a0a0c;
+      return brushed(((x * 3) | 0) % 6 === 0 ? shade(col, 0.9) : shade(col, 0.75), x, y);
     }
     // kortänden: kylflänsar
-    return ((y * 6) | 0) % 2 ? 0x2a2c2f : shade(col, 0.7);
+    const fy = (y * 9) % 1;
+    return fy < 0.5 ? (fy < 0.12 ? 0x7a7e84 : 0x4a4d52) : 0x121315;
   }, o.id);
 }
 
@@ -242,7 +254,7 @@ export function drawPsu(R, p, o) {
         if (watt.on(((W - 0.5 - x) / 0.13) | 0, ((y - 0.9) / 0.13) | 0)) return 0x111111;
         return acc;
       }
-      return (x < 0.1 || y < 0.1 || x > W - 0.1 || y > H - 0.1) ? shade(col, 1.6) : col;
+      return (x < 0.1 || y < 0.1 || x > W - 0.1 || y > H - 0.1) ? shade(col, 1.6) : brushed(col, x, y);
     }
     if (f === 'left') {
       if (x > 0.5 && x < 4.4 && y > 0.4 && y < 2.4) {
@@ -251,6 +263,7 @@ export function drawPsu(R, p, o) {
         return acc;
       }
       if (x > 5 && x < 6.3 && y > 0.5 && y < 1.8) return (x > 5.2 && x < 6.1 && y > 0.7 && y < 1.6) ? 0xd8b24a : 0xf2f2f2; // 80 PLUS
+      if (x > 0.5 && x < 4.4 && y > 1.8 && y < 2.8) { if (fineLines(x, y, 0.6, 1.9, 3.6, 6, 0.14)) return 0x111111; return 0xe8e8e4; }
       return col;
     }
     // framsida: modulära uttag eller kabelgenomföring

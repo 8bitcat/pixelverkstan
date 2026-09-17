@@ -56,8 +56,8 @@ export function connectorIcon(type, W = 64, H = 54) {
 }
 
 // Ritar en kabel i det lågupplösta kabellagret: pts = lista med [x,y], progress 0..1
-export function drawCablePixels(ctx, pts, type, progress = 1, t = 0) {
-  const cable = CONN[type], w = cable.width;
+export function drawCablePixels(ctx, pts, type, progress = 1, scale = 1) {
+  const cable = CONN[type], w = Math.round(cable.width * scale);
   const n = Math.max(2, Math.floor((pts.length - 1) * progress) + 1);
   const hex = (c) => '#' + c.toString(16).padStart(6, '0');
   const outline = hex(shade(cable.color, cable.color > 0x808080 ? 0.55 : 0.35));
@@ -67,14 +67,17 @@ export function drawCablePixels(ctx, pts, type, progress = 1, t = 0) {
   // fyllning med ränder (sleeve)
   for (let i = 0; i < n; i++) {
     const [x, y] = pts[i];
-    ctx.fillStyle = cable.rainbow ? hex(rainbow(0, i * 0.4, 0.5)) : hex(((i >> 1) % 3 === 0) ? cable.stripe : cable.color);
+    ctx.fillStyle = cable.rainbow ? hex(rainbow(0, i * 0.2, 0.5)) : hex(((i >> 2) % 3 === 0) ? cable.stripe : cable.color);
     ctx.fillRect(Math.round(x - w / 2), Math.round(y - w / 2), w, w);
+    if (w >= 3 && !cable.rainbow) { ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(Math.round(x - w / 2), Math.round(y - w / 2), w, 1); }
   }
   if (progress >= 1) {
     const [x, y] = pts[pts.length - 1];
-    ctx.fillStyle = outline; ctx.fillRect(Math.round(x) - w - 1, Math.round(y) - 3, w * 2 + 3, 5);
-    ctx.fillStyle = hex(cable.color); ctx.fillRect(Math.round(x) - w, Math.round(y) - 2, w * 2 + 1, 3);
-    ctx.fillStyle = hex(cable.stripe); ctx.fillRect(Math.round(x) - w, Math.round(y) - 2, w * 2 + 1, 1);
+    const hh = Math.round(3 * scale);
+    ctx.fillStyle = outline; ctx.fillRect(Math.round(x) - w - 1, Math.round(y) - hh, w * 2 + 3, hh * 2);
+    ctx.fillStyle = hex(cable.color); ctx.fillRect(Math.round(x) - w, Math.round(y) - hh + 1, w * 2 + 1, hh * 2 - 2);
+    ctx.fillStyle = hex(cable.stripe); ctx.fillRect(Math.round(x) - w, Math.round(y) - hh + 1, w * 2 + 1, Math.max(1, scale | 0));
+    for (let i = 0; i < w * 2; i += 2) { ctx.fillStyle = '#d8b24a'; ctx.fillRect(Math.round(x) - w + i + 1, Math.round(y) + hh - 2, 1, 1); }
   }
 }
 

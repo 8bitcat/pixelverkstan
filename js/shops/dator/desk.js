@@ -2,13 +2,13 @@
 // tangentbord och mus på baksidan, slå på nätagget och tryck på startknappen.
 // Startsekvensen avslöjar det man glömt – då får man felsöka och försöka igen.
 import { Raster, hex, shade, mix, rainbow } from '../../core/raster.js';
-import { drawText } from '../../core/pixfont.js';
+import { drawText, textBitmap } from '../../core/pixfont.js';
 import * as L from './layout.js';
 import { drawCaseStanding, STAND } from './art-case.js';
 import { fan, hash } from './art-common.js';
 import { drawInternals, drawScreen, drawRear, rearPorts, SWITCH, PLUGS, plugIcon, drawPlugHead } from './desk-art.js';
 
-const DV = { w: 420, h: 306, k: 9, hz: 7, ox: 128, oy: 100 };
+const DV = { w: 840, h: 612, k: 18, hz: 14, ox: 256, oy: 200 };
 const CASE_AT = [20, 2.5, 6];
 const MON = { u0: 1.5, u1: 16.5, v0: 2.4, v1: 3.0, z0: 8.4, z1: 16.2 };
 const STRIP = [25, 11.1, 6.4];
@@ -17,8 +17,9 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 export class Desk {
   constructor(view) {
     this.view = view;
-    this.R = new Raster(DV.w, DV.h); Object.assign(this.R, DV);
-    this.side = document.createElement('canvas'); this.side.width = 100; this.side.height = 107;
+    this.R = new Raster(DV.w, DV.h); Object.assign(this.R, DV, { edges: true });
+    this.redraw = 0;
+    this.side = document.createElement('canvas'); this.side.width = 200; this.side.height = 214;
     this.screen = document.createElement('canvas'); this.screen.width = 160; this.screen.height = 90;
     this.rear = document.createElement('canvas'); this.rear.width = 90; this.rear.height = 160;
     this.t = 0;
@@ -265,17 +266,27 @@ export class Desk {
     // bakgrund: vägg + golv
     ctx.fillStyle = '#e9e1d2'; ctx.fillRect(0, 0, cw, ch);
     ctx.fillStyle = '#d9cdb7'; ctx.fillRect(0, ch * 0.72, cw, ch);
-    // scenen
-    const R = this.R;
-    R.clear();
-    const spin = st.powered ? t * 14 : 0.3;
-    const o = { id: 0, t, spin, powered: st.powered, lit: st.lit };
-    this.drawDesk(R);
-    this.drawMonitor(R);
-    drawCaseStanding(R, b.placed.case, { ...o, lit: { ...st.lit, power: st.powered } }, CASE_AT);
-    R.flush();
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(R.canvas, this.ox, this.oy, DV.w * this.s, DV.h * this.s);
+    // scenen i två lager: statiskt (bord, skärm, mugg) och rörligt (dator, tangentbord, mus)
+    const staticKey = `${!!d.plugs.mon_power}|${st.powered}`;
+    if (!this.Rs || this.staticKey !== staticKey) {
+      this.Rs ||= Object.assign(new Raster(DV.w, DV.h), DV, { edges: true });
+      this.Rs.clear(); this.drawStatic(this.Rs); this.Rs.flush();
+      this.staticKey = staticKey;
+    }
+    const dynKey = `${st.powered}|${Object.keys(d.plugs).length}|${JSON.stringify(st.lit)}`;
+    this.redraw -= 1 / 60;
+    if (this.dynKey !== dynKey || (st.powered && this.redraw <= 0)) {
+      const R = this.R;
+      R.clear();
+      const o = { id: 0, t, spin: st.powered ? t * 14 : 0.3, powered: st.powered, lit: { ...st.lit, power: st.powered } };
+      this.drawDynamic(R);
+      drawCaseStanding(R, b.placed.case, o, CASE_AT);
+      R.flush();
+      this.dynKey = dynKey; this.redraw = 1 / 15;
+    }
+    ctx.imageSmoothingEnabled = this.s * v.dpr < 1;
+    ctx.drawImage(this.Rs.canvas, this.ox, this.oy, DV.w * this.s, DV.h * this.s);
+    ctx.drawImage(this.R.canvas, this.ox, this.oy, DV.w * this.s, DV.h * this.s);
     // glassida med insidan
     const sctx = this.side.getContext('2d');
     drawInternals(sctx, b, st, t);
@@ -332,57 +343,82 @@ export class Desk {
     };
   }
 
-  drawDesk(R) {
-    const wood = 0xa06a3f, woodDk = 0x7d4f2c;
+  drawStatic(R) {
+    const wood = 0xa06a3f, woodDk = 0x7d4f2c, woodLt = 0xb57b4b;
     R.box(0, 32, 0, 13, 0, 6, (f, x, y, W, H) => {
       if (f === 'top') {
-        const grain = Math.sin(y * 3 + Math.sin(x * 0.7) * 1.2);
-        if (x < 0.15 || y < 0.15 || x > W - 0.15 || y > H - 0.15) return 0xb57b4b;
-        return grain > 0.75 ? shade(wood, 0.9) : grain < -0.85 ? shade(wood, 1.07) : wood;
+        if (x < 0.12 || y < 0.12 || x > W - 0.12 || y > H - 0.12) return woodLt;
+        const grain = Math.sin(y * 3.2 + Math.sin(x * 0.7) * 1.3 + Math.sin(x * 2.3) * 0.15);
+        if (grain > 0.9) return shade(wood, 0.84);
+        if (grain > 0.72) return shade(wood, 0.93);
+        if (grain < -0.88) return shade(wood, 1.08);
+        return hash(x * 8 | 0, y * 8 | 0) > 0.97 ? shade(wood, 0.9) : wood;
       }
       if (f === 'left') {
-        if (y < 0.6) return 0xb57b4b;
-        if (x > 3 && x < 12 && y > 1.2 && y < 5.4) return (Math.abs(y - 2.2) < 0.08 && x > 6.5 && x < 8.5) ? 0xd8b24a : (x < 3.15 || x > 11.85 || y < 1.35 || y > 5.25) ? woodDk : shade(wood, 0.95);
-        return ((x * 2 + Math.sin(y * 2)) % 3 < 0.1) ? woodDk : wood;
+        if (y < 0.5) return y < 0.1 ? woodLt : shade(wood, 1.02);
+        if (x > 3 && x < 12 && y > 1.2 && y < 5.4) {
+          if (x < 3.12 || x > 11.88 || y < 1.32 || y > 5.28) return woodDk;
+          if (Math.abs(y - 2.2) < 0.1 && x > 6.4 && x < 8.6) return y < 2.2 ? 0xf0cf6a : 0xb8902e;   // handtag
+          return ((x * 2 + Math.sin(y * 3)) % 2.5 < 0.08) ? shade(wood, 0.88) : shade(wood, 0.97);
+        }
+        return ((x * 2 + Math.sin(y * 2)) % 3 < 0.08) ? woodDk : wood;
       }
-      return y < 0.6 ? 0xb57b4b : shade(wood, 0.92);
+      return y < 0.5 ? woodLt : ((y * 2 + Math.sin(x * 3)) % 3 < 0.08 ? woodDk : shade(wood, 0.92));
+    }, 0, { noEdges: true });
+    // mugg med handtag och kaffe
+    R.box(1.2, 2.4, 9.6, 10.8, 6, 7.1, (f, x, y, W, H) => {
+      if (f === 'top') { const d = Math.hypot(x - 0.6, y - 0.6); return d < 0.42 ? (d < 0.2 ? 0x6a4020 : 0x4a2a14) : 0xf7f3ec; }
+      if (f === 'left' && x > 0.3 && x < 0.9 && y > 0.3 && y < 0.62) return (y < 0.4 || y > 0.54) ? 0xc9323a : 0xffffff;
+      return 0xf0ece4;
     });
-    // grenuttag
-    R.box(21, 29, 10.6, 11.7, 6, 6.4, (f, x, y) => {
-      if (f !== 'top') return 0xdedede;
-      if (x > 0.3 && x < 0.9 && y > 0.3 && y < 0.8) return 0xd8343c;
-      for (let i = 0; i < 4; i++) { const cx = 1.9 + i * 1.7; if (Math.hypot(x - cx, y - 0.55) < 0.38) return 0x9a9a9a; }
-      return 0xf2f2f0;
-    });
-    // mugg
-    R.box(1.2, 2.4, 9.6, 10.8, 6, 7.1, (f, x, y) => f === 'top' ? (Math.hypot(x - 0.6, y - 0.6) < 0.45 ? 0x4a2a14 : 0xf0ece4) : (f === 'left' && x > 0.3 && x < 0.9 && y > 0.3 && y < 0.6 ? 0xc9323a : 0xf0ece4));
-    // tangentbord
-    const lit = this.state.powered && this.d.plugs.kb;
-    R.box(3, 14, 6, 9, 6, 6.45, (f, x, y, W, H) => {
-      if (f !== 'top') return 0x1c1c1e;
-      if (x < 0.3 || y < 0.3 || x > W - 0.3 || y > H - 0.3) return 0x2a2a2e;
-      const kx = (x - 0.3) % 0.62, ky = (y - 0.3) % 0.62;
-      if (kx > 0.52 || ky > 0.52) return lit ? rainbow(this.t, x * 0.4) : 0x0c0c0e;
-      return 0x3a3a40;
-    });
-    // musmatta + mus
-    R.box(15, 19.5, 6, 10.5, 6, 6.05, () => 0x202a36);
-    R.box(16.2, 17.6, 7.2, 9.3, 6.05, 6.55, (f, x, y, W, H) => {
-      if (f !== 'top') return 0x1c1c1e;
-      if (Math.abs(x - W / 2) < 0.05 && y < 0.8) return 0x0c0c0e;
-      if (y > H - 0.3 && this.state.powered && this.d.plugs.mouse) return rainbow(this.t, 2);
-      return 0x2a2a2e;
-    });
-  }
-  drawMonitor(R) {
-    R.box(7, 11, 1.3, 3.3, 6, 6.25, () => 0x2a2a2e);
-    R.box(8.6, 9.4, 1.6, 2.2, 6.25, 9, () => 0x3a3a40);
+    R.box(2.4, 2.6, 10.0, 10.4, 6.3, 6.9, () => 0xe6e2da);
+    // musmatta
+    R.box(15, 19.5, 6, 10.5, 6, 6.05, (f, x, y, W, H) => (x < 0.12 || y < 0.12 || x > W - 0.12 || y > H - 0.12) ? 0x3a4a5c : 0x202a36, 0, { noEdges: true });
+    // skärm: fot, hals, panel med tunn ram och logga
+    R.box(7, 11, 1.3, 3.3, 6, 6.25, (f, x, y) => f === 'top' && Math.hypot(x - 2, y - 1) < 0.3 ? 0x3a3a40 : 0x2a2a2e);
+    R.box(8.6, 9.4, 1.6, 2.2, 6.25, 9, (f, x, y) => (f === 'left' && y > 0.6 && y < 0.8) ? 0x1a1a1e : 0x3a3a40);
+    const logo = textBitmap('PIXELVIEW');
     R.box(MON.u0, MON.u1, MON.v0, MON.v1, MON.z0, MON.z1, (f, x, y, W, H) => {
       if (f === 'left') {
-        if (x > W - 0.9 && y > H - 0.3 && x < W - 0.7) return this.d.plugs.mon_power ? (this.state.powered ? 0x45ff7a : 0xe8a030) : 0x333333;
-        return 0x141416;
+        if (x > W - 0.95 && y > H - 0.3 && x < W - 0.75 && y < H - 0.12) return this.d.plugs.mon_power ? (this.state.powered ? 0x45ff7a : 0xe8a030) : 0x333333;
+        if (y > H - 0.35 && logo.on(((x - W / 2 + 1.2) / 0.08) | 0, ((y - H + 0.32) / 0.06) | 0)) return 0x8a8a92;
+        return y < 0.12 || x < 0.12 || x > W - 0.12 ? 0x222226 : 0x141416;
       }
-      return f === 'top' ? 0x26262a : 0x1c1c1e;
+      if (f === 'top') return ((x * 4) | 0) % 2 ? 0x26262a : 0x1f1f23;
+      return ((y * 5) | 0) % 3 === 0 ? 0x18181b : 0x1c1c1e;
+    });
+  }
+  drawDynamic(R) {
+    const t = this.t, st = this.state, d = this.d;
+    // grenuttag med strömbrytare och uttag
+    R.box(21, 29, 10.6, 11.7, 6, 6.4, (f, x, y) => {
+      if (f !== 'top') return 0xdedede;
+      if (x > 0.25 && x < 0.95 && y > 0.25 && y < 0.85) return y < 0.55 ? 0xe84a52 : 0xb82830;
+      for (let i = 0; i < 4; i++) {
+        const cx = 1.9 + i * 1.7, dd = Math.hypot(x - cx, y - 0.55);
+        if (dd < 0.4) return (Math.abs(x - cx - 0.15) < 0.05 || Math.abs(x - cx + 0.15) < 0.05) && Math.abs(y - 0.55) < 0.1 ? 0x2a2a2a : (dd > 0.33 ? 0xbdbdbd : 0x9a9a9a);
+      }
+      return 0xf2f2f0;
+    });
+    // tangentbord: tangenter med ljus ovankant, RGB mellan tangenterna när det är på
+    const lit = st.powered && d.plugs.kb;
+    R.box(3, 14, 6, 9, 6, 6.45, (f, x, y, W, H) => {
+      if (f !== 'top') return 0x1c1c1e;
+      if (x < 0.25 || y < 0.25 || x > W - 0.25 || y > H - 0.25) return 0x2a2a2e;
+      const row = Math.floor((y - 0.25) / 0.52), stagger = [0, 0.18, 0.3, 0.45, 0][row] || 0;
+      const kx = ((x - 0.25 - stagger) % 0.52 + 0.52) % 0.52, ky = (y - 0.25) % 0.52;
+      if (row === 4 && x > 3 && x < 7.5) { if (ky > 0.44) return lit ? rainbow(t, x * 0.4) : 0x0c0c0e; return ky < 0.07 ? 0x55555c : 0x3a3a40; } // mellanslag
+      if (kx > 0.44 || ky > 0.44) return lit ? rainbow(t, x * 0.4) : 0x0c0c0e;
+      if (ky < 0.07) return 0x55555c;
+      return (kx > 0.15 && kx < 0.29 && ky > 0.16 && ky < 0.24) ? 0x6a6a72 : 0x3a3a40;
+    });
+    // mus med scrollhjul och RGB-list
+    R.box(16.2, 17.6, 7.2, 9.3, 6.05, 6.55, (f, x, y, W, H) => {
+      if (f !== 'top') return y < 0.1 && st.powered && d.plugs.mouse ? rainbow(t, 2) : 0x1c1c1e;
+      if (Math.abs(x - W / 2) < 0.06 && y < 0.9) return 0x0c0c0e;
+      if (Math.abs(x - W / 2) < 0.12 && y > 0.25 && y < 0.55) return 0x5a5a62;
+      if (y > H - 0.3 && st.powered && d.plugs.mouse) return rainbow(t, 2);
+      return y < 0.12 ? 0x3a3a40 : 0x2a2a2e;
     });
   }
 

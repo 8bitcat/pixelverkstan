@@ -14,7 +14,7 @@ export class BuildView {
     this.game = game; this.shop = game.shop; this.L = game.shop.layout; this.hooks = hooks;
     this.canvas = $('#board'); this.ctx = this.canvas.getContext('2d');
     const V = this.L.VIEW;
-    this.R = new Raster(V.w, V.h); Object.assign(this.R, { k: V.k, hz: V.hz, ox: V.ox, oy: V.oy });
+    this.R = new Raster(V.w, V.h); Object.assign(this.R, { k: V.k, hz: V.hz, ox: V.ox, oy: V.oy, edges: true });
     this.cableCanvas = document.createElement('canvas');
     this.cableCanvas.width = V.w; this.cableCanvas.height = V.h;
     this.cableCtx = this.cableCanvas.getContext('2d');
@@ -423,7 +423,8 @@ export class BuildView {
     ctx.fillStyle = '#efe9df'; ctx.fillRect(0, 0, this.cw, this.ch);
     const sx = this.shake > 0 ? Math.round(Math.sin(this.t * 80) * 5) : 0;
     ctx.save(); ctx.translate(sx, 0);
-    ctx.imageSmoothingEnabled = false;
+    // skarpa pixlar när bilden förstoras; mjuk nedskalning på små skärmar
+    ctx.imageSmoothingEnabled = this.s * this.dpr < 1;
     ctx.drawImage(this.R.canvas, this.ox, this.oy, V.w * this.s, V.h * this.s);
     ctx.drawImage(this.cableCanvas, this.ox, this.oy, V.w * this.s, V.h * this.s);
 

@@ -2,7 +2,8 @@
 // u = bak (0) → fram (26), v = tak (0) → botten (24), z = uppåt mot betraktaren.
 // Nätagg och hårddisk bor i "källaren" längst ner (v > 18), som i riktiga chassin.
 
-export const VIEW = { w: 436, h: 252, k: 8, hz: 6.5, ox: 212, oy: 40 };
+// Upplösning: 16 px per enhet (dubbelt så detaljerat som från början)
+export const VIEW = { w: 872, h: 504, k: 16, hz: 13, ox: 424, oy: 80 };
 
 export const G = {
   mat:   { u0: -1, u1: 26.5, v0: -1, v1: 25 },

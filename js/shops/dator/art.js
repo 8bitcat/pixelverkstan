@@ -26,7 +26,7 @@ const ICONS = new Map();
 
 function makeRaster(scale = 1) {
   const R = new Raster(VIEW.w + 40, VIEW.h + 60);
-  R.k = VIEW.k * scale; R.hz = VIEW.hz * scale; R.ox = VIEW.ox + 20; R.oy = VIEW.oy + 40;
+  R.k = VIEW.k * scale; R.hz = VIEW.hz * scale; R.ox = VIEW.ox + 20; R.oy = VIEW.oy + 40; R.edges = true;
   R.clear();
   return R;
 }
@@ -51,10 +51,12 @@ export function iconCanvas(part, W = 64, H = 54) {
   let src = ICONS.get(key);
   if (!src) {
     const o = { ids: {}, id: 0, spin: 0.4, t: 1.2, showroom: true, leverClosed: true };
-    let R = makeRaster(1); drawIconPart(R, part, o); R.flush();
+    // mät storleken billigt i låg upplösning, rita sedan exakt i rätt skala
+    const q = 0.25;
+    let R = makeRaster(q); drawIconPart(R, part, o);
     let bb = bbox(R);
-    const f = Math.min((W - 2) / bb.w, (H - 2) / bb.h);
-    if (f < 1) { R = makeRaster(f); drawIconPart(R, part, o); R.flush(); bb = bbox(R); }
+    const f = Math.min((W - 2) / (bb.w / q), (H - 2) / (bb.h / q)) * 0.97;
+    R = makeRaster(Math.min(1, f)); drawIconPart(R, part, o); R.flush(); bb = bbox(R);
     const s = f >= 2 ? Math.min(4, Math.floor(f)) : 1;
     src = document.createElement('canvas'); src.width = W; src.height = H;
     const cx = src.getContext('2d'); cx.imageSmoothingEnabled = false;

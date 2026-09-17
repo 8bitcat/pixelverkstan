@@ -3,7 +3,7 @@
 import { hex, shade, mix } from '../../core/raster.js';
 import { textBitmap } from '../../core/pixfont.js';
 import { G, BOARD_TOP, FAN_SLOTS, PORTS, SCREWS } from './geom.js';
-import { C, fan, honeycomb, mesh, hash, isLit, led } from './art-common.js';
+import { C, fan, honeycomb, mesh, hash, isLit, led, brushed, smd, traces, perforated } from './art-common.js';
 
 const STANDOFFS = [[2.5, 2.5], [2.5, 9], [2.5, 16], [9.5, 2.5], [9.5, 9], [9.5, 16], [13.8, 2.5], [13.8, 9], [13.8, 16]];
 
@@ -56,7 +56,8 @@ export function drawCase(R, part, o) {
     const p = G.psu;
     if (x > p.u0 + 1 && x < p.u1 - 1 && y > p.v0 + 0.6 && y < p.v1 - 0.6 && honeycomb(x, y, 0.45) === false) return shade(inner, 0.45);
     if (x > 16.8 && x < 24.7 && y > 18.6 && y < 23 && (((y - 18.6) * 2.2) | 0) % 2 === 0 && (x < 17.1 || x > 24.4)) return C.steelDark; // skenor
-    return hash(x * 2 | 0, y * 2 | 0) > 0.95 ? shade(inner, 1.05) : inner;
+    if (x > 20.5 && x < 23.8 && y > 1 && y < 17 && perforated(x, y, 0.3, 0.07)) return shade(inner, 0.55);
+    return brushed(inner, x, y, 'x');
   }, id);
 
   // tak (v = 0): nätventiler
@@ -142,8 +143,17 @@ export function drawBoard(R, part, o) {
     if (u > 9.45 && u < 9.75 && v > 7.4 && v < 14 && ((u * 20) | 0) % 2 === 0) return trace;
     if (v > 12.55 && v < 12.75 && u > 9.6 && u < 13.4) return trace;
     if (v > 9.8 && v < 10.0 && u > 8.5 && u < 9.6) return trace;
+    // fina kretsbanor mellan komponenterna
+    if (u > 3 && u < 9.5 && v > 11 && v < 12.1 && traces(u, v, 0.12, 0.04)) return trace;
+    if (u > 10 && u < 13 && v > 13.2 && v < 15.6 && traces(v, u, 0.12, 0.04)) return trace;
+    if (u > 1.7 && u < 3.1 && v > 8.8 && v < 12.6 && traces(v, u, 0.1, 0.035)) return trace;
+    // små ytmonterade komponenter
+    const sm = smd(u, v, 0.12, 0.34);
+    if (sm >= 0 && !(u > 4.8 && u < 8.8 && v > 3.6 && v < 7.6) && !(u > 10 && u < 13 && v > 2.8 && v < 9.8)) return sm;
     // vias
-    if (hash(u * 4 | 0, v * 4 | 0) > 0.985) return 0xc9b37a;
+    const hv = hash(u * 6 | 0, v * 6 | 0);
+    if (hv > 0.992) return 0xd8c07a;
+    if (hv > 0.985) return shade(pcb, 0.55);
     return hash(u * 2 | 0, v * 2 | 0) > 0.8 ? shade(pcb, 1.07) : pcb;
   }, id);
 
@@ -165,7 +175,7 @@ export function drawBoard(R, part, o) {
   for (let i = 0; i < 7; i++) B(4.9 + i * 0.6, 5.35 + i * 0.6, 2.95, 3.45, 0.4, (f) => f === 'top' ? 0x6b7078 : 0x4b4f55);
   for (let i = 0; i < 6; i++) B(3.35, 3.8, 3.3 + i * 0.75, 3.75 + i * 0.75, 0.4, (f) => f === 'top' ? 0x6b7078 : 0x4b4f55);
   if (tier >= 2) {
-    const fin = (f, x, y) => f === 'top' ? (((x + y) * 5 | 0) % 2 ? acc : shade(acc, 0.72)) : ((y * 6 | 0) % 2 ? acc : shade(acc, 0.8));
+    const fin = (f, x, y) => f === 'top' ? ((((x + y) * 9) | 0) % 2 ? brushed(acc, x, y) : shade(acc, 0.66)) : (((y * 10) | 0) % 2 ? brushed(acc, x, y, 'y') : shade(acc, 0.78));
     B(4.8, 9.1, 1.95, 2.95, 1.05, fin);
     B(3.25, 4.35, 3.1, 8.1, 1.05, fin);
   }

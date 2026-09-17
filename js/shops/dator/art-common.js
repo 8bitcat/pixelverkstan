@@ -78,3 +78,42 @@ export function hash(x, y) {
   h = (h ^ (h >> 13)) * 1274126177;
   return ((h ^ (h >> 16)) >>> 0) / 4294967295;
 }
+
+// ---------- Finare detaljer (för högupplöst rastrering, 16 px/enhet) ----------
+// Borstad metall: tunna ljusare/mörkare streck längs en axel
+export function brushed(c, x, y, along = 'x') {
+  const a = along === 'x' ? y : x;
+  const n = hash((a * 60) | 0, 7);
+  return n > 0.82 ? shade(c, 1.07) : n < 0.12 ? shade(c, 0.94) : c;
+}
+// Små ytmonterade komponenter (motstånd/kondensatorer) utspridda i ett rutnät
+export function smd(x, y, density = 0.35, cell = 0.3) {
+  const cx = Math.floor(x / cell), cy = Math.floor(y / cell);
+  if (hash(cx * 3 + 11, cy * 5 + 3) > density) return -1;
+  const fx = x / cell - cx, fy = y / cell - cy;
+  const horiz = hash(cx, cy) > 0.5;
+  const [w, h] = horiz ? [0.5, 0.26] : [0.26, 0.5];
+  if (fx < 0.25 || fy < 0.25 || fx > 0.25 + w || fy > 0.25 + h) return -1;
+  const end = horiz ? (fx < 0.33 || fx > 0.25 + w - 0.08) : (fy < 0.33 || fy > 0.25 + h - 0.08);
+  if (end) return 0xc9ccd0;
+  return hash(cx + 5, cy + 9) > 0.6 ? 0x2a2a2e : 0x6b4a2a;
+}
+// Tunna kretsbanor i ett knippe: parallella linjer
+export function traces(x, y, pitch = 0.11, width = 0.035) {
+  return ((y % pitch) + pitch) % pitch < width;
+}
+// Perforerad plåt (små runda hål)
+export const perforated = (x, y, p = 0.22, r = 0.06) => Math.hypot(((x % p) + p) % p - p / 2, ((y % p) + p) % p - p / 2) < r;
+// Streckkod
+export function barcode(x, y, x0, y0, w, h) {
+  if (x < x0 || x > x0 + w || y < y0 || y > y0 + h) return -1;
+  return hash(((x - x0) * 55) | 0, 3) > 0.45 ? 0x111111 : 0xf4f4f0;
+}
+// "Text"-rader (små streck som ser ut som finstilt)
+export function fineLines(x, y, x0, y0, w, rows, pitch = 0.13) {
+  if (x < x0 || x > x0 + w || y < y0 || y > y0 + rows * pitch) return false;
+  const r = Math.floor((y - y0) / pitch), fy = (y - y0) / pitch - r;
+  if (fy > 0.45) return false;
+  const len = 0.45 + hash(r, 17) * 0.55;
+  return (x - x0) / w < len && hash(((x - x0) * 30) | 0, r) > 0.25;
+}

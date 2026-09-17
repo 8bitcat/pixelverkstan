@@ -255,8 +255,9 @@ export function drawCables(ctx, R, b, anim = {}) {
     const c = CABLE[id];
     if (!c.requires.every((r) => b.placed[r])) continue;
     const a = R.proj(...cableFrom(c, b)), e = R.proj(...portPos(key, b));
-    const lift = Math.min(28, 8 + Math.hypot(e[0] - a[0], e[1] - a[1]) * 0.18);
+    const sc = R.k / 8;
+    const lift = Math.min(28 * sc, 8 * sc + Math.hypot(e[0] - a[0], e[1] - a[1]) * 0.18);
     const prog = anim.plug?.id === id ? Math.min(1, anim.plug.t) : 1;
-    drawCablePixels(ctx, cableCurve(a, e, lift), cableConn(c, b), prog);
+    drawCablePixels(ctx, cableCurve(a, e, lift), cableConn(c, b), prog, sc);
   }
 }
