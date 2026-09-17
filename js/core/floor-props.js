@@ -197,6 +197,101 @@ export function makeMagRack() {
   return { img: P.flush(), x: OX, y: OY, sort: base };
 }
 
+// ---------- TV-hörna: TV på en bänk, konsolerna på hyllan under ----------
+// CRT före 2006, platt-TV efter. Konsoler och skärmbild ritas dynamiskt (floor.js).
+export function makeTvCorner(W, year) {
+  const H = 78, P = new Pix(W, H), flat = year >= 2006;
+  const cx = Math.round(W / 2);
+  // bänk med öppet fack
+  const top = 44, cav0 = 49, cav1 = 70, base = 74;
+  for (let y = top; y < base; y++) for (let x = 0; x < W; x++) {
+    const grain = Math.sin(x * 0.2 + Math.sin(y * 0.8) * 2 + y * 0.3);
+    let c = mix(0x5a3a26, 0x7a5236, 0.5 + grain * 0.3 + (hash(x, y, 31) - 0.5) * 0.2);
+    if (y < top + 2) c = 0xc9a36b; if (y === top + 2) c = 0x8a6446;
+    if (x === 0) c = mix(c, 0xffffff, 0.2); if (x === W - 1) c = mul(c, 0.6);
+    P.px(x, y, c);
+  }
+  for (let y = cav0; y < cav1; y++) for (let x = 3; x < W - 3; x++) P.px(x, y, mix(0x1a1418, 0x2a2028, (y - cav0) / (cav1 - cav0) + (bayer(x, y) - 0.5) * 0.1));
+  P.hl(3, cav1 - 1, W - 6, 0x0e0a10);
+  P.rect(2, base, W - 4, 3, 0x1b1a1f); P.hl(2, base, W - 4, 0x0e0d12);
+  // skylt på bänkens kant
+  const label = 'TV-HÖRNAN', tw = textW(SMALL, label) + 8, px0 = Math.round((W - tw) / 2);
+  P.rect(px0, base - 4 + 1, tw, 3, 0x8a6a2a);
+  P.rect(px0, cav1, tw, 4, 0xd8b85a); text(P, SMALL, label, px0 + 4, cav1 - 1, 0x3a2a10);
+  let screen;
+  if (flat) {
+    const w = Math.min(W - 16, 52), h = 26, x0 = cx - (w >> 1), y0 = top - h - 4;
+    P.rect(x0 - 2, y0 - 2, w + 4, h + 4, 0x17181c); P.box(x0 - 2, y0 - 2, w + 4, h + 4, 0x3a3d44); P.hl(x0 - 2, y0 - 2, w + 4, 0x6a6f7a);
+    P.rect(x0, y0, w, h, 0x0b0c10);
+    P.rect(cx - 3, top - 4, 6, 4, 0x2a2d33); P.rect(cx - 10, top - 1, 20, 1, 0x3a3d44);
+    P.px(x0 + w - 3, y0 + h + 1, 0x45e06a);
+    screen = { x: x0, y: y0, w, h };
+  } else {
+    const w = 38, h = 30, x0 = cx - (w >> 1), y0 = top - h;
+    for (let y = y0; y < top; y++) for (let x = x0; x < x0 + w; x++) P.px(x, y, mix(0xd8d0b8, 0xb8b0a0, (y - y0) / h + (hash(x, y, 32) - 0.5) * 0.1));
+    P.hl(x0, y0, w, 0xf0e8d8); P.vl(x0, y0, h, 0xe8e0d0); P.vl(x0 + w - 1, y0, h, 0x8a8478); P.hl(x0, top - 1, w, 0x7a7468);
+    const sx = x0 + 3, sy = y0 + 3, sw = w - 12, sh = h - 7;
+    P.rect(sx - 1, sy - 1, sw + 2, sh + 2, 0x1a1a1e); P.rect(sx, sy, sw, sh, 0x0b0c10);
+    // rattar och högtalargaller till höger
+    P.rect(x0 + w - 8, y0 + 4, 5, 5, 0x3a3a40); P.px(x0 + w - 6, y0 + 6, 0xd8b24a); P.rect(x0 + w - 8, y0 + 11, 5, 5, 0x3a3a40); P.px(x0 + w - 6, y0 + 13, 0xd8b24a);
+    for (let y = y0 + 18; y < top - 3; y += 2) P.hl(x0 + w - 8, y, 5, 0x6a6458);
+    P.rect(x0 + 6, top - 2, w - 12, 2, 0x3a3a40);
+    screen = { x: sx, y: sy, w: sw, h: sh };
+  }
+  // konsolplatser i facket
+  const n = W > 140 ? 4 : 3, cell = (W - 8) / n;
+  const spots = Array.from({ length: n }, (_, i) => ({ x: Math.round(4 + cell * i + (cell - 30) / 2), y: cav1 - 2 }));
+  return { img: P.flush(), W, H, screen, spots, cav: { x: 3, y: cav0, w: W - 6, h: cav1 - cav0 }, tv: true };
+}
+
+// ---------- Spelhylla: gondol med omslag utåt och ryggar i rader ----------
+export function makeGameShelf(W) {
+  const H = 80, P = new Pix(W, H);
+  const boards = [26, 50, 72];
+  // bakstycke
+  for (let y = 6; y < 76; y++) for (let x = 1; x < W - 1; x++) P.px(x, y, mix(0x2a2430, 0x3a3040, (bayer(x, y) - 0.5) * 0.3 + 0.5 + (y % 24) * 0.008));
+  P.vl(0, 6, 70, 0x8a6446); P.vl(W - 1, 6, 70, 0x3a2618);
+  for (const by of boards) { P.rect(0, by, W, 2, 0xd9b98a); P.rect(0, by + 2, W, 2, 0x8a6446); P.hl(0, by + 4, W, 0x0e0a14, 0.35); }
+  // toppskylt
+  P.rect(0, 0, W, 8, 0x3a78d8); P.hl(0, 0, W, 0x7ab0e0); P.hl(0, 7, W, 0x1a3a78);
+  const label = 'SPEL', tw = textW(BIG, label);
+  text(P, BIG, label, Math.round((W - tw) / 2), 1, 0xffffff);
+  P.px(3, 3, 0xf0e030); P.px(W - 4, 3, 0xf0e030);
+  // led-list under varje hyllplan
+  for (const by of boards) P.hl(2, by - 1, W - 4, 0xfff6d8, 0.4);
+  P.rect(2, 76, W - 4, 3, 0x1b1a1f);
+  // platser: översta = framsidan utåt (12 brett), de andra = ryggar (3 brett) med några framsidor
+  const fronts = Math.floor((W - 6) / 14), spines = Math.floor((W - 6) / 4);
+  return { img: P.flush(), W, H, boards, fronts, spines, shelf: true };
+}
+
+// ---------- Spelbord: skrivbord med skärm, tangentbord och stol ----------
+export function makeGameDesk(W, year) {
+  const H = 64, P = new Pix(W, H), flat = year >= 2006, top = 38;
+  // bordsskiva
+  for (let y = top; y < top + 8; y++) for (let x = 0; x < W; x++) P.px(x, y, mix(0xd9b98a, 0xb08a58, (y - top) / 8 + (hash(x, y, 33) - 0.5) * 0.1));
+  P.hl(0, top, W, 0xecd3a8); P.hl(0, top + 7, W, 0x6a4a2a);
+  for (const lx of [4, W - 7]) { P.rect(lx, top + 8, 3, 16, 0x3a3a44); P.vl(lx, top + 8, 16, 0x5a5a66); }
+  P.rect(2, H - 3, W - 4, 3, 0x1b1a1f);
+  // datorlåda under bordet
+  P.rect(W - 34, top + 9, 16, 14, 0xd8d0b8); P.box(W - 34, top + 9, 16, 14, 0x8a8478); P.rect(W - 31, top + 12, 10, 2, 0x3a3a40); P.px(W - 22, top + 19, 0x45e06a);
+  // skärm
+  const mx = Math.round(W * 0.62), sw = flat ? 34 : 28, sh = flat ? 20 : 22, x0 = mx - (sw >> 1), y0 = top - sh - (flat ? 4 : 1);
+  if (flat) { P.rect(x0 - 1, y0 - 1, sw + 2, sh + 2, 0x17181c); P.rect(mx - 2, top - 4, 4, 4, 0x2a2d33); P.rect(mx - 8, top - 1, 16, 1, 0x3a3d44); }
+  else { for (let y = y0 - 3; y < top; y++) for (let x = x0 - 4; x < x0 + sw + 4; x++) P.px(x, y, mix(0xd8d0b8, 0xb8b0a0, (y - y0) / sh)); P.hl(x0 - 4, y0 - 3, sw + 8, 0xf0e8d8); P.hl(x0 - 4, top - 1, sw + 8, 0x7a7468); }
+  P.rect(x0, y0, sw, sh, 0x0b0c10);
+  // tangentbord och mus
+  P.rect(8, top + 2, 30, 4, 0xd8d0b8); P.hl(8, top + 2, 30, 0xf0e8d8); for (let x = 10; x < 36; x += 3) P.px(x, top + 4, 0x6a6458);
+  P.rect(42, top + 3, 4, 3, 0xd8d0b8); P.px(43, top + 3, 0x8a8478);
+  // stol framför bordets vänstra del
+  const chx = 22, chy = H - 4;
+  P.rect(chx - 8, chy - 22, 16, 12, 0x2f6f7a); P.hl(chx - 8, chy - 22, 16, 0x4a9aaa); P.rect(chx - 9, chy - 10, 18, 5, 0x3b8894); P.hl(chx - 9, chy - 10, 18, 0x5ab0c0);
+  P.rect(chx - 1, chy - 5, 2, 4, 0x2a2d33); P.rect(chx - 6, chy - 1, 12, 1, 0x2a2d33); P.px(chx - 6, chy, 0x5a5a66); P.px(chx + 5, chy, 0x5a5a66);
+  const label = 'SPELBORD', tw = textW(SMALL, label) + 6;
+  P.rect(W - tw - 4, top + 9, tw, 8, 0xd8b85a); P.box(W - tw - 4, top + 9, tw, 8, 0x8a6a2a); text(P, SMALL, label, W - tw - 1, top + 11, 0x3a2a10);
+  return { img: P.flush(), W, H, screen: { x: x0, y: y0, w: sw, h: sh }, desk: true, seat: { x: chx, y: chy - 6 } };
+}
+
 // ---------- Tom plats / stängd plats ----------
 // tom plats: streckad ram på golvet med skylt
 export function makeEmptySlot(W, D, n) {

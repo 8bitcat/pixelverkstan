@@ -9,6 +9,9 @@
 // Kategorier utan montrar (chassin, moderkort, nätagg …) styrs av lagerhyllan bakom disken.
 //
 // Ingen DOM här – filen körs även i Node (tools/).
+import { ARKAD, hypeAt, isProduct } from './products.js';
+export { ARKAD };
+export const arkadInfo = (id) => ARKAD.find((a) => a.id === id) || null;
 
 export const CAP = [2, 3, 4, 5];                 // tier-tak per nivå 0..3
 export const SHOWCASE_CATS = ['gpu', 'cpu', 'ram', 'storage', 'sound'];   // kategorier som får egna montrar
@@ -83,7 +86,13 @@ export const CAT_NAME = { gpu: 'Grafikkort', cpu: 'Processorer', ram: 'RAM-minne
 export const UNITS = [
   { id: 'kaffe', name: 'Kaffeautomat', icon: '☕', size: 'small', year: 1983, cost: 2200, trivsel: 3, desc: 'Kunderna väntar gladare med en kopp i handen. Ger lite dricks.' },
   { id: 'godis', name: 'Godisautomat', icon: '🍬', size: 'small', year: 1983, cost: 1600, trivsel: 2, desc: 'Barnen tjatar sig kvar i butiken.' },
+  { id: 'tv', name: 'TV-hörna', icon: '📺', size: 'booth', year: 1983, cost: 4000, drag: 1, trivsel: 1, desc: 'En TV med konsolerna under – kunderna får prova, och du får sälja konsoler.' },
+  { id: 'spelhylla', name: 'Spelhylla', icon: '🎮', size: 'booth', year: 1983, cost: 2000, drag: 1, desc: 'Spel med omslaget utåt. Den som köpte konsolen kommer tillbaka efter spel.' },
+  { id: 'spelbord', name: 'Spelbord', icon: '🖥️', size: 'wide', year: 1983, cost: 3500, drag: 1, desc: 'Ett bord där du bygger butikens egen speldator – och spelar på den.' },
 ];
+// hur många konsoler och spel som får plats på display
+export const TV_CAP = { medium: 3, wide: 4 };
+export const SHELF_CAP = { medium: 14, wide: 20 };
 export const unitInfo = (id) => UNITS.find((u) => u.id === id) || null;
 
 // ---------- Prylar (fast plats i rummet) ----------
@@ -126,8 +135,10 @@ export function emptyFit(showcases = []) {
 
 // Vilken tier en del får ha för att köpas in och ställas ut
 const lagerLevel = (fit) => (fit.items.lager4 ? 4 : fit.items.lager3 ? 3 : fit.items.lager2 ? 2 : 1);
+export const hasUnit = (fit, unit) => fit.slots.some((s) => s && s.kind === 'unit' && s.unit === unit);
 export function capFor(fit, p) {
   if (!p) return 0;
+  if (isProduct(p)) return p.cat === 'konsol' ? (hasUnit(fit, 'tv') ? 9 : 0) : p.cat === 'spel' ? (hasUnit(fit, 'spelhylla') ? 9 : 0) : 0;
   const lagerCap = lagerLevel(fit) + 1;   // 2, 3, 4, 5
   if (SHOWCASE_CATS.includes(p.cat)) {
     const key = brandKey(p);
@@ -146,6 +157,9 @@ export function capFor(fit, p) {
 // Text som förklarar vad som krävs för att få sälja delen
 export function needFor(fit, p) {
   if (!p) return '';
+  if (p.cat === 'konsol') return 'kräver en TV-hörna';
+  if (p.cat === 'spel') return 'kräver en spelhylla';
+  if (p.cat === 'arkad') return 'köps under 🏪 Butiken';
   if (SHOWCASE_CATS.includes(p.cat)) {
     const has = fit.slots.some((s) => s && s.cat === p.cat);
     if (!has) return p.tier <= 3 ? `kräver lagerhylla nivå ${p.tier - 1} eller en ${CAT_NAME[p.cat]?.toLowerCase() || p.cat}-hylla` : `kräver ett märkesbås för ${CAT_NAME[p.cat]?.toLowerCase() || p.cat}`;
@@ -170,7 +184,7 @@ export function statsFor(fit) {
   for (const s of fit.slots) {
     if (!s) continue;
     if (s.kind === 'brand') { out.drag += s.level; if (s.level >= 3) out.rykte += 2; }
-    if (s.kind === 'unit') { const u = unitInfo(s.unit); if (u) { out.trivsel += u.trivsel || 0; out.drag += u.drag || 0; } }
+    if (s.kind === 'unit') { const u = unitInfo(s.unit); if (u) { out.trivsel += u.trivsel || 0; out.drag += u.drag || 0; } if (s.unit === 'arkad') { const a = ARKAD.find((x) => x.id === s.product); if (a) out.drag += a.drag; } }
   }
   out.drag = Math.min(20, out.drag); out.trivsel = Math.min(20, out.trivsel);
   return out;
@@ -181,7 +195,7 @@ export function slotTitle(s) {
   if (!s) return 'Ledig plats';
   if (s.kind === 'cat') return `${CAT_NAME[s.cat] || s.cat}-hylla`;
   if (s.kind === 'brand') { const b = brandInfo(s.cat, s.brand); return `${b?.name || s.brand}-monter nivå ${s.level}`; }
-  if (s.kind === 'unit') return unitInfo(s.unit)?.name || s.unit;
+  if (s.kind === 'unit') return s.unit === 'arkad' ? (ARKAD.find((x) => x.id === s.product)?.name || 'Arkadmaskin') : (unitInfo(s.unit)?.name || s.unit);
   return '?';
 }
 // Vad en plats är värd (för byte/rivning: 40 % tillbaka)
@@ -189,7 +203,7 @@ export function slotValue(s, year) {
   if (!s) return 0;
   if (s.kind === 'cat') return priceFor(BOOTH_COST[0], year);
   if (s.kind === 'brand') return priceFor(BOOTH_COST[s.level], year);
-  if (s.kind === 'unit') return priceFor(unitInfo(s.unit)?.cost || 0, year);
+  if (s.kind === 'unit') return s.unit === 'arkad' ? (ARKAD.find((x) => x.id === s.product)?.cost || 0) : priceFor(unitInfo(s.unit)?.cost || 0, year);
   return 0;
 }
 // Alternativ som går att sätta på en plats i år: [{ id, title, kind, cat, brand, level, unit, cost, desc }]
@@ -211,14 +225,19 @@ export function optionsFor(fit, slotIndex, size, year) {
     }
   }
   for (const u of UNITS) {
-    if (u.size !== size && !(u.size === 'small' && size === 'small')) continue;
-    if (year < u.year) continue;
-    out.push({ id: `unit:${u.id}`, title: u.name, kind: 'unit', unit: u.id, cost: priceFor(u.cost, year), desc: u.desc, icon: u.icon });
+    const fits = u.size === size || (u.size === 'booth' && holdsBooth);
+    if (!fits || year < u.year) continue;
+    out.push({ id: `unit:${u.id}`, title: u.name, kind: 'unit', unit: u.id, cost: priceFor(u.cost, year), desc: u.desc, icon: u.icon, drag: u.drag, trivsel: u.trivsel, year });
+  }
+  // arkadmaskiner på de små platserna (priset är kabinettets pris det året)
+  if (size === 'small') for (const a of ARKAD) {
+    if (year < a.year || year > a.until) continue;
+    out.push({ id: `arkad:${a.id}`, title: a.name, kind: 'unit', unit: 'arkad', product: a.id, cost: a.cost, desc: `${a.desc || ''} ${a.coin ? a.coin + ' kr per spel.' : ''}`.trim(), icon: '👾', drag: a.drag, color: a.look.marquee, hype: hypeAt(a, year) });
   }
   // det som redan står där kostar inget; ett byte ger 40 % tillbaka
   const tradeIn = Math.round(slotValue(cur, year) * 0.4 / 50) * 50;
   for (const o of out) {
-    o.current = !!cur && ((o.kind === 'cat' && cur.kind === 'cat' && cur.cat === o.cat) || (o.kind === 'brand' && cur.kind === 'brand' && cur.cat === o.cat && cur.brand === o.brand && cur.level === o.level) || (o.kind === 'unit' && cur.kind === 'unit' && cur.unit === o.unit));
+    o.current = !!cur && ((o.kind === 'cat' && cur.kind === 'cat' && cur.cat === o.cat) || (o.kind === 'brand' && cur.kind === 'brand' && cur.cat === o.cat && cur.brand === o.brand && cur.level === o.level) || (o.kind === 'unit' && cur.kind === 'unit' && cur.unit === o.unit && (cur.product || null) === (o.product || null)));
     // uppgradering av samma märkesbås: betala mellanskillnaden
     const upgrade = cur && o.kind === 'brand' && cur.kind === 'brand' && cur.cat === o.cat && cur.brand === o.brand && o.level > cur.level;
     o.pay = o.current ? 0 : upgrade ? Math.max(0, o.cost - priceFor(BOOTH_COST[cur.level], year)) : Math.max(0, o.cost - tradeIn);
@@ -229,5 +248,5 @@ export function optionsFor(fit, slotIndex, size, year) {
 export function applyOption(fit, slotIndex, o) {
   if (o.kind === 'cat') fit.slots[slotIndex] = { kind: 'cat', cat: o.cat, level: 0 };
   else if (o.kind === 'brand') fit.slots[slotIndex] = { kind: 'brand', cat: o.cat, brand: o.brand, level: o.level };
-  else if (o.kind === 'unit') fit.slots[slotIndex] = { kind: 'unit', unit: o.unit };
+  else if (o.kind === 'unit') fit.slots[slotIndex] = o.product ? { kind: 'unit', unit: o.unit, product: o.product } : { kind: 'unit', unit: o.unit };
 }

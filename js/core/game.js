@@ -108,10 +108,10 @@ export class Game {
       const x = Array.isArray(f.slots) ? f.slots[i] : undefined;
       if (x === undefined) return s;
       if (!x || typeof x !== 'object' || !['cat', 'brand', 'unit'].includes(x.kind)) return null;
-      return { kind: x.kind, cat: x.cat, brand: x.brand, level: Math.max(0, Math.min(3, x.level | 0)), unit: x.unit };
+      return { kind: x.kind, cat: x.cat, brand: x.brand, level: Math.max(0, Math.min(3, x.level | 0)), unit: x.unit, ...(x.product ? { product: String(x.product) } : {}) };
     });
     const nSlots = FLOOR_SLOTS.length;
-    while (slots.length < nSlots) { const x = f.slots?.[slots.length]; slots.push(x && typeof x === 'object' && ['cat', 'brand', 'unit'].includes(x.kind) ? { kind: x.kind, cat: x.cat, brand: x.brand, level: Math.max(0, Math.min(3, x.level | 0)), unit: x.unit } : null); }
+    while (slots.length < nSlots) { const x = f.slots?.[slots.length]; slots.push(x && typeof x === 'object' && ['cat', 'brand', 'unit'].includes(x.kind) ? { kind: x.kind, cat: x.cat, brand: x.brand, level: Math.max(0, Math.min(3, x.level | 0)), unit: x.unit, ...(x.product ? { product: String(x.product) } : {}) } : null); }
     return { slots, items: f.items && typeof f.items === 'object' ? { ...f.items } : {} };
   }
   get fitStats() { return this.shop.fit ? this.shop.fit.statsFor(this.fit) : { drag: 0, trivsel: 0, rykte: 0, queue: 0 }; }
@@ -121,6 +121,7 @@ export class Game {
   // får delen köpas in och ställas ut? (det billigaste i varje kategori går alltid)
   canSell(p) {
     if (!p || !this.shop.fit) return true;
+    if (this.shop.isProduct?.(p)) return this.capFor(p) > 0;
     if (p.tier <= this.capFor(p)) return true;
     if (p.tier <= this.minTier(p.cat)) return true;
     // startpaketets delar får alltid säljas – annars fastnar de guidade kunderna
@@ -273,7 +274,7 @@ export class Game {
   // ---------- Kunder ----------
   // Delar som slutat säljas byts mot likvärdiga som finns i år (kunden ändrar sig)
   refreshOrder(order) {
-    if (!order || !this.shop.fixOrder) return null;
+    if (!order || !this.shop.fixOrder || order.product) return null;
     return this.shop.fixOrder(order, this.year, (id) => this.stockFree(id));
   }
   hasGone(order) { return order.items.some((it) => it.gone); }
@@ -324,6 +325,16 @@ export class Game {
           this.spawn(this.shop.generateOrder(this, FIRST_NAMES));
         }
         this.spawnTimer = (Math.max(14, 40 - this.level * 5) + Math.random() * 12) * (empty ? 1.6 : 1) * this.spawnMul;
+      }
+    }
+    // arkadmaskinerna drar in mynt
+    if (this.shop.fit) {
+      this.arcadeT = (this.arcadeT || 0) + dt;
+      if (this.arcadeT >= 60) {
+        this.arcadeT = 0;
+        let earn = 0;
+        for (const s of this.fit.slots) if (s && s.kind === 'unit' && s.unit === 'arkad') { const a = this.shop.part[s.product]; if (a) earn += Math.round(a.coin * 6 * (0.4 + this.shop.hypeAt(a, this.year))); }
+        if (earn > 0) { this.money += earn; this.stats.earned += earn; this.emit('toast', { text: `🕹️ Arkadmaskinerna drog in ${fmt(earn)} kr.`, kind: 'good' }); this.save(); this.emit('change'); }
       }
     }
     // leveranser
@@ -382,6 +393,17 @@ export class Game {
   accept(c) {
     const order = c.order;
     if (this.missingFor(order).length || this.missingChoices(order).length) return false;
+    // färdiga produkter säljs direkt över disk: kunden går till utlämningen och betalar
+    if (order.product) {
+      const id = order.product;
+      this.stock[id]--; this.clampShown(id);
+      const price = this.shop.priceFor(order, {});
+      c.payout = { price, tip: 0, bonus: 0, total: price, xp: this.shop.xpFor(order), stars: 3, product: true };
+      c.phase = 'ready'; c.patience = Infinity;
+      this.stats.sold = (this.stats.sold || 0) + 1;
+      this.save(); this.emit('change');
+      return { id: 'sale', product: id };
+    }
     const reserved = [];
     for (const it of order.items) if (it.part) { this.stock[it.part]--; this.clampShown(it.part); reserved.push(it.part); }
     const nParts = order.items.length;

@@ -11,6 +11,7 @@ import * as LY from './floor-layout.js';
 import * as SC from './floor-scene.js';
 import * as PR from './floor-props.js';
 import * as WK from './floor-walk.js';
+import { consoleSprite, coverSprite, spineSprite, cabinetSprite, cabinetScreen, attractFrame, ATTRACT_FOR_ENGINE, CONSOLE_BOX, COVER_BOX, CAB_BOX } from '../shops/dator/art-products.js';
 
 export const FW = LY.FW, FH = LY.FH;
 const SPEED = 58, OUT_SPEED = 66;
@@ -112,7 +113,13 @@ export class Floor {
       const def = fit.slots[i], W = slot.x1 - slot.x0, D = LY.SLOT_DEPTH[slot.size];
       if (i >= this.openSlots) return { i, slot, closed: true, img: PR.makeClosedSlot(W, D), x: slot.x0, y: slot.base - D - 34 + 1, sort: slot.base };
       if (!def) return { i, slot, empty: true, img: PR.makeEmptySlot(W, D, i + 1), x: slot.x0, y: slot.base - D, sort: slot.base - D - 1 };
-      if (def.kind === 'unit') { const img = PR.makeVendor(def.unit); return { i, slot, def, img, x: Math.round(slot.x0 + (W - img.width) / 2), y: slot.base - img.height + 1, sort: slot.base }; }
+      if (def.kind === 'unit') {
+        if (def.unit === 'tv') { const frame = PR.makeTvCorner(W, g.year); return { i, slot, def, frame, unit: 'tv', img: null, x: slot.x0, y: slot.base - frame.H + 1, sort: slot.base }; }
+        if (def.unit === 'spelhylla') { const frame = PR.makeGameShelf(W); return { i, slot, def, frame, unit: 'spelhylla', img: null, x: slot.x0, y: slot.base - frame.H + 1, sort: slot.base }; }
+        if (def.unit === 'spelbord') { const frame = PR.makeGameDesk(W, g.year); return { i, slot, def, frame, unit: 'spelbord', img: null, x: slot.x0, y: slot.base - frame.H + 1, sort: slot.base }; }
+        if (def.unit === 'arkad') { const prod = shop.part[def.product]; return { i, slot, def, unit: 'arkad', prod, img: null, x: Math.round(slot.x0 + (W - CAB_BOX.w) / 2), y: slot.base - CAB_BOX.h + 1, sort: slot.base }; }
+        const img = PR.makeVendor(def.unit); return { i, slot, def, img, x: Math.round(slot.x0 + (W - img.width) / 2), y: slot.base - img.height + 1, sort: slot.base };
+      }
       const cat = shop.cats?.[def.cat], brand = def.kind === 'brand' && F ? F.brandInfo(def.cat, def.brand) : null;
       const velvet = mix(mul(hex(brand?.color || cat?.color, 0x7a2e3e), 0.5), 0x1a1030, 0.35);
       const catName = (F?.CAT_NAME?.[def.cat] || cat?.name || def.cat).toUpperCase();
@@ -486,7 +493,7 @@ export class Floor {
     });
     S.push([LY.COUNTER.base, () => this.drawCounter(ctx)]);
     for (const u of this.units || []) {
-      if (u.frame) S.push([u.sort, () => { if (u.img) ctx.drawImage(u.img, u.x, u.y, u.img.width / this.RES, u.img.height / this.RES); this.drawUnitFx(ctx, u); }]);
+      if (u.frame || u.unit === 'arkad') S.push([u.sort, () => { if (u.img) ctx.drawImage(u.img, u.x, u.y, u.img.width / this.RES, u.img.height / this.RES); this.drawUnitFx(ctx, u); }]);
       else S.push([u.sort, () => ctx.drawImage(u.img, u.x, u.y)]);
     }
     S.push([LY.ROPE.back, () => ctx.drawImage(this.ropeBack.img, this.ropeBack.x, this.ropeBack.y)]);
@@ -575,8 +582,68 @@ export class Floor {
     const sig = Object.keys(g.shown).map((id) => id + ':' + g.shownFree(id)).join(',');
     if (sig === this.sig) return;
     this.sig = sig;
-    for (const u of this.units) if (u.frame) u.img = u.frame.tower ? this.renderTower(u) : this.renderVitrine(u);
+    for (const u of this.units) {
+      if (u.unit === 'tv') u.img = this.renderTv(u);
+      else if (u.unit === 'spelhylla') u.img = this.renderGameShelf(u);
+      else if (u.unit === 'spelbord') u.img = this.renderDesk(u);
+      else if (u.unit === 'arkad') u.img = u.prod ? cabinetSprite(u.prod, this.RES) : null;
+      else if (u.frame) u.img = u.frame.tower ? this.renderTower(u) : this.renderVitrine(u);
+    }
     this.shelfImg = this.renderShelf();
+  }
+
+  // produkter som står framme, hetast först
+  productsShown(cat, cap) {
+    const g = this.game, shop = this.shop;
+    return this.owned().filter((p) => p.cat === cat).sort((a, b) => shop.hypeAt(b, g.year) - shop.hypeAt(a, g.year)).slice(0, cap);
+  }
+  unitCanvas(u) {
+    const RES = this.RES, c = document.createElement('canvas'); c.width = u.frame.W * RES; c.height = u.frame.H * RES;
+    const x = c.getContext('2d'); x.setTransform(RES, 0, 0, RES, 0, 0); x.imageSmoothingEnabled = false;
+    x.drawImage(u.frame.img, 0, 0);
+    return [c, x];
+  }
+  renderTv(u) {
+    const [c, x] = this.unitCanvas(u), f = u.frame, RES = this.RES, g = this.game;
+    const cons = this.productsShown('konsol', f.spots.length);
+    u.shownCons = cons;
+    cons.forEach((p, i) => {
+      const sp = f.spots[i], img = consoleSprite(p, RES);
+      x.fillStyle = 'rgba(0,0,0,.4)'; x.fillRect(sp.x + 2, sp.y - 1, CONSOLE_BOX.w - 4, 2);
+      x.drawImage(img, sp.x, sp.y - CONSOLE_BOX.h, CONSOLE_BOX.w, CONSOLE_BOX.h);
+      const label = PLATE[p.look.shape] || p.name.toUpperCase().slice(0, 6), tw = textW(SMALL, label) + 4, tx = Math.round(sp.x + (CONSOLE_BOX.w - tw) / 2);
+      x.fillStyle = '#f4efe2'; x.fillRect(tx, sp.y, tw, 7); x.fillStyle = '#17151a'; x.fillRect(tx, sp.y + 7, tw, 1);
+      ctxText(x, SMALL, label, tx + 2, sp.y + 1, '#17151a');
+      const n = g.shownFree(p.id); if (n > 1) { const t = '×' + n; ctxText(x, SMALL, t, sp.x + CONSOLE_BOX.w - textW(SMALL, t) - 1, sp.y - CONSOLE_BOX.h + 1, '#f4efe2'); }
+    });
+    if (!cons.length) { const t = 'INGA KONSOLER'; x.fillStyle = 'rgba(244,239,226,.85)'; x.fillRect(Math.round((f.W - textW(SMALL, t) - 8) / 2), f.cav.y + 6, textW(SMALL, t) + 8, 9); ctxText(x, SMALL, t, Math.round((f.W - textW(SMALL, t)) / 2), f.cav.y + 8, '#9e1b22'); }
+    return c;
+  }
+  renderGameShelf(u) {
+    const [c, x] = this.unitCanvas(u), f = u.frame, RES = this.RES, g = this.game;
+    const games = this.productsShown('spel', f.fronts + f.spines * 2);
+    u.shownGames = games;
+    // översta hyllplanet: omslagen utåt
+    const fronts = games.slice(0, f.fronts);
+    fronts.forEach((p, i) => {
+      const px = 4 + i * 14, py = f.boards[0] - COVER_BOX.h;
+      x.drawImage(coverSprite(p, RES), px, py, COVER_BOX.w, COVER_BOX.h);
+      const n = g.shownFree(p.id); if (n > 1) { x.fillStyle = '#17151a'; x.fillRect(px + 8, py - 1, 5, 6); ctxText(x, SMALL, String(Math.min(9, n)), px + 9, py, '#f4efe2'); }
+    });
+    // två hyllplan med ryggar
+    const rest = games.slice(f.fronts);
+    rest.forEach((p, i) => {
+      const row = Math.floor(i / f.spines), col = i % f.spines;
+      if (row > 1) return;
+      const px = 3 + col * 4, py = f.boards[row + 1] - COVER_BOX.h;
+      x.drawImage(spineSprite(p, RES), px, py, 3, COVER_BOX.h);
+    });
+    if (!games.length) { const t = 'TOM HYLLA'; x.fillStyle = 'rgba(244,239,226,.85)'; x.fillRect(Math.round((f.W - textW(SMALL, t) - 8) / 2), 34, textW(SMALL, t) + 8, 9); ctxText(x, SMALL, t, Math.round((f.W - textW(SMALL, t)) / 2), 36, '#9e1b22'); }
+    return c;
+  }
+  renderDesk(u) {
+    const [c] = this.unitCanvas(u);
+    return c;
   }
 
   // delarna som hör hemma i en monter: rätt kategori, rätt märke (märkesbås) och tillåtna att sälja;
@@ -654,7 +721,31 @@ export class Floor {
 
   // rörligt på montrarna: demoskärmen på flaggskeppsmontern och pulsande ljus på belysta bås
   drawUnitFx(ctx, u) {
-    const f = u.frame, t = this.t;
+    const f = u.frame, t = this.t, RES = this.RES, shop = this.shop;
+    // skärmar: attract-läge i skärmpixlar
+    const screenAt = (sx, sy, sw, sh, kind) => {
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+      attractFrame(ctx, kind, (u.x + sx) * RES, (u.y + sy) * RES, sw * RES, sh * RES, t + u.i * 3.7);
+      ctx.restore();
+    };
+    if (u.unit === 'arkad') { if (u.prod) { const s = cabinetScreen(u.prod); screenAt(s.x, s.y, s.w, s.h, u.prod.attract); } return; }
+    if (u.unit === 'tv') {
+      const cons = u.shownCons || [], top = cons[0];
+      const game = top ? this.owned().find((p) => p.cat === 'spel' && p.platform === top.look.shape) || shop.products?.gamesFor(top.look.shape)[0] : null;
+      const kind = !cons.length ? 'off' : game ? (ATTRACT_FOR_ENGINE[game.engine] || 'default') : 'default';
+      if (kind === 'off') { ctx.fillStyle = '#0b0c10'; ctx.fillRect(u.x + f.screen.x, u.y + f.screen.y, f.screen.w, f.screen.h); if (Math.floor(t) % 2) { ctx.fillStyle = '#3a3a44'; ctx.fillRect(u.x + f.screen.x + 2, u.y + f.screen.y + f.screen.h - 3, 3, 1); } }
+      else screenAt(f.screen.x, f.screen.y, f.screen.w, f.screen.h, kind);
+      return;
+    }
+    if (u.unit === 'spelbord') {
+      const s = f.screen, msg = 'BYGG DIN DATOR  ', tw = textW(SMALL, msg), off = Math.round((t * 14) % tw);
+      ctx.fillStyle = '#0b0c10'; ctx.fillRect(u.x + s.x, u.y + s.y, s.w, s.h);
+      ctx.save(); ctx.beginPath(); ctx.rect(u.x + s.x, u.y + s.y, s.w, s.h); ctx.clip();
+      ctxText(ctx, SMALL, msg + msg, u.x + s.x + 2 - off, u.y + s.y + Math.round(s.h / 2) - 2, Math.floor(t * 2) % 2 ? '#3fb04a' : '#8fd49a');
+      ctx.restore();
+      return;
+    }
+    if (u.unit) return;
     if (!f.brand || f.level < 2) return;
     const col = hex(f.brand.color, 0x76b900);
     if (f.level >= 3 && !f.tower) {
@@ -676,7 +767,7 @@ export class Floor {
 
   renderShelf() {
     const shop = this.shop, g = this.game, S = SC.SHELF;
-    const shown = new Set((shop.showcases || []).map((s) => s.cat));
+    const shown = new Set([...(shop.showcases || []).map((s) => s.cat), ...(shop.productCats || []), ...(shop.fit?.SHOWCASE_CATS || [])]);
     const cats = (shop.catOrder || Object.keys(shop.cats || {})).filter((c) => !shown.has(c)).slice(0, 6);
     const c = document.createElement('canvas'); c.width = S.x1 - S.x0; c.height = 60;
     const x = c.getContext('2d');
@@ -953,6 +1044,14 @@ export class Floor {
       ctx.fillStyle = INK;
       for (let i = 0; i < 3; i++) if (Math.floor(t * 2.5 + c.id) % 4 > i) ctx.fillRect(bx + 3 + i * 4, by + 4, 2, 2);
     }
+    // produktkunder: en liten bubbla med det de vill ha
+    if (c.order?.product && (c.phase === 'queue' || c.phase === 'arriving') && !c.moving && !(this.clickable(c))) {
+      const p = this.shop.part[c.order.product], label = (p ? (PLATE[p.look?.shape] || p.name.toUpperCase().slice(0, 9)) : '?') + '?';
+      const w = textW(SMALL, label) + 6, bx = x - Math.round(w / 2), by = head - 18;
+      ctx.fillStyle = INK; ctx.fillRect(bx - 1, by - 1, w + 2, 10); ctx.fillRect(x - 1, by + 9, 3, 2);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(bx, by, w, 8); ctx.fillRect(x, by + 8, 1, 2);
+      ctxText(ctx, SMALL, label, bx + 3, by + 2, INK);
+    }
     if ((c.phase === 'queue' || c.phase === 'waiting') && isFinite(c.patienceMax) && !c.moving) {
       const f = Math.max(0, Math.min(1, c.patience / c.patienceMax));
       const px = x - 17, py = head + 2, ph = 20;
@@ -985,6 +1084,9 @@ export class Floor {
     }
   }
 }
+
+// korta namn på skyltarna under konsolerna
+const PLATE = { atari2600: 'ATARI', c64: 'C64', amiga500: 'AMIGA', nes: 'NES', sms: 'MASTER', gameboy: 'G.BOY', megadrive: 'MEGA D', gamegear: 'G.GEAR', neogeo: 'NEOGEO', snes: 'SNES', playstation: 'PS1', saturn: 'SATURN', n64: 'N64', gbc: 'GBC', dreamcast: 'DREAMC', ps2: 'PS2', gba: 'GBA', gamecube: 'G.CUBE', xbox: 'XBOX', ds: 'DS', psp: 'PSP', xbox360: 'X360', wii: 'WII', ps3: 'PS3', '3ds': '3DS', wiiu: 'WII U', ps4: 'PS4', xboxone: 'XB ONE', switch: 'SWITCH', quest2: 'QUEST', ps5: 'PS5', seriesx: 'SERIES', steamdeck: 'DECK', switch2: 'SW 2' };
 
 // "ASUS ROG Astral GeForce RTX 5080 OC" → ["RTX 5080 OC", "ASUS ROG ASTRAL"]
 function heroTitle(name) {

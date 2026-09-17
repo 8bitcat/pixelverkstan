@@ -4,6 +4,7 @@ import * as catalog from './catalog.js';
 import * as layout from './layout.js';
 import * as orders from './orders.js';
 import * as upgrades from './upgrades.js';
+import * as products from './products.js';
 import { iconCanvas } from './art.js';
 import { Desk } from './desk.js';
 import { DB, loadParts, onSale } from './parts/index.js';
@@ -25,6 +26,11 @@ export default {
   hero: 'astral-5080',
   // bås, hyllor, prylar och lokalstorlek (se upgrades.js)
   fit: upgrades,
+  // konsoler, spel och arkadmaskiner (se products.js)
+  products,
+  isProduct: products.isProduct,
+  hypeAt: products.hypeAt,
+  productCats: catalog.PRODUCT_CATS,
   // Stjärnobjektet: årets finaste grafikkort (RTX 5080 Astral när det finns)
   heroFor(game) {
     const list = onSale(game.year).filter((p) => p.cat === 'gpu');

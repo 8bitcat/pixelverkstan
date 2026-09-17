@@ -7,6 +7,8 @@ import {
   drawMedia, drawSound, drawFanBox, mediaFront, cpuTop, cpuKind, gpuBox, cardLen, driveDims, psuDims,
 } from './art-parts.js';
 import { drawCaseStanding, standDims } from './art-case.js';
+import { productIcon } from './art-products.js';
+import { isProduct } from './products.js';
 
 export {
   drawMat, drawScrews, drawScrewHoles, drawCaseStanding, standDims,
@@ -58,6 +60,7 @@ function drawIconPart(R, part, o) {
 // Ritar delen isolerat (RGB tänt som i en butiksmonter) och beskär till W×H.
 // Stora ikoner ritas med upp till MAX_K pixlar per enhet (full detalj).
 export function iconCanvas(part, W = 64, H = 54) {
+  if (isProduct(part)) return productIcon(part, W, H);
   const key = part.id + ':' + W + 'x' + H;
   let src = ICONS.get(key);
   if (!src) {

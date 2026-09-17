@@ -13,7 +13,7 @@ export const COMMANDS = {
     const c = g.customers.find((x) => x.id === customerId);
     if (!c || c.phase !== 'queue') return null;
     const o = g.accept(c);
-    return o ? o.id : null;
+    return o ? o.id : null;   // 'sale' = såld över disk
   },
   decline: (g, { customerId }) => { const c = g.customers.find((x) => x.id === customerId); if (c && c.phase === 'queue') g.decline(c); return true; },
   // valfria delar som plockas ur lagret när man bygger

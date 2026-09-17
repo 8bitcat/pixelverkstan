@@ -4,6 +4,7 @@ import { fmt } from './game.js';
 import * as PR from './floor-props.js';
 import { SLOTS, SLOT_DEPTH } from './floor-layout.js';
 import { hex, mix, mul } from './floor-pix.js';
+import { cabinetSprite } from '../shops/dator/art-products.js';
 
 const $ = (s) => document.querySelector(s);
 export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -154,6 +155,7 @@ export function openOrderDialog(game, c, h) {
     c = game.customers.find((x) => x.id === c.id) || c;
     if (c.phase !== 'queue') { closeModal(); return; }
     const shop = game.shop, o = c.order;
+    const prod = o.product ? shop.part[o.product] : null;
     const miss = game.missingFor(o), missChoice = game.missingChoices(o), toBuy = game.toBuyFor(o);
     const buyCost = toBuy.reduce((s, m) => s + shop.part[m.id].cost * m.buy, 0);
     const needLeft = {};
@@ -186,20 +188,21 @@ export function openOrderDialog(game, c, h) {
     else if (gone) tip = '🛑 En del i beställningen säljs inte längre och går inte att köpa in. Tacka nej till kunden – nya kunder kommer snart.';
     else if (locked.length) tip = `🔒 Kunden vill ha något finare än butiken får sälja (${esc([...new Set(locked)].join(', '))}). Tacka nej – önskemålet hamnar på efterfrågantavlan i 🏪 Butiken.`;
     else if (waiting) tip = '🚚 Delarna är på väg. Packa upp lådan vid dörren när den kommit – sedan kan du ta emot beställningen.';
+    else if (prod && !miss.length) tip = '💰 Färdig vara – sälj direkt över disk, kunden hämtar vid utlämningen.';
     else if (toBuy.length && buyCost > game.money) tip = `😬 Du har inte råd att köpa in det som saknas (${fmt(buyCost)} kr). Tacka nej, eller sälj fler datorer först.`;
     const price = shop.priceFor(o, {});
     const body = `<div class="who">${'<span data-face></span>'}<div class="speech">${esc(o.msg)}</div></div>
-      <h3 style="margin:4px 0 8px">Beställning: ${esc(o.title)}</h3>
+      <h3 style="margin:4px 0 8px">${prod ? 'Vill köpa' : 'Beställning'}: ${esc(o.title)}</h3>
       <div class="plist">${rows}</div>
       <div class="sum"><span>Kunden betalar${o.items.some((i) => i.choice) ? ' ca' : ''}</span><b>${fmt(price)} kr</b></div>
-      <div class="sp" style="color:var(--muted)">Delarnas pris + ${fmt(shop.feeFor(o))} kr i montering.</div>
+      <div class="sp" style="color:var(--muted)">${prod ? `${esc(shop.specLine(prod))}${shop.products && shop.products.valueAt(prod, game.year) < 1 ? ' · <b>värdet har sjunkit</b> – gammalt lager' : ''}` : `Delarnas pris + ${fmt(shop.feeFor(o))} kr i montering.`}</div>
       ${tip ? `<div class="speech" style="margin:10px 0 0;background:#fff4c7">${tip}</div>` : ''}`;
     const buttons = [
       { label: 'Tacka nej', cls: 'btn-red', onClick: () => { closeModal(); h.onDecline(c); } },
       { label: `🛒 Köp in det som saknas (${fmt(buyCost)} kr)`, cls: 'btn-gold', hidden: !toBuy.length, disabled: buyCost > game.money,
         onClick: () => { act('buyMissing', { customerId: c.id }); render(); } },
       { label: '🛒 Till grossisten', hidden: !missChoice.length, onClick: () => h.onShop(missChoice[0], () => openOrderDialog(game, c, h)) },
-      { label: gone ? '🛑 Går inte att bygga' : locked.length ? '🔒 Får inte säljas' : waiting ? '🚚 Väntar på lådan …' : '✓ Ta emot beställningen', cls: 'btn-go', disabled: miss.length || missChoice.length, onClick: () => { closeModal(); h.onAccept(c); } },
+      { label: gone ? '🛑 Går inte att bygga' : locked.length ? '🔒 Får inte säljas' : waiting ? '🚚 Väntar på lådan …' : prod ? `💰 Sälj för ${fmt(price)} kr` : '✓ Ta emot beställningen', cls: 'btn-go', disabled: miss.length || missChoice.length, onClick: () => { closeModal(); h.onAccept(c); } },
     ];
     const dlg = openModal(`Ny kund: ${esc(c.name)}`, body, buttons);
     dlg.querySelector('[data-face]').replaceWith(portrait(c.look));
@@ -408,10 +411,14 @@ const FIT_STATE = { tab: 'platser' };
 const previewCache = new Map();
 // pixelförhandsvisning av det som går att köpa (samma ritfunktioner som butiksgolvet)
 function fitPreview(F, o, size) {
-  const key = `${o.id}|${size}`;
+  const key = `${o.id}|${size}|${o.year || 0}`;
   if (previewCache.has(key)) return previewCache.get(key).cloneNode ? cloneCanvas(previewCache.get(key)) : previewCache.get(key);
   let img;
-  if (o.kind === 'unit') img = PR.makeVendor(o.unit);
+  if (o.kind === 'unit' && o.unit === 'arkad') { const p = F.ARKAD?.find((a) => a.id === o.product) || F.arkadInfo?.(o.product); img = p ? cabinetSprite(p, 2) : PR.makeVendor('godis'); }
+  else if (o.kind === 'unit' && o.unit === 'tv') img = PR.makeTvCorner(size === 'wide' ? 156 : 118, o.year || 1991).img;
+  else if (o.kind === 'unit' && o.unit === 'spelhylla') img = PR.makeGameShelf(size === 'wide' ? 156 : 118).img;
+  else if (o.kind === 'unit' && o.unit === 'spelbord') img = PR.makeGameDesk(156, o.year || 1991).img;
+  else if (o.kind === 'unit') img = PR.makeVendor(o.unit);
   else {
     const brand = o.kind === 'brand' ? F.brandInfo(o.cat, o.brand) : null;
     const catColor = { gpu: '#3f9b3a', cpu: '#2c6fb7', ram: '#c9323a', storage: '#7a5bc9', sound: '#c86a2a' }[o.cat] || '#7a2e3e';

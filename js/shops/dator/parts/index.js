@@ -2,6 +2,7 @@
 // bygger index per år. Saknas en kategorifil används delarna från catalog.js.
 import * as K from './canon.js';
 import { PARTS as LEGACY } from '../catalog.js';
+import { PRODUCTS } from '../products.js';
 
 export const DB = { parts: [], part: {}, byYear: new Map(), loaded: false };
 
@@ -39,6 +40,8 @@ export async function loadParts() {
     if (!Array.isArray(arr)) arr = LEGACY.filter((p) => p.cat === cat).map((p) => ({ ...p, ...(LEGACY_FIX[cat]?.(p) || {}) }));
     for (const p of arr) out.push(normalize(p));
   }
+  // färdiga produkter (konsoler, spel, arkadmaskiner) ligger i samma databas men byggs aldrig in
+  for (const p of PRODUCTS) out.push({ rgb: false, lvl: 1, ...p });
   DB.parts = out;
   DB.part = Object.fromEntries(out.map((p) => [p.id, p]));
   DB.byYear = new Map();

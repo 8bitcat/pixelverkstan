@@ -14,9 +14,14 @@ export const CATS = {
   sound:   { name: 'Ljudkort', icon: '🔊', color: '#c86a2a' },
   psu:     { name: 'Nätaggregat', icon: '🔌', color: '#e0a02a' },
   fans:    { name: 'Chassifläktar', icon: '🌀', color: '#8fa3b8' },
+  // färdiga produkter över disk
+  konsol:  { name: 'Konsoler', icon: '🕹️', color: '#e23b5a' },
+  spel:    { name: 'Spel', icon: '🎮', color: '#3a78d8' },
+  arkad:   { name: 'Arkadmaskiner', icon: '👾', color: '#f0e030' },
 };
 
-export const CAT_ORDER = ['case', 'mb', 'cpu', 'cooler', 'ram', 'storage', 'media', 'gpu', 'sound', 'psu', 'fans'];
+export const CAT_ORDER = ['case', 'mb', 'cpu', 'cooler', 'ram', 'storage', 'media', 'gpu', 'sound', 'psu', 'fans', 'konsol', 'spel'];
+export const PRODUCT_CATS = ['konsol', 'spel', 'arkad'];
 
 // Epoker (visas i HUD och när ett nytt år börjar)
 export const ERAS = [
@@ -156,6 +161,9 @@ export function specLine(p) {
     case 'psu': return `${p.form} · ${p.watt} W${p.eff && p.eff !== 'none' ? ' · 80 PLUS ' + (p.eff === '80plus' ? '' : p.eff[0].toUpperCase() + p.eff.slice(1)) : ''}${p.modular ? ' · modulärt' : ''}`;
     case 'case': return `${(p.forms || p.fits).join('/')} · ${{ desktop: 'skrivbordslåda', minitower: 'minitorn', tower: 'torn', midi: 'miditorn', full: 'fulltorn', sff: 'litet' }[p.style] || ''} · ${p.fans.length} fläktar${rgb}`;
     case 'fans': return `${p.count} st ${p.size || 120} mm${rgb}`;
+    case 'konsol': return `${p.handheld ? 'handhållen' : p.computer ? 'hemdator' : p.vr ? 'VR-glasögon' : 'konsol'} · ${p.maker[0].toUpperCase() + p.maker.slice(1)} · het ${p.hype[0]}–${p.hype[2]}`;
+    case 'spel': return `${p.platform === 'pc' ? 'PC' : p.platform.toUpperCase()} · ${p.brand} · ${p.year}`;
+    case 'arkad': return `${{ upright: 'stående skåp', sitdown: 'sittkabinett', gun: 'ljuspistol', dance: 'dansmatta' }[p.cab]} · ${p.coin ? p.coin + ' kr/spel' : 'gratis'} · drar folk +${p.drag}`;
   }
   return '';
 }

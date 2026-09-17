@@ -185,6 +185,10 @@ function setupGame(shopModule, opts) {
     if (UI.modalOpen()) return;
     if (what.empty) return UI.openFittings(game, 'platser', what.slot);
     if (what.closed) { UI.toast('Den här delen av lokalen är stängd – bygg ut butiken under 🏪 Butiken.', ''); return UI.openFittings(game, 'lager'); }
+    if (what.unit === 'tv') return UI.openShowcase(game, { cats: ['konsol'], title: 'TV-hörnan' });
+    if (what.unit === 'spelhylla') return UI.openShowcase(game, { cats: ['spel'], title: 'Spelhyllan' });
+    if (what.unit === 'arkad') { UI.toast('🕹️ Arkadmaskinen – snart kan du spela på den!', ''); return; }
+    if (what.unit === 'spelbord') { UI.toast('🖥️ Spelbordet – snart bygger du butikens egen speldator här.', ''); return; }
     if (what.unit) { UI.toast(what.unit === 'kaffe' ? '☕ Mmm, en kopp kaffe.' : '🍬 Nom nom.', 'good'); return; }
     UI.openShowcase(game, what);
   };
@@ -194,6 +198,7 @@ function setupGame(shopModule, opts) {
       onAccept: (cust) => {
         const id = act('accept', { customerId: cust.id });
         if (coop instanceof CoopClient) { UI.toast('Beställningen är mottagen – den dyker upp i listan.', 'good'); return; }
+        if (id === 'sale') { UI.toast(`💰 Sålt! ${cust.name} betalar vid utlämningen.`, 'good'); return; }
         const o = game.orders.find((x) => x.id === id);
         if (!o) return;
         if (o.tutorial !== undefined) { openBuild(o); }

@@ -3,6 +3,7 @@
 import { retail, CAT_ORDER } from './catalog.js';
 import { DB, onSale } from './parts/index.js';
 import * as C from './compat.js';
+import { KONSOLER, SPEL, hypeAt, valueAt, PLATFORM_NAME } from './products.js';
 
 // gpu: 'need' = alltid grafikkort, 'auto' = bara om kortet/processorn saknar grafik
 const TEMPLATES = [
@@ -121,9 +122,39 @@ export function composeBuild(t, year, pick = rnd, allow = null) {
   return [cs, mb, cpu, cooler, ram, storage, floppy, optical, gpu, sound, psu, fans].filter(Boolean);
 }
 
+// Kunder som vill köpa en konsol eller ett spel över disk. Det som står framme
+// efterfrågas mer; det som är hett i år men saknas efterfrågas också – och hamnar
+// på efterfrågantavlan när man tackar nej.
+export function productOrder(game, names) {
+  const year = game.year, F = game.shop.fit, fit = game.fit;
+  const hasTv = F?.hasUnit(fit, 'tv'), hasShelf = F?.hasUnit(fit, 'spelhylla');
+  const shown = (p) => (game.shownFree ? game.shownFree(p.id) : 0) > 0;
+  const cons = KONSOLER.filter((k) => year >= k.year && year <= k.until && hypeAt(k, year) > 0.15);
+  if (!cons.length) return null;
+  const weight = (p) => hypeAt(p, year) * (shown(p) ? 3 : 1);
+  const pickW = (list) => { let r = Math.random() * list.reduce((s, p) => s + weight(p), 0); for (const p of list) { r -= weight(p); if (r <= 0) return p; } return list[list.length - 1]; };
+  const ownedCons = KONSOLER.filter((k) => shown(k));
+  const games = SPEL.filter((s) => year >= s.year && year <= s.until && (s.platform === 'pc' || ownedCons.some((k) => k.look.shape === s.platform)));
+  const wantGame = hasShelf && games.length && Math.random() < 0.5;
+  const p = wantGame ? pickW(games) : pickW(cons);
+  let msg;
+  if (p.cat === 'spel') msg = rnd([`Har ni ${p.name} till ${PLATFORM_NAME[p.platform] || p.platform}?`, `${p.name}! Alla i klassen har det.`, `Jag vill köpa ${p.name}.`]);
+  else if (shown(p)) msg = rnd([`Jag vill köpa en ${p.name}!`, `Den där ${p.name} i TV-hörnan – jag tar den.`, `Får jag prova ${p.name}? Jag tar en om den är bra.`]);
+  else {
+    const newest = Math.max(0, ...ownedCons.map((k) => k.year));
+    msg = ownedCons.length && newest < year - 4 ? rnd([`Dålig grafik på det ni har … har ni inte ${p.name}?`, `Har ni inget nyare? ${p.name}?`]) : rnd([`Har ni ingen ${p.name}? Alla har en!`, `Jag letar efter en ${p.name}.`]);
+  }
+  return { template: 'produkt', title: p.name, name: rnd(names), msg, items: [{ cat: p.cat, part: p.id }], year, product: p.id };
+}
+
 // game: { year, stockFree(id), progress }
 export function generateOrder(game, names) {
   const year = game.year;
+  // konsoler och spel: oftare när det finns en TV-hörna, ibland även utan (efterfrågan)
+  if (game.shop.fit) {
+    const hasTv = game.shop.fit.hasUnit(game.fit, 'tv');
+    if (Math.random() < (hasTv ? 0.35 : 0.1)) { const o = productOrder(game, names); if (o) return o; }
+  }
   const pool = templatesFor(year);
   if (!pool.length) return null;
   const t = rnd(pool);
@@ -273,11 +304,12 @@ export function fixOrder(order, year, stockFree = () => 0) {
   return swaps;
 }
 
-export function feeFor(order) { return TEMPLATE[order.template]?.fee || 700; }
-export function xpFor(order) { return TEMPLATE[order.template]?.xp || 14; }
+export function feeFor(order) { return order.product ? 0 : (TEMPLATE[order.template]?.fee || 700); }
+export function xpFor(order) { return order.product ? (DB.part[order.product]?.cat === 'konsol' ? 6 : 3) : (TEMPLATE[order.template]?.xp || 14); }
 
-// Vad kunden betalar: delarnas butikspris + montering
+// Vad kunden betalar: delarnas butikspris + montering (produkter: pris × värdefaktor för året)
 export function priceFor(order, chosen = {}) {
+  if (order.product) { const p = DB.part[order.product]; return p ? Math.round(retail(p) * valueAt(p, order.year || p.year) / 10) * 10 : 0; }
   let sum = feeFor(order);
   for (const it of order.items) {
     const id = it.part || chosen[it.cat];
