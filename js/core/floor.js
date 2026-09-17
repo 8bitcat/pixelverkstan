@@ -494,6 +494,40 @@ export class Floor {
     out.fillStyle = '#17151a'; out.fillRect(this.offX - 3, this.offY - 3, W + 6, H + 6);
     out.imageSmoothingEnabled = false;
     out.drawImage(this.buf, this.offX, this.offY, W, H);
+    this.drawSpeech(out);
+  }
+
+  // Pratbubblor (chatt) ritas i skärmens upplösning så att texten blir läsbar
+  drawSpeech(out) {
+    const now = performance.now();
+    for (const pl of this.players) {
+      if (!pl.say || now > pl.say.until) continue;
+      const px = pl.away ? 470 : pl.x, py = pl.away ? 84 : pl.y - (pl.look?.kid ? 44 : 54);
+      const sx = this.offX + px * this.scale, sy = this.offY + py * this.scale;
+      const fs = Math.max(15, Math.min(22, Math.round(8 * this.scale)));
+      out.font = `${fs}px "VT323", monospace`;
+      const words = String(pl.say.text).split(/\s+/), lines = [];
+      let line = '';
+      for (const w of words) {
+        const test = line ? line + ' ' + w : w;
+        if (out.measureText(test).width > 190 && line) { lines.push(line); line = w; } else line = test;
+      }
+      if (line) lines.push(line);
+      const w = Math.min(220, Math.max(...lines.map((l) => out.measureText(l).width))) + 14, h = lines.length * (fs + 1) + 10;
+      const bx = Math.round(Math.max(4, Math.min(this.canvas.clientWidth - w - 4, sx - w / 2))), by = Math.round(sy - h - 10);
+      const fade = Math.min(1, (pl.say.until - now) / 600);
+      out.save(); out.globalAlpha = fade;
+      out.fillStyle = '#17151a'; out.fillRect(bx - 2, by - 2, w + 4, h + 4);
+      out.fillStyle = '#ffffff'; out.fillRect(bx, by, w, h);
+      out.fillStyle = pl.color || '#7ee8fa'; out.fillRect(bx, by, 4, h);
+      // pil ner mot avataren
+      const tx = Math.round(Math.max(bx + 8, Math.min(bx + w - 8, sx)));
+      out.fillStyle = '#17151a'; out.fillRect(tx - 5, by + h, 10, 4); out.fillRect(tx - 3, by + h + 4, 6, 3); out.fillRect(tx - 1, by + h + 7, 2, 2);
+      out.fillStyle = '#ffffff'; out.fillRect(tx - 3, by + h, 6, 3); out.fillRect(tx - 1, by + h + 3, 2, 3);
+      out.fillStyle = '#17151a'; out.textBaseline = 'top';
+      lines.forEach((l, i) => out.fillText(l, bx + 9, by + 5 + i * (fs + 1)));
+      out.restore();
+    }
   }
 
   // delar i lager (lagret är glest – snabbare än att gå igenom alla delar)

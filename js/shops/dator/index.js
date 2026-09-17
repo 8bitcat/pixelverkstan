@@ -42,6 +42,7 @@ export default {
     { year: 1991, title: 'Multimedia och DOOM', desc: '486:or, Sound Blaster och CD-ROM' },
     { year: 1999, title: '3D-kort och internet', desc: 'Pentium III, Voodoo och GeForce' },
     { year: 2008, title: 'Flera kärnor', desc: 'Core 2, DDR2 och Crysis' },
+    { year: 2016, title: 'GTX 1000 och VR', desc: 'GeForce GTX 1060/1070/1080, Skylake, DDR4 och VR-glasögon' },
     { year: 2021, title: 'AI och ray tracing', desc: 'Ryzen, RTX och RGB' },
   ],
   levels: catalog.LEVELS,

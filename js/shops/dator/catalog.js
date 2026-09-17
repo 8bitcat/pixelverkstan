@@ -27,6 +27,7 @@ export const ERAS = [
   { from: 2000, title: 'Gigahertz-kriget', emoji: '⚡' },
   { from: 2005, title: 'Flera kärnor', emoji: '🧠' },
   { from: 2010, title: 'SSD-revolutionen', emoji: '🚀' },
+  { from: 2016, title: 'GTX 1000 och VR', emoji: '🕶️' },
   { from: 2017, title: 'Ryzen och RGB', emoji: '🌈' },
   { from: 2021, title: 'AI och ray tracing', emoji: '🤖' },
 ];

@@ -552,6 +552,8 @@ export class BuildView {
     this.cursors.set(id, { order: m.order, s: m.s, x: m.x, y: m.y, drag: m.drag, name: info?.name || 'Kompis', color: info?.color || '#7ee8fa', t: performance.now() });
   }
   removeCursor(id) { this.cursors.delete(id); }
+  // chattmeddelande visas vid kompisens muspekare
+  chatCursor(id, text) { const c = this.cursors.get(id); if (c) { c.say = text; c.sayUntil = performance.now() + 7000; } }
   drawCursors(ctx) {
     if (!this.order || !this.cursors.size) return;
     const now = performance.now();
@@ -586,6 +588,14 @@ export class BuildView {
       ctx.fillStyle = '#17151a'; ctx.fillRect(x + 14, y + 22, w + 2, 18);
       ctx.fillStyle = c.color; ctx.fillRect(x + 15, y + 23, w, 16);
       ctx.fillStyle = '#17151a'; ctx.textBaseline = 'middle'; ctx.fillText(c.name, x + 20, y + 31);
+      if (c.say && now < c.sayUntil) {
+        ctx.font = '18px "VT323", monospace';
+        const tw = Math.min(260, Math.ceil(ctx.measureText(c.say).width)) + 14, bx = x + 14, by = y - 30;
+        ctx.fillStyle = '#17151a'; ctx.fillRect(bx - 2, by - 2, tw + 4, 26);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(bx, by, tw, 22);
+        ctx.fillStyle = c.color; ctx.fillRect(bx, by, 4, 22);
+        ctx.fillStyle = '#17151a'; ctx.fillText(c.say.length > 40 ? c.say.slice(0, 39) + '…' : c.say, bx + 9, by + 11);
+      }
       ctx.restore();
     }
   }

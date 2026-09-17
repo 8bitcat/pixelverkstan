@@ -5,6 +5,19 @@
 const PEER_JS = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
 const PREFIX = 'pixelverkstan-v1-';
 const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+// STUN hittar vägen mellan två nätverk; TURN skickar vidare när det inte går direkt
+// (t.ex. mobilnät). Open Relay är en gratis offentlig TURN-tjänst.
+const PEER_OPTS = {
+  debug: 0,
+  config: {
+    iceServers: [
+      { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+      { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+    ],
+  },
+};
 
 let peerLib = null;
 function loadPeer() {
@@ -32,6 +45,7 @@ export class Net {
     this.hostConn = null;    // klient: anslutningen till värden
     this.handlers = {};
     this.closed = false;
+    this.lastRecv = Date.now();
   }
   on(type, fn) { (this.handlers[type] ||= []).push(fn); return this; }
   emit(type, msg, from) { for (const fn of this.handlers[type] || []) { try { fn(msg, from); } catch (e) { console.error(e); } } }
@@ -44,7 +58,7 @@ export class Net {
       const code = attempt === 0 && wanted ? cleanCode(wanted) : makeCode();
       try {
         await new Promise((resolve, reject) => {
-          const peer = new Peer(PREFIX + code, { debug: 0 });
+          const peer = new Peer(PREFIX + code, PEER_OPTS);
           const fail = (err) => { peer.destroy(); reject(err); };
           peer.on('open', () => { this.peer = peer; resolve(); });
           peer.on('error', (err) => { if (!this.peer) fail(err); else this.emit('error', { err }); });
@@ -61,7 +75,7 @@ export class Net {
   }
   accept(conn) {
     conn.on('open', () => { this.conns.set(conn.peer, conn); this.emit('peer-join', {}, conn.peer); });
-    conn.on('data', (msg) => { if (msg && msg.t) this.emit(msg.t, msg, conn.peer); });
+    conn.on('data', (msg) => { this.lastRecv = Date.now(); if (msg && msg.t) this.emit(msg.t, msg, conn.peer); });
     const gone = () => { if (this.conns.delete(conn.peer)) this.emit('peer-leave', {}, conn.peer); };
     conn.on('close', gone);
     conn.on('error', gone);
@@ -73,7 +87,7 @@ export class Net {
     code = cleanCode(code);
     if (code.length !== 4) throw new Error('Rumskoden har fyra bokstäver.');
     await new Promise((resolve, reject) => {
-      const peer = new Peer({ debug: 0 });
+      const peer = new Peer(PEER_OPTS);
       let done = false;
       const timer = setTimeout(() => { if (!done) { done = true; peer.destroy(); reject(new Error('Fick inget svar från rummet. Stämmer koden?')); } }, 15000);
       peer.on('error', (err) => {
@@ -85,7 +99,7 @@ export class Net {
         this.peer = peer;
         const conn = peer.connect(PREFIX + code, { reliable: true });
         conn.on('open', () => { if (done) return; done = true; clearTimeout(timer); this.hostConn = conn; resolve(); });
-        conn.on('data', (msg) => { if (msg && msg.t) this.emit(msg.t, msg, 'host'); });
+        conn.on('data', (msg) => { this.lastRecv = Date.now(); if (msg && msg.t) this.emit(msg.t, msg, 'host'); });
         conn.on('close', () => { if (!this.closed) this.emit('host-leave', {}); });
       });
     });
@@ -93,6 +107,8 @@ export class Net {
     return code;
   }
 
+  // värden: koppla bort en spelare (t.ex. ett spöke efter omladdning)
+  drop(peerId) { const c = this.conns.get(peerId); this.conns.delete(peerId); try { c?.close(); } catch {} }
   send(msg) { if (this.hostConn?.open) this.hostConn.send(msg); }
   sendTo(peerId, msg) { const c = this.conns.get(peerId); if (c?.open) c.send(msg); }
   broadcast(msg, except = null) { for (const [id, c] of this.conns) if (id !== except && c.open) c.send(msg); }

@@ -20,6 +20,51 @@ export function toast(text, kind = '') {
   setTimeout(() => el.remove(), 3100);
 }
 
+// ---------- Chatt (co-op) ----------
+export function chatLog(name, color, text) {
+  const log = $('#chatlog');
+  const el = document.createElement('div');
+  el.className = 'chatline';
+  el.innerHTML = `<b style="background:${esc(color || '#7ee8fa')}">${esc(name)}</b> ${esc(text)}`;
+  log.append(el);
+  while (log.children.length > 6) log.firstChild.remove();
+  setTimeout(() => el.classList.add('old'), 14000);
+  setTimeout(() => el.remove(), 15000);
+}
+export function openChatBar(onSend) {
+  const bar = $('#chatbar'), input = $('#chat-input');
+  bar.classList.remove('hidden');
+  input.value = '';
+  input.focus();
+  const send = () => { const v = input.value.trim(); if (v) onSend(v); closeChatBar(); };
+  $('#chat-send').onclick = send;
+  input.onkeydown = (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); send(); }
+    if (e.key === 'Escape') closeChatBar();
+  };
+}
+export function closeChatBar() { $('#chatbar').classList.add('hidden'); $('#chat-input').blur(); }
+export const chatBarOpen = () => !$('#chatbar').classList.contains('hidden');
+
+// Kompisar som bygger just nu → kort i hörnet med "Bygg med"
+export function renderFriendBuilds(list, onJoin) {
+  const box = $('#friendbuilds');
+  const key = list.map((x) => `${x.order.id}:${x.names.join(',')}:${x.mine}`).join('|');
+  if (box.dataset.key === key) return;
+  box.dataset.key = key;
+  box.innerHTML = '';
+  for (const x of list) {
+    const el = document.createElement('div');
+    el.className = 'friendbuild';
+    el.style.setProperty('--pc', x.color || '#7ee8fa');
+    el.innerHTML = `<div><b>🔧 ${x.names.map(esc).join(' och ')} ${x.names.length > 1 ? 'bygger' : 'bygger'}</b><small>${esc(x.order.title)} åt ${esc(x.order.name)}</small></div>
+      ${x.mine ? '<span class="fb-here">Du är med</span>' : '<button class="btn btn-go btn-small">Bygg med</button>'}`;
+    el.querySelector('button')?.addEventListener('click', () => onJoin(x.order));
+    box.append(el);
+  }
+}
+
 // ---------- Modal ----------
 export function openModal(title, bodyHtml, buttons = [], { closable = true } = {}) {
   const m = $('#modal');
@@ -54,7 +99,7 @@ export function renderHud(game, h, room = null) {
     <div class="chip money">💰 ${fmt(game.money)} kr</div>
     <div class="chip" title="${li.next ? `Nästa år: ${esc(li.next.title)}` : 'Nutid!'}">📅 ${li.year ?? li.level} <small style="font-family:var(--font);font-size:15px">${esc(li.era?.title || li.title)}</small> <span class="xpbar"><i style="width:${Math.round(li.frac * 100)}%"></i></span></div>
     <div class="chip">😊 ${game.stats.served}</div>
-    ${room ? `<button class="chip room-chip" data-h="room" title="Rummet – koden och spelarna">👥 ${esc(room.code)} · ${room.count}</button>` : ''}
+    ${room ? `<button class="chip room-chip" data-h="room" title="Rummet – koden och spelarna">👥 ${esc(room.code)} · ${room.count}</button><button class="btn" data-h="chat" title="Chatta (Enter)">💬</button>` : ''}
     <div class="hud-spacer"></div>
     <button class="btn" data-h="stock" title="Förråd och skyltning">📦 Lager</button>
     <button class="btn" data-h="shop">🛒 Grossist</button>

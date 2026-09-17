@@ -377,3 +377,34 @@ h3 { font: 22px var(--head); font-weight: 400; }
   .av-sec h4 { font-size: 16px; margin: 6px 0 4px; }
 }
 /* ---------- slut: Avatarredigerare ---------- */
+
+/* ---------- Co-op: chatt och kompisars byggen ---------- */
+#chatlog { position: fixed; left: 12px; bottom: 12px; z-index: 40; display: flex; flex-direction: column; gap: 4px; max-width: min(420px, 70vw); pointer-events: none; }
+.chatline { background: rgba(23, 21, 26, .86); color: #f4efe2; font: 19px var(--font); padding: 3px 8px; border-left: 3px solid #f4efe2; transition: opacity 1s; }
+.chatline b { color: #17151a; padding: 0 5px; font-weight: 400; margin-right: 4px; }
+.chatline.old { opacity: 0; }
+#chatbar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 60; display: flex; gap: 6px; width: min(560px, calc(100vw - 24px)); background: var(--paper); border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); padding: 6px; }
+#chatbar input { flex: 1; min-width: 0; font: 22px var(--font); border: 2px solid var(--ink); padding: 4px 8px; }
+#friendbuilds { position: fixed; right: 10px; top: 58px; z-index: 35; display: flex; flex-direction: column; gap: 6px; width: min(300px, calc(100vw - 20px)); }
+#friendbuilds.in-build { top: 64px; right: 62px; }
+.friendbuild { display: flex; gap: 8px; align-items: center; background: var(--paper); border: 3px solid var(--ink); box-shadow: 4px 4px 0 var(--pc, #7ee8fa); padding: 6px 8px; animation: fb-in .25s ease-out; }
+.friendbuild > div { flex: 1; min-width: 0; }
+.friendbuild b { display: block; font: 19px var(--head); }
+.friendbuild small { display: block; font-size: 16px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fb-here { font-size: 15px; color: #2f8f46; white-space: nowrap; }
+@keyframes fb-in { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ---------- Avatarväljare ---------- */
+.av-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.av-card { position: relative; border: 3px solid var(--ink); background: #fff; box-shadow: 4px 4px 0 var(--pc, var(--ink)); display: flex; flex-direction: column; }
+.av-card.on { background: #fff8d6; }
+.av-card-main { border: 0; background: none; padding: 10px 6px 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; font: inherit; }
+.av-card-main canvas { width: 64px; height: 64px; image-rendering: pixelated; border: 2px solid var(--ink); }
+.av-card-main b { font: 22px var(--head); border-bottom: 3px solid var(--pc, var(--ink)); }
+.av-card-tools { display: flex; justify-content: center; gap: 4px; padding: 0 6px 8px; }
+.av-card-tools .btn { padding: 2px 6px; font-size: 14px; }
+.av-new { align-items: center; justify-content: center; cursor: pointer; min-height: 150px; font: inherit; background: var(--paper2); box-shadow: 4px 4px 0 var(--ink); }
+.av-new span { font: 44px var(--head); line-height: 1; }
+.av-new b { font: 22px var(--head); }
+body[data-screen="build"] #chatlog { bottom: 150px; left: 280px; }
+@media (max-width: 760px) { body[data-screen="build"] #chatlog { left: 8px; bottom: 170px; } }

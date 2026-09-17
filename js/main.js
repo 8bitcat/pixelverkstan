@@ -23,6 +23,13 @@ function myAvatar() {
   return { name: av.name || 'Du', look: av.look || SHOPKEEPER, color: myColor || av.color || '#7ee8fa' };
 }
 let myColor = null;   // färgen värden gav oss i co-op
+// en fast id per webbläsare, så att en omladdning ersätter den gamla anslutningen
+const PID = (() => { try { let v = localStorage.getItem('pixelverkstan_pid'); if (!v) { v = Math.random().toString(36).slice(2, 10); localStorage.setItem('pixelverkstan_pid', v); } return v; } catch { return Math.random().toString(36).slice(2, 10); } })();
+// i co-op väljer man alltid vem man är (sparad avatar eller en ny) – annars heter alla "Du"
+function requireName(then, text = 'Välj din avatar innan ni spelar tillsammans – så ser kompisarna vem du är.') {
+  if (!AV?.openAvatarPicker) return then();
+  AV.openAvatarPicker({ title: '🧑 Vem spelar?', text, onPick: () => then() });
+}
 
 // Alla ändringar av spelet går via act() (i co-op skickas de till värden)
 function act(name, args = {}) {
@@ -37,6 +44,7 @@ function queueRefresh() { if (refreshQueued) return; refreshQueued = true; reque
 
 function show(name) {
   screen = name;
+  document.body.dataset.screen = name;
   for (const id of ['menu', 'shop', 'build', 'lobby']) $('#' + id)?.classList.toggle('hidden', id !== name);
   if (name === 'shop') { floor.resize(); hudDirty = true; }
   if (name === 'build') requestAnimationFrame(() => build.resize());
@@ -89,8 +97,8 @@ async function renderMenu() {
     else chooseStartYear(s.module, (opts) => start(s.module, opts));
   }));
   $('#m-avatar').onclick = () => {
-    if (!AV?.openAvatarEditor) return UI.toast('Avatarredigeraren laddas …');
-    AV.openAvatarEditor({ onDone: () => renderMenu() });
+    if (!AV?.openAvatarPicker) return UI.toast('Avatarredigeraren laddas …');
+    AV.openAvatarPicker({ title: '🧑 Mina avatarer', text: 'Välj vem som spelar, ändra en avatar eller skapa en ny.', onPick: () => renderMenu(), onCancel: () => renderMenu() });
   };
   $('#m-coop').onclick = () => openCoopMenu();
   const r = $('#reset');
@@ -142,7 +150,8 @@ const app = {
   onPlayers: (list) => { lobbyPlayers = list; if (screen === 'lobby') renderLobby(); hudDirty = true; },
   onWelcome: (m) => startMirror(m),
   onEvent: (type, data) => { if (type === 'delivery') floor?.spawnVan(); if (type === 'levelup') setTimeout(() => UI.showLevelUp(game, data), 900); },
-  onHostLeft: () => { UI.toast('Värden stängde butiken.', 'bad'); endCoop(); },
+  onChat: (from, text) => showChat(from, text),
+  onHostLeft: (why) => { UI.toast(why === 'lost' ? 'Tappade kontakten med värden.' : 'Värden stängde butiken.', 'bad'); endCoop(); },
 };
 
 function setupGame(shopModule, opts) {
@@ -196,10 +205,18 @@ async function start(shopModule, opts = {}) {
   setupGame(shopModule, opts);
   show('shop');
   if (coop instanceof CoopHost) coop.started();
+  addBuildChatButton();
 }
 
 // klient i co-op: spelet speglar värdens
 async function startMirror(m) {
+  try { await startMirrorInner(m); } catch (e) {
+    console.error(e);
+    UI.toast('Kunde inte öppna butiken: ' + e.message, 'bad');
+    net?.send({ t: 'err', msg: e.message });
+  }
+}
+async function startMirrorInner(m) {
   const mod = SHOPS.find((s) => s.id === m.shop)?.module || mainShop();
   if (mod.init) { UI.toast('Laddar delar …'); await mod.init(); }
   await avatarReady;
@@ -211,7 +228,8 @@ async function startMirror(m) {
   coop.orders(m.orders);
   UI.closeModal();
   show('shop');
-  UI.toast(`👥 Du är med i butiken (rum ${net.code})!`, 'good');
+  addBuildChatButton();
+  UI.toast(`👥 Du är med i butiken (rum ${net.code})! Tryck Enter eller 💬 för att chatta.`, 'good');
 }
 
 function openBuild(order) {
@@ -236,6 +254,7 @@ const hudHandlers = {
   shop: () => UI.openShop(game),
   stock: () => UI.openStock(game),
   room: () => openRoomInfo(),
+  chat: () => openChat(),
   menu: () => {
     if (coop) {
       UI.openModal('Lämna butiken?', `<p style="font-size:18px">${coop instanceof CoopHost ? 'Du är värd – om du går till menyn stängs butiken för alla. Spelet sparas.' : 'Du lämnar din kompis butik.'}</p>`, [
@@ -247,6 +266,68 @@ const hudHandlers = {
     game.save(); build.order = null; renderMenu(); show('menu');
   },
 };
+
+// ---------- Chatt ----------
+function addBuildChatButton() {
+  $('#build-chat')?.remove();
+  if (!coop) return;
+  const b = document.createElement('button');
+  b.id = 'build-chat'; b.className = 'btn'; b.textContent = '💬'; b.title = 'Chatta (Enter)';
+  b.onclick = () => openChat();
+  $('#build-boot').before(b);
+}
+const coopPlayers = () => (coop instanceof CoopHost ? coop.playerList() : coop?.list || []);
+function openChat() { if (coop) UI.openChatBar(sendChat); }
+function sendChat(text) {
+  text = String(text || '').trim().slice(0, 80);
+  if (!text || !coop) return;
+  if (coop instanceof CoopHost) net.broadcast({ t: 'chat', from: 'host', text });
+  else net.send({ t: 'chat', text });
+  showChat('me', text);
+}
+function showChat(from, text) {
+  const mine = from === 'me' || (coop instanceof CoopClient && from === coop.you);
+  const info = mine ? myAvatar() : coopPlayers().find((p) => p.id === from);
+  const name = info?.name || 'Kompis', color = info?.color || '#7ee8fa';
+  const pl = mine ? floor?.localPlayer() : floor?.players.find((p) => p.id === from);
+  if (pl) pl.say = { text, until: performance.now() + 7000 };
+  if (!mine) build?.chatCursor?.(from, text);
+  UI.chatLog(name, color, text);
+}
+document.addEventListener('keydown', (e) => {
+  if (!coop || e.key !== 'Enter' || UI.modalOpen() || UI.chatBarOpen()) return;
+  if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return;
+  e.preventDefault();
+  openChat();
+});
+
+// ---------- Kompisar som bygger ----------
+const friendAt = new Map();   // spelare → beställningen de byggde senast
+function updateFriendBuilds() {
+  const box = $('#friendbuilds');
+  if (!coop || !floor || !game || (screen !== 'shop' && screen !== 'build')) { if (box.innerHTML) { box.innerHTML = ''; box.dataset.key = ''; } return; }
+  box.classList.toggle('in-build', screen === 'build');
+  const groups = new Map();
+  for (const p of floor.players) {
+    if (p.local || p.away !== 'workshop' || !p.orderId) {
+      if (!p.local) friendAt.delete(p.id);
+      continue;
+    }
+    const order = game.orders.find((o) => o.id === p.orderId);
+    if (!order) continue;
+    if (friendAt.get(p.id) !== order.id) {
+      friendAt.set(p.id, order.id);
+      if (!(screen === 'build' && build.order === order)) UI.toast(`🔧 ${p.name} började bygga ${order.title.toLowerCase()} – tryck på Bygg med för att hjälpa till!`, 'good');
+    }
+    const g = groups.get(order.id) || { order, names: [], color: p.color, mine: screen === 'build' && build.order === order };
+    g.names.push(p.name);
+    groups.set(order.id, g);
+  }
+  UI.renderFriendBuilds([...groups.values()], (order) => {
+    if (screen === 'build') { leaveWorkshop(); build.order = null; }
+    openBuild(order);
+  });
+}
 
 // ---------- Co-op: lobby ----------
 function openCoopMenu() {
@@ -263,9 +344,13 @@ function openCoopMenu() {
   dlg.querySelector('#c-host').onclick = () => {
     const mod = mainShop();
     UI.closeModal();
-    chooseStartYear(mod, (opts) => hostRoom(mod, opts), '👥 Vilket spel vill ni köra?');
+    requireName(() => chooseStartYear(mod, (opts) => hostRoom(mod, opts), '👥 Vilket spel vill ni köra?'));
   };
-  dlg.querySelector('#c-join').onclick = () => joinRoom(code.value);
+  dlg.querySelector('#c-join').onclick = () => {
+    const c = cleanCode(code.value);
+    if (c.length !== 4) return UI.toast('Rumskoden har fyra bokstäver.', 'bad');
+    requireName(() => joinRoom(c));
+  };
 }
 
 async function hostRoom(mod, opts) {
@@ -290,9 +375,11 @@ async function joinRoom(raw) {
   lobbyPlayers = [];
   show('lobby'); renderLobby();
   try { await net.join(code); } catch (e) { UI.toast(e.message, 'bad'); endCoop(); return; }
+  // ta bort ?rum= så att en omladdning inte går med en gång till
+  if (location.search.includes('rum=')) history.replaceState(null, '', location.pathname);
   lobbyState.connecting = false;
   const av = myAvatar();
-  net.send({ t: 'hello', name: av.name, look: av.look, color: av.color });
+  net.send({ t: 'hello', pid: PID, name: AV?.loadAvatar?.().name || '', look: av.look, color: av.color });
   renderLobby();
 }
 
@@ -337,18 +424,23 @@ function openRoomInfo() {
 }
 
 function endCoop() {
-  if (coop instanceof CoopHost) game?.save();
+  if (coop instanceof CoopHost) { game?.save(); net?.broadcast({ t: 'bye-host' }); }
+  if (coop instanceof CoopClient) net?.send({ t: 'bye' });
+  coop?.close?.();
   net?.close();
   net = null; coop = null; lobbyState = null; lobbyPlayers = []; myColor = null;
   if (build) build.order = null;
   if (floor) floor.players = floor.players.filter((p) => p.local);
   game = null; floor = null; build = null;
-  UI.closeModal();
+  UI.closeModal(); UI.closeChatBar();
+  $('#friendbuilds').innerHTML = ''; $('#friendbuilds').dataset.key = '';
+  friendAt.clear();
+  $('#build-chat')?.remove();
   renderMenu(); show('menu');
 }
 
 // ---------- Loop ----------
-let last = performance.now(), ordersTimer = 0;
+let last = performance.now(), ordersTimer = 0, friendsTimer = 0;
 function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
@@ -365,18 +457,24 @@ function loop(now) {
       if (ordersTimer <= 0) { UI.renderOrders(game, openBuild, floor.players); ordersTimer = 0.5; }
     }
     if (screen === 'build') build.frame(dt);
+    friendsTimer -= dt;
+    if (friendsTimer <= 0) { updateFriendBuilds(); friendsTimer = 0.4; }
   }
   requestAnimationFrame(loop);
 }
 
 window.addEventListener('resize', () => { if (floor) floor.resize(); if (build && screen === 'build') build.resize(); });
-window.addEventListener('beforeunload', () => { if (!(coop instanceof CoopClient)) game?.save(); });
+window.addEventListener('beforeunload', () => {
+  if (!(coop instanceof CoopClient)) game?.save();
+  if (coop instanceof CoopClient) net?.send({ t: 'bye' });
+  if (coop instanceof CoopHost) net?.broadcast({ t: 'bye-host' });
+});
 document.fonts?.ready.then(() => { hudDirty = true; });
 
 renderMenu().then(() => {
   // inbjudningslänk: ?rum=ABCD
   const room = cleanCode(new URLSearchParams(location.search).get('rum'));
-  if (room.length === 4) joinRoom(room);
+  if (room.length === 4) requireName(() => joinRoom(room));
 });
 requestAnimationFrame(loop);
 

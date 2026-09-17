@@ -89,7 +89,67 @@ export function saveAvatar(av) {
   const c = cleanAvatar(av), raw = JSON.stringify(c);
   store.set(AVATAR_KEY, raw);
   memo = { raw, av: c };
+  if (c.name) upsertProfile(c, av.oldName);
   return { ...c };
+}
+
+// ---------- Sparade avatarer (flera personer kan dela en dator) ----------
+export const PROFILES_KEY = 'pixelverkstan_avatars';
+const PROFILE_MAX = 12;
+export function listAvatars() {
+  let list = [];
+  try { list = JSON.parse(store.get(PROFILES_KEY) || '[]'); } catch { list = []; }
+  list = (Array.isArray(list) ? list : []).map(cleanAvatar).filter((a) => a.name);
+  // den nuvarande avataren (från tiden före listan) följer med
+  try {
+    const cur = JSON.parse(store.get(AVATAR_KEY) || 'null');
+    if (cur?.name && cur.look && !list.some((a) => a.name.toLowerCase() === String(cur.name).toLowerCase())) { list.unshift(cleanAvatar(cur)); store.set(PROFILES_KEY, JSON.stringify(list)); }
+  } catch { /* ingen */ }
+  return list;
+}
+function upsertProfile(av, oldName) {
+  const list = listAvatars().filter((a) => a.name.toLowerCase() !== String(oldName || '').toLowerCase() || !oldName);
+  const i = list.findIndex((a) => a.name.toLowerCase() === av.name.toLowerCase());
+  if (i >= 0) list.splice(i, 1);
+  list.unshift({ name: av.name, look: av.look, color: av.color });
+  store.set(PROFILES_KEY, JSON.stringify(list.slice(0, PROFILE_MAX)));
+}
+export function deleteAvatar(name) {
+  const list = listAvatars().filter((a) => a.name.toLowerCase() !== String(name).toLowerCase());
+  store.set(PROFILES_KEY, JSON.stringify(list));
+  const cur = loadAvatar();
+  if (cur.name && cur.name.toLowerCase() === String(name).toLowerCase()) saveAvatar(list[0] || { name: '', look: defaultLook(), color: rnd(MARKER_COLORS) });
+}
+
+// Välj vem du är: sparade avatarer + skapa ny. onPick(av) när man valt.
+export function openAvatarPicker({ title = '🧑 Vem spelar?', text = 'Välj din avatar eller skapa en ny.', onPick, onCancel } = {}) {
+  const list = listAvatars();
+  if (!list.length) return openAvatarEditor({ fresh: true, onDone: onPick, onCancel });
+  const cur = loadAvatar();
+  const body = `<p style="font-size:19px;margin-top:0">${esc(text)}</p>
+    <div class="av-pick">${list.map((a, i) => `<div class="av-card ${cur.name === a.name ? 'on' : ''}" style="--pc:${esc(avatarColor(a))}">
+        <button class="av-card-main" data-pick="${i}"><span data-face="${i}"></span><b>${esc(a.name)}</b></button>
+        <div class="av-card-tools"><button class="btn btn-small" data-edit="${i}" title="Ändra ${esc(a.name)}">✏️</button><button class="btn btn-small" data-del="${i}" title="Ta bort ${esc(a.name)}">🗑</button></div>
+      </div>`).join('')}
+      <button class="av-card av-new" data-new><span>✚</span><b>Ny avatar</b></button>
+    </div>`;
+  const dlg = openModal(title, body, [{ label: 'Avbryt', onClick: () => { closeModal(); onCancel?.(); } }]);
+  dlg.classList.add('dlg-wide');
+  const x = dlg.querySelector('[data-close]');
+  if (x) x.onclick = () => { closeModal(); onCancel?.(); };
+  dlg.querySelectorAll('[data-face]').forEach((el) => el.replaceWith(avatarPortrait(list[+el.dataset.face], 64)));
+  dlg.querySelectorAll('[data-pick]').forEach((b) => (b.onclick = () => { const av = saveAvatar(list[+b.dataset.pick]); closeModal(); onPick?.(av); }));
+  dlg.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => {
+    saveAvatar(list[+b.dataset.edit]);
+    openAvatarEditor({ onDone: (av) => onPick?.(av), onCancel: () => openAvatarPicker({ title, text, onPick, onCancel }) });
+  }));
+  dlg.querySelectorAll('[data-del]').forEach((b) => (b.onclick = () => {
+    const a = list[+b.dataset.del];
+    if (!confirm(`Ta bort avataren ${a.name}?`)) return;
+    deleteAvatar(a.name);
+    openAvatarPicker({ title, text, onPick, onCancel });
+  }));
+  dlg.querySelector('[data-new]').onclick = () => openAvatarEditor({ fresh: true, onDone: (av) => onPick?.(av), onCancel: () => openAvatarPicker({ title, text, onPick, onCancel }) });
 }
 
 export function avatarColor(av) {
@@ -212,9 +272,10 @@ function drawFloor(ctx, camX, camY) {
 
 let lastTab = 'skin';
 
-export function openAvatarEditor({ onDone } = {}) {
-  const saved = loadAvatar();
-  const cur = { name: saved.name || rnd(FIRST_NAMES), look: saved.look, color: saved.color };
+export function openAvatarEditor({ onDone, onCancel, fresh = false } = {}) {
+  const saved = fresh ? { name: '', look: defaultLook(), color: rnd(MARKER_COLORS) } : loadAvatar();
+  const oldName = fresh ? '' : saved.name;
+  const cur = { name: saved.name || (fresh ? '' : rnd(FIRST_NAMES)), look: saved.look, color: saved.color };
   const start = { ...cur };
   let tab = TABS.some((t) => t.id === lastTab) ? lastTab : 'skin';
   let adultBuild = cur.look.kid ? 5 : cur.look.build; // kroppsbyggnaden tillbaka när man byter barn → vuxen
@@ -246,12 +307,14 @@ export function openAvatarEditor({ onDone } = {}) {
   const dlg = openModal('🧑 Min avatar', body, [
     { label: '🎲 Slumpa', cls: 'av-rand', onClick: () => randomize() },
     { label: '↺ Återställ', cls: 'av-reset', onClick: () => { Object.assign(cur, start); input.value = cur.name; setErr(''); changed(); } },
-    { label: 'Avbryt', cls: 'av-cancel', onClick: closeModal },
+    { label: 'Avbryt', cls: 'av-cancel', onClick: () => { closeModal(); onCancel?.(); } },
     { label: '<span class="av-ico">💾 </span>Spara', cls: 'btn-go av-save', onClick: () => save() },
   ]);
   dlg.classList.add('dlg-avatar');
   // Klick utanför ska inte kasta bort ändringarna – stäng med ✕ eller Avbryt
   if (dlg.parentElement) dlg.parentElement.onclick = null;
+  const xBtn = dlg.querySelector('[data-close]');
+  if (xBtn) xBtn.onclick = () => { closeModal(); onCancel?.(); };
 
   const $ = (s) => dlg.querySelector(s);
   const cv = $('.av-cv'), ctx = cv.getContext('2d'), tagEl = $('.av-tag'), faceEl = $('.av-face');
@@ -441,7 +504,7 @@ export function openAvatarEditor({ onDone } = {}) {
       input.focus();
       return;
     }
-    const av = saveAvatar({ name, look: cur.look, color: cur.color });
+    const av = saveAvatar({ name, look: cur.look, color: cur.color, oldName });
     closeModal();
     try { toast(`Sparat! Hej ${av.name} 👋`, 'good'); } catch { /* ingen toast-yta */ }
     onDone?.(av);

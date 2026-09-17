@@ -49,7 +49,26 @@ export class CoopHost {
     net.on('bop', (m, from) => this.bop(m, from));
     net.on('breq', (m, from) => this.breq(m, from));
     net.on('cur', (m, from) => { this.app.build?.remoteCursor?.(from, m, this.playerInfo(from)); this.net.broadcast({ ...m, from }, from); });
+    net.on('ping', (m, from) => this.seen.set(from, Date.now()));
+    net.on('chat', (m, from) => {
+      const text = String(m.text || '').slice(0, 80);
+      if (!text || !this.players.has(from)) return;
+      this.net.broadcast({ t: 'chat', from, text }, from);
+      this.app.onChat?.(from, text);
+    });
+    net.on('bye', (m, from) => { this.net.drop(from); this.leave(from); });
+    net.on('err', (m, from) => { const p = this.players.get(from); this.app.toast?.(`⚠️ ${p?.name || 'En spelare'} fick ett fel: ${String(m.msg).slice(0, 80)}`, 'bad'); });
+    // spelare som inte hörts av på länge (stängd flik, tappad uppkoppling) tas bort
+    this.seen = new Map();
+    this.timer = setInterval(() => {
+      const now = Date.now();
+      this.net.broadcast({ t: 'ping' });
+      for (const id of [...this.players.keys()]) {
+        if (now - (this.seen.get(id) || now) > 12000) { this.net.drop(id); this.leave(id, 'tappade kontakten'); }
+      }
+    }, 2000);
   }
+  close() { clearInterval(this.timer); }
   get game() { return this.app.game; }
   playerInfo(id) { return id === 'host' ? this.app.me() : this.players.get(id); }
   nextColor() {
@@ -61,15 +80,26 @@ export class CoopHost {
     return [{ id: 'host', name: me.name, look: me.look, color: me.color, host: true }, ...[...this.players.values()]];
   }
   hello(m, from) {
+    this.seen.set(from, Date.now());
+    // samma webbläsare som anslöt igen: ta bort den gamla anslutningen
+    for (const [id, p] of this.players) if (m.pid && p.pid === m.pid && id !== from) { this.net.drop(id); this.leave(id, null); }
     let color = m.color;
     if (!color || [this.app.me().color, ...[...this.players.values()].map((p) => p.color)].includes(color)) color = this.nextColor();
     const clean = this.app.clean ? this.app.clean({ name: m.name, look: m.look, color }) : m;
-    const p = { id: from, name: String(clean.name || 'Kompis').slice(0, 12), look: clean.look, color: clean.color || color };
+    const taken = new Set([this.app.me().name, ...[...this.players.values()].map((x) => x.name)].map((n) => String(n).toLowerCase()));
+    let name = String(clean.name || '').trim().slice(0, 12) || 'Kompis';
+    for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${String(clean.name || 'Kompis').slice(0, 9)} ${n}`;
+    const p = { id: from, pid: m.pid || null, name, look: clean.look, color: clean.color || color };
     this.players.set(from, p);
     this.known.set(from, new Set());
     this.app.onPlayers?.(this.playerList());
     this.net.broadcast({ t: 'players', list: this.playerList() });
-    if (this.game) this.welcome(from);
+    if (this.game) {
+      this.welcome(from);
+      // syns direkt i dörren medan kompisen laddar
+      const f = this.app.floor;
+      if (f && !f.players.some((x) => x.id === from)) f.players.push({ id: from, name: p.name, look: p.look, color: p.color, x: 206, y: 104, tx: 206, ty: 110, dir: 'down', seed: Math.random() * 6 });
+    }
     else this.net.sendTo(from, { t: 'lobby', code: this.net.code, list: this.playerList() });
     this.app.toast?.(`👋 ${p.name} är med!`);
   }
@@ -83,14 +113,14 @@ export class CoopHost {
     });
   }
   started() { for (const id of this.players.keys()) this.welcome(id); }
-  leave(id) {
+  leave(id, why = 'lämnade butiken') {
     const p = this.players.get(id);
-    this.players.delete(id); this.known.delete(id);
+    this.players.delete(id); this.known.delete(id); this.seen.delete(id);
     this.app.floor && (this.app.floor.players = this.app.floor.players.filter((x) => x.id !== id));
     this.app.build?.removeCursor?.(id);
     this.app.onPlayers?.(this.playerList());
     this.net.broadcast({ t: 'players', list: this.playerList() });
-    if (p) this.app.toast?.(`${p.name} lämnade butiken.`);
+    if (p && why) this.app.toast?.(`${p.name} ${why}.`);
   }
   cmd(m, from) {
     const g = this.game;
@@ -100,6 +130,7 @@ export class CoopHost {
     this.econDirty = true; this.ordersDirty = true;
   }
   pos(m, from) {
+    this.seen.set(from, Date.now());
     const f = this.app.floor;
     if (!f) return;
     let pl = f.players.find((x) => x.id === from);
@@ -176,7 +207,15 @@ export class CoopClient {
     net.on('bsnap', (m) => this.bsnap(m));
     net.on('cur', (m) => app.build?.remoteCursor?.(m.from, m, this.list.find((p) => p.id === m.from)));
     net.on('host-leave', () => app.onHostLeft?.());
+    net.on('bye-host', () => app.onHostLeft?.());
+    net.on('chat', (m) => app.onChat?.(m.from, String(m.text || '').slice(0, 80)));
+    this.timer = setInterval(() => {
+      if (!this.net.hostConn) return;
+      this.net.send({ t: 'ping' });
+      if (Date.now() - this.net.lastRecv > 15000) { clearInterval(this.timer); app.onHostLeft?.('lost'); }
+    }, 2000);
   }
+  close() { clearInterval(this.timer); }
   get game() { return this.app.game; }
   // samma objekt per spelare så att figurernas bilder cachas
   cleanList(list) {

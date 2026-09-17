@@ -22,13 +22,14 @@ const host = await newPlayer('Pappa', '#f5c542');
 const kid = await newPlayer('Ville', '#ff7ab6');
 // värden startar rum
 await host.click('#m-coop'); await host.click('#c-host');
+await host.click('[data-pick="0"]');
 await host.click('[data-year="1991"]');
 await host.waitForSelector('.room-code', { timeout: 30000 });
 await host.waitForFunction(() => window.PV?.net?.code, null, { timeout: 30000 });
 const code = await host.evaluate(() => PV.net.code);
 ok(/^[A-Z]{4}$/.test(code), `rum skapat: ${code}`);
 // kompisen går med
-await kid.click('#m-coop'); await kid.fill('#c-code', code); await kid.click('#c-join');
+await kid.click('#m-coop'); await kid.fill('#c-code', code); await kid.click('#c-join'); await kid.click('[data-pick="0"]');
 await host.waitForFunction(() => document.querySelectorAll('.lobby-player').length === 2, null, { timeout: 30000 });
 await kid.waitForFunction(() => document.querySelectorAll('.lobby-player').length === 2, null, { timeout: 30000 });
 ok(true, 'båda syns i lobbyn');
