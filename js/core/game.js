@@ -194,15 +194,22 @@ export class Game {
         const tutActive = this.customers.some((c) => c.order.tutorial !== undefined);
         if (!tutActive && this.orders.length === 0) {
           const o = this.shop.tutorialOrder(this.tutorialStep, this);
-          // kunden kommer först när delarna (utom det kunden vill att vi köper in) står framme
-          if (o && this.tutorialReady(o)) this.spawn(o);
+          // första kunden kommer när startpaketet står framme; de andra kommer ändå (saknade delar köps in)
+          if (o && this.tutorialReady(o)) { this.spawn(o); this.tutorWait = 0; }
+          else if (this.tutorialStep > 0 || this.hasShown()) {
+            // skyddsnät: kan den guidade kunden inte komma går vi vidare på egen hand
+            this.tutorWait = (this.tutorWait || 0) + 2;
+            if (this.tutorWait > 90 || !o) { this.tutorialStep = this.shop.tutorialCount; this.tutorWait = 0; this.emit('toast', { text: 'Nu kör du på egen hand! Kunderna kommer – fyll på lagret hos 🛒 Grossisten.', kind: '' }); this.save(); }
+          }
         }
         this.spawnTimer = 2;
       } else {
-        if (this.queue().length < MAX_QUEUE && this.orders.length < MAX_ORDERS && this.customers.length < 7 && this.hasShown()) {
+        // kunder kommer även när butiken är tom (de beställer det man får köpa in), men mer sällan
+        const empty = !this.hasShown();
+        if (this.queue().length < MAX_QUEUE && this.orders.length < MAX_ORDERS && this.customers.length < 7 && (!empty || this.queue().length === 0)) {
           this.spawn(this.shop.generateOrder(this, FIRST_NAMES));
         }
-        this.spawnTimer = Math.max(14, 40 - this.level * 5) + Math.random() * 12;
+        this.spawnTimer = (Math.max(14, 40 - this.level * 5) + Math.random() * 12) * (empty ? 1.6 : 1);
       }
     }
     // leveranser
@@ -226,7 +233,8 @@ export class Game {
   tutorialReady(o) {
     const need = {};
     for (const it of o.items) if (it.part) need[it.part] = (need[it.part] || 0) + 1;
-    const missingOk = o.tutorial === 2 ? 1 : 0;   // tredje kunden vill ha ett kort vi inte har
+    if (o.tutorial > 0) return true;               // andra och tredje kunden: köp in det som saknas
+    const missingOk = 0;
     let missing = 0;
     for (const [id, n] of Object.entries(need)) if (this.shownFree(id) < n) missing += n - this.shownFree(id);
     return missing <= missingOk;
