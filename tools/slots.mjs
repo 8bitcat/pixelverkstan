@@ -1,0 +1,55 @@
+// Sparplatser per startår: välj år, gå till menyn, byt år, fortsätt, börja om, äldre sparning flyttas.
+import { createRequire } from "module";
+const require = createRequire("D:/Qisy/QISYFrontend/QISYFrontend-1/package.json");
+const { chromium } = require("playwright");
+const OUT = "D:/GamesProjects/pixelverkstan/tools/out/";
+const URL = process.argv[2] || "http://localhost:8777/index.html";
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1400, height: 860 } });
+const errors = [];
+page.on("pageerror", (e) => errors.push(e.message));
+const ok = (cond, msg) => { console.log((cond ? 'OK   ' : 'FEL  ') + msg); if (!cond) errors.push(msg); };
+await page.goto(URL);
+// äldre sparning (en per butik) från 1999
+await page.evaluate(() => { localStorage.clear(); localStorage.setItem('pixelverkstan_dator', JSON.stringify({ v: 2, money: 12345, xp: 95, stock: {}, stats: { served: 4 }, tutorialStep: 3, startYear: 1999 })); });
+await page.reload(); await page.waitForTimeout(400);
+ok(await page.evaluate(() => !localStorage.getItem('pixelverkstan_dator') && !!localStorage.getItem('pixelverkstan_dator_1999')), 'äldre sparning flyttad till 1999');
+const menu = async () => { await page.click('[data-h="menu"]'); await page.waitForSelector('#menu:not(.hidden)'); };
+const openShop = async () => { await page.click('[data-shop="dator"]'); await page.waitForSelector('[data-year="1983"]'); };
+const pick = async (y) => { await page.click(`[data-year="${y}"]`); await page.waitForFunction((y) => window.PV?.game?.startYear === y, y, { timeout: 30000 }); await page.waitForTimeout(500); };
+
+await openShop();
+await page.screenshot({ path: OUT + "slot0-years.png" });
+ok(await page.isVisible('[data-reset="1999"]'), '1999 visar Börja om');
+ok((await page.textContent('[data-year="1999"]')).includes('Fortsätt'), '1999 visar Fortsätt');
+await pick(1983);
+await page.evaluate(() => { PV.game.money = 77777; PV.game.xp = 31; });
+const y83 = await page.evaluate(() => PV.game.year);
+ok(y83 === 1984, `1983-spelet har gått till ${y83}`);
+await menu();
+await openShop();
+const t83 = await page.textContent('[data-year="1983"]');
+ok(t83.replace(/[\s  ]/g, '').includes('77777'), `1983 visar sparade pengar i årsvalet (${t83.replace(/\s+/g, ' ').trim()})`);
+await pick(2021);
+ok(await page.evaluate(() => PV.game.year === 2021 && PV.game.money !== 77777), 'nytt spel 2021 startade');
+// bygg i 2021 och testa zoomknappen i den nya byggvyn
+await page.evaluate(() => { const g = PV.game; g.tutorialStep = 9; const o = g.shop.tutorialOrder(1, g); for (const it of o.items) g.stock[it.part] = (g.stock[it.part] || 0) + 1; o.guided = false; const c = g.spawn(o); c.phase = 'queue'; PV.openBuild(g.accept(c)); });
+await page.click('button:has-text("Med hjälp")'); await page.waitForTimeout(300);
+const z0 = await page.evaluate(() => PV.build.cam.zoom);
+await page.click('[data-z="in"]'); await page.waitForTimeout(200);
+ok(await page.evaluate((z0) => PV.build.cam.zoom > z0, z0), 'zoomknappen styr den nya byggvyn');
+ok(await page.evaluate(() => document.querySelectorAll('#zoom-ctl').length === 1), 'bara en zoomrad');
+await page.click('#build-back'); await page.waitForTimeout(300);
+await menu();
+await openShop();
+await pick(1983);
+ok(await page.evaluate(() => PV.game.money === 77777 && PV.game.year === 1984), '1983-spelet fortsätter med sina pengar och år');
+await menu();
+await openShop();
+await page.click('[data-reset="1999"]'); await page.click('button:has-text("Ja, börja om")'); await page.waitForSelector('[data-year="1999"]');
+ok(!(await page.textContent('[data-year="1999"]')).includes('Fortsätt') && !(await page.evaluate(() => localStorage.getItem('pixelverkstan_dator_1999'))), 'Börja om rensar bara 1999');
+ok(await page.evaluate(() => !!localStorage.getItem('pixelverkstan_dator_1983') && !!localStorage.getItem('pixelverkstan_dator_2021')), '1983 och 2021 finns kvar');
+await page.screenshot({ path: OUT + "slot1-years.png" });
+console.log(errors.length ? errors.join('\n') : 'inga fel');
+await browser.close();
+process.exit(errors.length ? 1 : 0);

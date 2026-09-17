@@ -8,7 +8,7 @@ Samsung …) byggs ihop i en isometrisk vy, och spelet lär ut datorarkitektur
 
 ## Epoker
 
-Välj startår (1983, 1991, 1999, 2008 eller 2021). Varje byggd dator ger erfarenhet
+Välj startår (1983, 1991, 1999, 2008 eller 2021). Varje startår har en egen sparning – ☰ tar dig tillbaka till menyn där du kan fortsätta ett annat år, starta ett nytt eller börja om. Varje byggd dator ger erfarenhet
 och åren går framåt (30 XP per år). Grossisten säljer bara det som fanns just det året,
 kunderna beställer datorer som passar sin tid (Lotus 1-2-3, DOOM, Quake, Counter-Strike,
 Crysis, Minecraft …) och ett nytt år visar årets nyheter.
@@ -120,6 +120,7 @@ node tools/era-faults.mjs 1985 1998 2024 # varje glömd kabel/kontakt/jumper ger
 node tools/erabuild.mjs 1990 c90 help    # hel kund via klick/drag i webbläsaren från valfritt år
 node tools/e2e.mjs                       # butik → bygge → skrivbord → leverans → betalt
 node tools/era-start.mjs                 # startårsval, laddtid, butik och grossist 1983
+node tools/slots.mjs                     # sparningar per startår: byta år, fortsätta, börja om
 node tools/mobile.mjs                    # mobilvy (iPhone 13)
 node tools/zoom.mjs                      # renderingstider vid zoom
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner

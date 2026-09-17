@@ -7,6 +7,17 @@ const MAX_QUEUE = 3;
 const MAX_ORDERS = 3;
 export const XP_PER_YEAR = 30;   // erfarenhet per år som går
 
+// Sparningar: en per butik och startår (slot), t.ex. pixelverkstan_dator_1983
+export const saveKeyFor = (shopId, slot) => 'pixelverkstan_' + shopId + (slot != null ? '_' + slot : '');
+export function readSave(shopId, slot, lastYear = 2026) {
+  try {
+    const d = JSON.parse(localStorage.getItem(saveKeyFor(shopId, slot)) || 'null');
+    if (!d || (d.v !== 1 && d.v !== 2)) return null;
+    const startYear = d.startYear ?? 2021;
+    return { ...d, year: Math.min(lastYear, startYear + Math.floor((d.xp || 0) / XP_PER_YEAR)), served: d.stats?.served || 0 };
+  } catch { return null; }
+}
+
 export class Game {
   constructor(shop, opts = {}) {
     this.shop = shop;
@@ -16,6 +27,7 @@ export class Game {
     this.nextId = 1;
     this.spawnTimer = 1.5;
     this.time = 0;
+    this.slot = opts.slot ?? null;
     if (opts.fresh || !this.load()) this.reset(opts.startYear ?? shop.defaultStartYear ?? 2021);
   }
 
@@ -23,7 +35,7 @@ export class Game {
   emit(type, data) { for (const fn of this.listeners) fn(type, data); }
 
   // ---------- Sparning ----------
-  get saveKey() { return 'pixelverkstan_' + this.shop.id; }
+  get saveKey() { return saveKeyFor(this.shop.id, this.slot); }
   reset(startYear = 2021) {
     this.startYear = startYear; this.xp = 0;
     const s = this.shop.startFor ? this.shop.startFor(startYear) : this.shop.start;

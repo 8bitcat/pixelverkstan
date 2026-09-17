@@ -28,17 +28,23 @@ export class BuildView {
     this.finale = this.shop.Finale ? new this.shop.Finale(this) : null;
     $('#build-back').onclick = () => this.hooks.onExit();
     $('#build-boot').onclick = () => this.topAction();
-    this.canvas.addEventListener('pointerdown', (e) => this.onPtrDown(e));
-    this.canvas.addEventListener('pointermove', (e) => this.onPtrMove(e));
-    this.canvas.addEventListener('pointerup', (e) => this.onPtrUp(e));
-    this.canvas.addEventListener('pointercancel', (e) => this.ptrs.delete(e.pointerId));
-    this.canvas.addEventListener('wheel', (e) => {
-      if (!this.order || this.phase !== 'build') return;
-      e.preventDefault();
-      this.zoomAt(this.local(e), Math.exp(-e.deltaY * 0.0016));
-    }, { passive: false });
-    window.addEventListener('pointermove', (e) => this.onDragMove(e));
-    window.addEventListener('pointerup', (e) => this.onDragEnd(e));
+    // ett nytt spel (annat startår) skapar en ny byggvy – ta bort den förras lyssnare
+    if (this.canvas._buildOff) this.canvas._buildOff();
+    const on = [
+      [this.canvas, 'pointerdown', (e) => this.onPtrDown(e)],
+      [this.canvas, 'pointermove', (e) => this.onPtrMove(e)],
+      [this.canvas, 'pointerup', (e) => this.onPtrUp(e)],
+      [this.canvas, 'pointercancel', (e) => this.ptrs.delete(e.pointerId)],
+      [this.canvas, 'wheel', (e) => {
+        if (!this.order || this.phase !== 'build') return;
+        e.preventDefault();
+        this.zoomAt(this.local(e), Math.exp(-e.deltaY * 0.0016));
+      }, { passive: false }],
+      [window, 'pointermove', (e) => this.onDragMove(e)],
+      [window, 'pointerup', (e) => this.onDragEnd(e)],
+    ];
+    for (const [el, type, fn, opt] of on) el.addEventListener(type, fn, opt);
+    this.canvas._buildOff = () => { for (const [el, type, fn, opt] of on) el.removeEventListener(type, fn, opt); };
   }
 
   // ---------- Öppna ----------
@@ -488,7 +494,8 @@ export class BuildView {
   }
   zoomUI() {
     const stage = $('#build-stage');
-    if (!stage || $('#zoom-ctl')) return;
+    $('#zoom-ctl')?.remove();
+    if (!stage) return;
     const box = document.createElement('div');
     box.id = 'zoom-ctl';
     box.innerHTML = '<button class="btn btn-small" data-z="in" title="Zooma in">＋</button><button class="btn btn-small" data-z="out" title="Zooma ut">－</button><button class="btn btn-small" data-z="fit" title="Visa hela">⤢</button>';

@@ -43,7 +43,7 @@ export function renderHud(game, h) {
     <div class="chip">😊 ${game.stats.served}</div>
     <div class="hud-spacer"></div>
     <button class="btn" data-h="shop">🛒 Grossist</button>
-    <button class="btn" data-h="menu">☰</button>`;
+    <button class="btn" data-h="menu" title="Meny – byt startår eller butik">☰</button>`;
   $('#hud').querySelectorAll('[data-h]').forEach((b) => (b.onclick = () => h[b.dataset.h]()));
 }
 
