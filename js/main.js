@@ -174,14 +174,20 @@ function setupGame(shopModule, opts) {
     },
   });
   game.on((type, data) => {
-    if (type === 'change') { hudDirty = true; queueRefresh(); }
+    if (type === 'change' || type === 'fit') { hudDirty = true; queueRefresh(); }
     if (coop instanceof CoopHost && coop.onGameEvent(type, data) === false) return;
     if (type === 'toast') UI.toast(data.text, data.kind);
     if (type === 'levelup') setTimeout(() => UI.showLevelUp(game, data), 900);
     if (type === 'delivery') floor.spawnVan();
   });
   floor.onBoxClick = (d) => { if (!UI.modalOpen()) UI.openDelivery(game, d); };
-  floor.onShowcaseClick = (what) => { if (!UI.modalOpen()) UI.openShowcase(game, what); };
+  floor.onShowcaseClick = (what) => {
+    if (UI.modalOpen()) return;
+    if (what.empty) return UI.openFittings(game, 'platser', what.slot);
+    if (what.closed) { UI.toast('Den här delen av lokalen är stängd – bygg ut butiken under 🏪 Butiken.', ''); return UI.openFittings(game, 'lager'); }
+    if (what.unit) { UI.toast(what.unit === 'kaffe' ? '☕ Mmm, en kopp kaffe.' : '🍬 Nom nom.', 'good'); return; }
+    UI.openShowcase(game, what);
+  };
   floor.onCustomerClick = (c) => {
     if (!floor.clickable(c) || UI.modalOpen()) return;
     UI.openOrderDialog(game, c, {
@@ -252,6 +258,7 @@ function leaveWorkshop() {
 
 const hudHandlers = {
   shop: () => UI.openShop(game),
+  fit: () => UI.openFittings(game),
   stock: () => UI.openStock(game),
   room: () => openRoomInfo(),
   chat: () => openChat(),

@@ -3,6 +3,7 @@
 import * as catalog from './catalog.js';
 import * as layout from './layout.js';
 import * as orders from './orders.js';
+import * as upgrades from './upgrades.js';
 import { iconCanvas } from './art.js';
 import { Desk } from './desk.js';
 import { DB, loadParts, onSale } from './parts/index.js';
@@ -22,6 +23,8 @@ export default {
     { cat: 'ram', title: 'RAM-minnen' },
   ],
   hero: 'astral-5080',
+  // bås, hyllor, prylar och lokalstorlek (se upgrades.js)
+  fit: upgrades,
   // Stjärnobjektet: årets finaste grafikkort (RTX 5080 Astral när det finns)
   heroFor(game) {
     const list = onSale(game.year).filter((p) => p.cat === 'gpu');
@@ -58,7 +61,7 @@ export default {
   starterKit(game) {
     const kit = {};
     for (const b of game.startInfo?.builds || []) for (const p of b || []) kit[p.id] = (kit[p.id] || 0) + 1;
-    return Object.entries(kit).map(([id, n]) => [id, Math.max(0, n - game.stockFree(id) - game.incoming(id))]).filter(([id, n]) => n > 0 && DB.part[id] && onSale(game.year).includes(DB.part[id]));
+    return Object.entries(kit).map(([id, n]) => [id, Math.max(0, n - game.stockFree(id) - game.incoming(id))]).filter(([id, n]) => n > 0 && DB.part[id] && onSale(game.year).includes(DB.part[id]) && (!game.canSell || game.canSell(DB.part[id])));
   },
   startFor: orders.startFor,
   tutorialOrder: orders.tutorialOrder,

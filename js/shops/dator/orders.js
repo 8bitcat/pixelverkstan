@@ -65,13 +65,15 @@ const cheapest = (a) => a.reduce((m, p) => (!m || p.cost < m.cost ? p : m), null
 
 // Bygger en sammanhängande dator av delar som säljs år `year`.
 // pick(list) väljer bland kandidaterna (slump eller billigast).
-export function composeBuild(t, year, pick = rnd) {
+// allow(p) = delar butiken får sälja; en kategori utan tillåtna kandidater faller tillbaka på alla
+export function composeBuild(t, year, pick = rnd, allow = null) {
   const pool = onSale(year);
   const byCat = {};
   for (const p of pool) (byCat[p.cat] ||= []).push(p);
   const [lo, hi] = t.tier;
   const choose = (cat, f = () => true, strictTier = true) => {
-    const all = (byCat[cat] || []).filter(f);
+    let all = (byCat[cat] || []).filter(f);
+    if (allow) { const ok = all.filter(allow); if (ok.length) all = ok; }
     if (!all.length) return null;
     let c = all.filter((p) => p.tier >= lo && p.tier <= hi);
     if (!c.length && strictTier) c = all.filter((p) => p.tier >= lo - 1 && p.tier <= hi + 1);
@@ -126,14 +128,21 @@ export function generateOrder(game, names) {
   if (!pool.length) return null;
   const t = rnd(pool);
   const wantMissing = Math.random() < 0.28;
+  // butiken får bara sälja det montrarna och lagerhyllan tillåter; ibland kommer en kund
+  // som vill ha något finare ändå – då får man tacka nej och se det på efterfrågantavlan
+  const allow = game.canSell ? (p) => game.canSell(p) : null;
+  const wantLocked = allow && Math.random() < 0.22;
   let best = null, bestScore = -1e9;
   for (let i = 0; i < 30; i++) {
-    const b = composeBuild(t, year);
+    const b = composeBuild(t, year, rnd, wantLocked ? null : allow);
     if (!b) continue;
+    if (wantLocked && !b.some((p) => !allow(p))) continue;
     const missing = b.filter((p) => (game.shownFree ? game.shownFree(p.id) : game.stockFree(p.id)) < 1).length;
     const score = wantMissing ? -Math.abs(missing - 1) * 10 + Math.random() : -missing * 10 + Math.random();
     if (score > bestScore) { bestScore = score; best = b; }
   }
+  if (!best && wantLocked) for (let i = 0; i < 30 && !best; i++) best = composeBuild(t, year, rnd, allow);
+  if (!best) for (let i = 0; i < 30 && !best; i++) best = composeBuild(t, year);
   if (!best) return null;
   const items = best.map((p) => ({ cat: p.cat, part: p.id }));
   // efter ett tag låter kunden dig välja vissa delar själv
@@ -159,7 +168,10 @@ export function generateOrder(game, names) {
 export function startFor(year) {
   const t = templatesFor(year).sort((a, b) => a.tier[0] - b.tier[0])[0] || TEMPLATES[0];
   let a = null, b = null;
+  const low = (p) => p.tier <= 2;
+  for (let i = 0; i < 12 && !a; i++) a = composeBuild(t, year, cheapest, low);
   for (let i = 0; i < 12 && !a; i++) a = composeBuild(t, year, cheapest);
+  for (let i = 0; i < 20 && !b; i++) b = composeBuild(t, year, rnd, low);
   for (let i = 0; i < 20 && !b; i++) b = composeBuild(t, year);
   b ||= a;
   // butiken börjar tom: startkassan räcker till startpaketet (båda byggena) och lite till
@@ -192,7 +204,7 @@ export function tutorialOrder(i, game) {
     if (snd) cards.push(snd.bus);
     const better = onSale(year).filter((g) => g.cat === 'gpu' && game.stockFree(g.id) < 1 && (!gpu || g.cost > gpu.cost)
       && C.cardsFit([...cards, g.bus], mb) && C.psuFits(psu, mb, cpu, g).ok && psu.watt >= C.wattNeed(cpu, g, 0, year)
-      && g.cost <= (game.money || 0) * 0.8).sort((x, y) => x.cost - y.cost)[0];
+      && (!game.canSell || game.canSell(g)) && g.cost <= (game.money || 0) * 0.8).sort((x, y) => x.cost - y.cost)[0];
     if (better && gpu) build = build.map((p) => (p === gpu ? better : p));
   }
   const msgs = {

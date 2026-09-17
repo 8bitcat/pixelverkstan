@@ -30,6 +30,10 @@ export const COMMANDS = {
     g.returnStock(id);
     return true;
   },
+  // butikens inredning
+  buySlot: (g, { slot, option }) => g.buySlot(slot | 0, String(option)),
+  sellSlot: (g, { slot }) => g.sellSlot(slot | 0),
+  buyItem: (g, { id }) => g.buyItem(String(id)),
   complete: (g, { orderId, result }) => {
     const o = g.orders.find((x) => x.id === orderId);
     return o ? g.complete(o, result) : null;

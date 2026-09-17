@@ -1,6 +1,9 @@
 // DOM-gränssnitt: HUD, beställningskort, dialoger (kund, grossist, resultat).
 import { portrait } from './people.js';
 import { fmt } from './game.js';
+import * as PR from './floor-props.js';
+import { SLOTS, SLOT_DEPTH } from './floor-layout.js';
+import { hex, mix, mul } from './floor-pix.js';
 
 const $ = (s) => document.querySelector(s);
 export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -99,8 +102,10 @@ export function renderHud(game, h, room = null) {
     <div class="chip money">💰 ${fmt(game.money)} kr</div>
     <div class="chip" title="${li.next ? `Nästa år: ${esc(li.next.title)}` : 'Nutid!'}">📅 ${li.year ?? li.level} <small style="font-family:var(--font);font-size:15px">${esc(li.era?.title || li.title)}</small> <span class="xpbar"><i style="width:${Math.round(li.frac * 100)}%"></i></span></div>
     <div class="chip">😊 ${game.stats.served}</div>
+    ${game.shop.fit ? `<button class="chip fit-chip" data-h="fit" title="Butiken: dragningskraft, trivsel och rykte">🪧${game.fitStats.drag} 😊${game.fitStats.trivsel} ⭐${game.rykte}</button>` : ''}
     ${room ? `<button class="chip room-chip" data-h="room" title="Rummet – koden och spelarna">👥 ${esc(room.code)} · ${room.count}</button><button class="btn" data-h="chat" title="Chatta (Enter)">💬</button>` : ''}
     <div class="hud-spacer"></div>
+    ${game.shop.fit ? '<button class="btn" data-h="fit" title="Bås, hyllor, inredning och lokal">🏪 Butiken</button>' : ''}
     <button class="btn" data-h="stock" title="Förråd och skyltning">📦 Lager</button>
     <button class="btn" data-h="shop">🛒 Grossist</button>
     <button class="btn" data-h="menu" title="Meny – byt startår eller butik">☰</button>`;
@@ -162,6 +167,7 @@ export function openOrderDialog(game, c, h) {
           : game.stockFree(p.id) >= n ? ['ok', '✓ i förrådet']
             : game.stockFree(p.id) + game.incoming(p.id) >= n ? ['wait', '🚚 på väg<br><small>packa upp lådan</small>']
               : !game.onSale(p) ? ['bad', '✗ säljs inte längre<br><small>går inte att köpa in</small>']
+              : !game.canSell(p) ? ['bad', `🔒 ${esc(game.needFor(p))}<br><small>se 🏪 Butiken</small>`]
                 : ['bad', `✗ saknas<br><small>inköp ${fmt(p.cost)} kr</small>`];
         rows += `<div class="prow"><span data-icon="${p.id}"></span><div><div class="nm">${esc(p.name)}</div><div class="sp">${esc(shop.cats[p.cat].name)} · ${esc(shop.specLine(p))}</div></div>
           <div class="st ${st[0]}">${st[1]}</div></div>`;
@@ -171,12 +177,14 @@ export function openOrderDialog(game, c, h) {
           <div class="st ${n ? 'ok' : 'bad'}">${n ? `✓ ${n} i lager` : '✗ inget i lager'}</div></div>`;
       }
     }
+    const locked = miss.filter((m) => game.onSale(shop.part[m.id]) && !game.canSell(shop.part[m.id])).map((m) => game.needFor(shop.part[m.id]));
     const gone = game.hasGone(o) || miss.some((m) => !game.onSale(shop.part[m.id]));
-    const waiting = miss.length && !toBuy.length && !gone;
+    const waiting = miss.length && !toBuy.length && !gone && !locked.length;
     let tip = '';
     if (o.tutorial === 0) tip = '💡 Allt kunden vill ha finns i lagret (✓). Tryck på <b>Ta emot beställningen</b>.';
     else if (o.tutorial !== undefined && toBuy.length) tip = '💡 Grafikkortet finns inte i lagret! Köp in det från grossisten – det kommer i en låda som du packar upp.';
     else if (gone) tip = '🛑 En del i beställningen säljs inte längre och går inte att köpa in. Tacka nej till kunden – nya kunder kommer snart.';
+    else if (locked.length) tip = `🔒 Kunden vill ha något finare än butiken får sälja (${esc([...new Set(locked)].join(', '))}). Tacka nej – önskemålet hamnar på efterfrågantavlan i 🏪 Butiken.`;
     else if (waiting) tip = '🚚 Delarna är på väg. Packa upp lådan vid dörren när den kommit – sedan kan du ta emot beställningen.';
     else if (toBuy.length && buyCost > game.money) tip = `😬 Du har inte råd att köpa in det som saknas (${fmt(buyCost)} kr). Tacka nej, eller sälj fler datorer först.`;
     const price = shop.priceFor(o, {});
@@ -191,7 +199,7 @@ export function openOrderDialog(game, c, h) {
       { label: `🛒 Köp in det som saknas (${fmt(buyCost)} kr)`, cls: 'btn-gold', hidden: !toBuy.length, disabled: buyCost > game.money,
         onClick: () => { act('buyMissing', { customerId: c.id }); render(); } },
       { label: '🛒 Till grossisten', hidden: !missChoice.length, onClick: () => h.onShop(missChoice[0], () => openOrderDialog(game, c, h)) },
-      { label: gone ? '🛑 Går inte att bygga' : waiting ? '🚚 Väntar på lådan …' : '✓ Ta emot beställningen', cls: 'btn-go', disabled: miss.length || missChoice.length, onClick: () => { closeModal(); h.onAccept(c); } },
+      { label: gone ? '🛑 Går inte att bygga' : locked.length ? '🔒 Får inte säljas' : waiting ? '🚚 Väntar på lådan …' : '✓ Ta emot beställningen', cls: 'btn-go', disabled: miss.length || missChoice.length, onClick: () => { closeModal(); h.onAccept(c); } },
     ];
     const dlg = openModal(`Ny kund: ${esc(c.name)}`, body, buttons);
     dlg.querySelector('[data-face]').replaceWith(portrait(c.look));
@@ -279,19 +287,23 @@ export function openShop(game, tab = null, onClose = null) {
     if (st.filter === 'own') list = list.filter((p) => game.stockFree(p.id) > 0 || game.incoming(p.id) > 0);
     if (q) list = list.filter((p) => (p.name + ' ' + p.brand + ' ' + shop.specLine(p)).toLowerCase().includes(q));
     const sorters = { new: (a, b) => b.year - a.year || b.tier - a.tier, cheap: (a, b) => a.cost - b.cost, dear: (a, b) => b.cost - a.cost, name: (a, b) => a.name.localeCompare(b.name, 'sv') };
-    list.sort(sorters[st.sort]);
+    // det man får sälja först, låsta delar sist
+    const lockOf = (p) => (game.onSale(p) && !game.canSell(p) ? 1 : 0);
+    list.sort((a, b) => lockOf(a) - lockOf(b) || sorters[st.sort](a, b));
     const pages = Math.max(1, Math.ceil(list.length / PER));
     st.page = Math.min(st.page, pages - 1);
     const shown = list.slice(st.page * PER, st.page * PER + PER);
     const tabs = shop.catOrder.map((c) => `<button class="tab ${c === st.tab ? 'on' : ''}" data-tab="${c}">${shop.cats[c].icon} ${esc(shop.cats[c].name)}</button>`).join('');
     let rows = '';
     for (const p of shown) {
-      const sale = game.onSale(p);
-      const btn = sale
-        ? `<button class="btn btn-small btn-gold" data-buy="${p.id}" ${p.cost > game.money ? 'disabled' : ''}>Köp ${fmt(p.cost)} kr</button>`
-        : `<button class="btn btn-small" disabled>${p.year > y ? `📅 ${p.year}` : 'Utgången'}</button>`;
-      rows += `<div class="prow shoprow" style="${sale ? '' : 'opacity:.55'}"><span data-icon="${p.id}"></span>
-        <div><div class="nm">${esc(p.name)}</div><div class="sp">${esc(shop.specLine(p))} · ${p.year}</div></div>
+      const sale = game.onSale(p), lock = sale && !game.canSell(p);
+      const btn = lock
+        ? `<button class="btn btn-small" data-lock="1" title="${esc(game.needFor(p))}">🔒 ${fmt(p.cost)} kr</button>`
+        : sale
+          ? `<button class="btn btn-small btn-gold" data-buy="${p.id}" ${p.cost > game.money ? 'disabled' : ''}>Köp ${fmt(p.cost)} kr</button>`
+          : `<button class="btn btn-small" disabled>${p.year > y ? `📅 ${p.year}` : 'Utgången'}</button>`;
+      rows += `<div class="prow shoprow ${lock ? 'locked' : ''}" style="${sale ? '' : 'opacity:.55'}"><span data-icon="${p.id}"></span>
+        <div><div class="nm">${esc(p.name)}</div><div class="sp">${esc(shop.specLine(p))} · ${p.year}${lock ? ` · <b class="lock-need">🔒 ${esc(game.needFor(p))}</b>` : ''}</div></div>
         <div class="own">i lager<br><b>${game.stockFree(p.id)}</b>${game.incoming(p.id) ? ` <small title="på väg">+${game.incoming(p.id)}🚚</small>` : ''}</div>${btn}</div>`;
     }
     if (!shown.length) rows = `<p style="font-size:19px">Inga delar matchar.${st.filter === 'sale' ? ' Prova filtret "Kommande".' : ''}</p>`;
@@ -316,6 +328,7 @@ export function openShop(game, tab = null, onClose = null) {
     dlg.querySelectorAll('[data-filter]').forEach((b) => (b.onclick = () => { st.filter = b.dataset.filter; st.page = 0; render(); }));
     dlg.querySelectorAll('[data-page]').forEach((b) => (b.onclick = () => { st.page += +b.dataset.page; render(); dlg.scrollTop = 0; }));
     dlg.querySelectorAll('[data-buy]').forEach((b) => (b.onclick = () => { if (act('buy', { id: b.dataset.buy }) !== false) { toast(`🚚 ${shop.part[b.dataset.buy].name} kommer i nästa låda`, 'good'); render(); } }));
+    dlg.querySelectorAll('[data-lock]').forEach((b) => (b.onclick = () => { toast(`🔒 ${b.title}. Köp bås under 🏪 Butiken.`, 'bad'); }));
     dlg.querySelector('[data-kit]')?.addEventListener('click', () => { act('buyMany', { list: kit }); toast('🚚 Startpaketet är beställt – lådan kommer snart!', 'good'); closeModal(); onClose?.(); });
     live(() => render());
     dlg.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(shop.icon(shop.part[el.dataset.icon], 44, 38)));
@@ -370,7 +383,9 @@ export function openShowcase(game, what) {
       <div class="sp" style="font-size:18px">${esc(shop.specLine(p))}</div>
       <p style="font-size:19px;margin:8px 0 0">Årets finaste grafikkort – bara till för att titta på. Det kom ut <b>${p.year}</b> och kostar ${fmt(p.cost)} kr hos grossisten.</p></div>`;
   } else {
-    const list = Object.keys(game.shown).filter((id) => game.shownFree(id) > 0).map((id) => shop.part[id]).filter((p) => p && (what.cat ? p.cat === what.cat : !what.cats || what.cats.includes(p.cat))).sort((a, b) => b.cost - a.cost);
+    const F = shop.fit;
+    const list = Object.keys(game.shown).filter((id) => game.shownFree(id) > 0).map((id) => shop.part[id])
+      .filter((p) => p && (what.cat ? p.cat === what.cat : !what.cats || what.cats.includes(p.cat)) && (!what.brand || !F || F.brandKey(p) === what.brand) && game.canSell(p)).sort((a, b) => b.cost - a.cost);
     parts = list.map((p) => [p, 270, 170]);
     title = `🏛️ ${esc(what.title || shop.cats[what.cat]?.name || 'Hyllan')}`;
     body = list.length
@@ -385,4 +400,99 @@ export function openShowcase(game, what) {
     c.style.width = w + 'px'; c.style.maxWidth = '100%'; c.style.height = 'auto';
     el.replaceWith(c);
   });
+}
+
+
+// ---------- Butiken: platser, bås, prylar och lokal ----------
+const FIT_STATE = { tab: 'platser' };
+const previewCache = new Map();
+// pixelförhandsvisning av det som går att köpa (samma ritfunktioner som butiksgolvet)
+function fitPreview(F, o, size) {
+  const key = `${o.id}|${size}`;
+  if (previewCache.has(key)) return previewCache.get(key).cloneNode ? cloneCanvas(previewCache.get(key)) : previewCache.get(key);
+  let img;
+  if (o.kind === 'unit') img = PR.makeVendor(o.unit);
+  else {
+    const brand = o.kind === 'brand' ? F.brandInfo(o.cat, o.brand) : null;
+    const catColor = { gpu: '#3f9b3a', cpu: '#2c6fb7', ram: '#c9323a', storage: '#7a5bc9', sound: '#c86a2a' }[o.cat] || '#7a2e3e';
+    const velvet = mix(mul(hex(brand?.color || catColor, 0x7a2e3e), 0.5), 0x1a1030, 0.35);
+    const title = (F.CAT_NAME[o.cat] || o.cat).toUpperCase();
+    const f = size === 'small' ? PR.makeTower(title, velvet, brand, o.level) : PR.makeVitrine(size === 'wide' ? 156 : 118, title, velvet, brand, o.level);
+    img = document.createElement('canvas'); img.width = f.W; img.height = f.H + 6;
+    const x = img.getContext('2d'); x.drawImage(f.under, 0, 6); x.drawImage(f.over, 0, 6);
+  }
+  previewCache.set(key, img);
+  return cloneCanvas(img);
+}
+function cloneCanvas(c) { const n = document.createElement('canvas'); n.width = c.width; n.height = c.height; n.getContext('2d').drawImage(c, 0, 0); return n; }
+function statChips(o) {
+  const parts = [];
+  if (o.drag) parts.push(`<i>🪧 +${o.drag}</i>`); if (o.trivsel) parts.push(`<i>😊 +${o.trivsel}</i>`); if (o.rykte) parts.push(`<i>⭐ +${o.rykte}</i>`);
+  if (o.queue) parts.push(`<i>🧍 kö +${o.queue}</i>`); if (o.lager) parts.push(`<i>🗄️ tier ${o.lager + 1}</i>`); if (o.lokal) parts.push(`<i>🏬 ${o.lokal === 2 ? '6 platser' : '8 platser'}</i>`);
+  if (o.cap) parts.push(`<i>🔓 tier ≤ ${o.cap}</i>`);
+  return parts.join(' ');
+}
+
+export function openFittings(game, tab = null, slot = null) {
+  const shop = game.shop, F = shop.fit, st = FIT_STATE;
+  if (!F) return;
+  if (tab) st.tab = tab;
+  if (slot !== null) st.pick = slot; else st.pick = null;
+  const render = () => {
+    const y = game.year, fit = game.fit, lokal = F.lokalOf(fit), open = F.SLOTS_PER_LOKAL[lokal], S = game.fitStats;
+    const head = `<div class="fit-head"><div><b>🏬 ${esc(F.LOKAL_NAME[lokal])}</b><small>${open} platser · nivå ${lokal} av 3</small></div>
+      <div class="fit-stats"><span title="Dragningskraft: fler kunder">🪧 ${S.drag}</span><span title="Trivsel: kunderna väntar längre">😊 ${S.trivsel}</span><span title="Rykte: stjärnor från nöjda kunder">⭐ ${game.rykte}</span></div></div>`;
+    const dem = Object.entries(game.demand || {}).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const demand = dem.length ? `<div class="demand"><b>📋 Kunder har frågat efter:</b> ${dem.map(([t, n]) => `<span>${esc(t)} <i>×${n}</i></span>`).join(' ')}</div>` : '';
+    const tabs = [['platser', '🏬 Platser'], ['skylt', '🪧 Skyltning'], ['trivsel', '😊 Trivsel'], ['lager', '🗄️ Lager & lokal']]
+      .map(([id, label]) => `<button class="tab ${st.tab === id ? 'on' : ''}" data-tab="${id}">${label}</button>`).join('');
+    let body = '';
+    if (st.tab === 'platser' && st.pick !== null) {
+      // väljaren för en plats
+      const i = st.pick, sl = SLOTS[i], cur = fit.slots[i];
+      const opts = F.optionsFor(fit, i, sl.size, y);
+      const groups = [['Hyllor', opts.filter((o) => o.kind === 'cat')], ['Märkesbås', opts.filter((o) => o.kind === 'brand')], ['Annat', opts.filter((o) => o.kind === 'unit')]];
+      body = `<p style="font-size:18px;margin:0 0 8px"><b>Plats ${i + 1}</b> (${sl.size === 'small' ? 'liten – torn eller automat' : sl.size === 'wide' ? 'bred monter' : 'monter'}) · nu: <b>${esc(F.slotTitle(cur))}</b>${cur ? ` <button class="btn btn-small btn-red" data-sell="${i}">Riv (+${fmt(Math.round(F.slotValue(cur, y) * 0.4 / 50) * 50)} kr)</button>` : ''}</p>
+        <div class="fit-groups">${groups.filter(([, l]) => l.length).map(([name, list]) => `<h3>${name}</h3><div class="fit-grid">${list.map((o) => `<div class="fit-card ${o.current ? 'cur' : ''}" style="--pc:${esc(o.color || '#d8b24a')}">
+          <span data-prev="${esc(o.id)}"></span><b>${esc(o.title)}</b><small>${esc(o.desc)}</small><div class="chips">${statChips(o)}</div>
+          ${o.current ? '<span class="owned">✓ står här</span>' : `<button class="btn btn-small ${o.upgrade ? 'btn-go' : 'btn-gold'}" data-opt="${esc(o.id)}" ${o.pay > game.money ? 'disabled' : ''}>${o.upgrade ? 'Uppgradera' : 'Köp'} ${fmt(o.pay)} kr</button>`}
+        </div>`).join('')}</div>`).join('')}</div>`;
+    } else if (st.tab === 'platser') {
+      body = `<p style="font-size:18px;margin:0 0 8px">Det du visar är det du får sälja. En <b>kategorihylla</b> tar instegsvaror, ett <b>märkesbås</b> höjer taket för det märket – nivå 1 → tier 3, nivå 2 → tier 4, nivå 3 → tier 5. Tryck på en plats för att köpa eller byta.</p>
+        <div class="slot-grid">${SLOTS.map((sl, i) => {
+          const cur = fit.slots[i], isOpen = i < open;
+          const prev = !isOpen ? '<span class="slot-closed">🔒</span>' : cur ? `<span data-slot-prev="${i}"></span>` : '<span class="slot-empty">＋</span>';
+          return `<button class="slot-card ${!isOpen ? 'closed' : cur ? '' : 'empty'}" data-slot="${i}" ${!isOpen ? 'disabled' : ''}>
+            <div class="slot-prev">${prev}</div><b>Plats ${i + 1}</b><small>${!isOpen ? 'större lokal krävs' : esc(F.slotTitle(cur))}</small></button>`;
+        }).join('')}</div>`;
+    } else {
+      const group = { skylt: ['skylt'], trivsel: ['trivsel'], lager: ['lokal', 'lager'] }[st.tab] || [];
+      const list = F.ITEMS.filter((it) => group.includes(it.group));
+      body = `<div class="plist">${list.map((it) => {
+        const owned = !!fit.items[it.id], cost = F.priceFor(it.cost, y), soon = it.year > y, need = it.needs && !fit.items[it.needs];
+        const btn = owned ? '<span class="owned">✓ har</span>' : soon ? `<button class="btn btn-small" disabled>📅 ${it.year}</button>` : need ? `<button class="btn btn-small" disabled title="kräver ${esc(F.itemInfo(it.needs)?.name || '')}">🔒 ${fmt(cost)} kr</button>`
+          : `<button class="btn btn-small btn-gold" data-item="${it.id}" ${cost > game.money ? 'disabled' : ''}>Köp ${fmt(cost)} kr</button>`;
+        return `<div class="prow itemrow ${owned ? 'owned-row' : ''}"><span class="ico">${it.icon}</span><div><div class="nm">${esc(it.name)}</div><div class="sp">${esc(it.desc)}${need ? ` · <b>kräver ${esc(F.itemInfo(it.needs)?.name || '')}</b>` : ''}</div><div class="chips">${statChips(it)}</div></div>${btn}</div>`;
+      }).join('')}</div>`;
+    }
+    const dlg = openModal(`🏪 Butiken <small style="font-size:15px;margin-left:8px">💰 ${fmt(game.money)} kr</small>`, `${head}${demand}<div class="tabs">${tabs}</div>${body}`,
+      [st.pick !== null ? { label: '← Alla platser', onClick: () => { st.pick = null; render(); } } : { label: 'Stäng', onClick: closeModal }]);
+    dlg.classList.add('dlg-wide');
+    dlg.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { st.tab = b.dataset.tab; st.pick = null; render(); }));
+    dlg.querySelectorAll('[data-slot]').forEach((b) => (b.onclick = () => { st.pick = +b.dataset.slot; render(); }));
+    dlg.querySelectorAll('[data-slot-prev]').forEach((el) => {
+      const i = +el.dataset.slotPrev, cur = fit.slots[i], sl = SLOTS[i];
+      const o = cur.kind === 'unit' ? { id: 'unit:' + cur.unit, kind: 'unit', unit: cur.unit } : cur.kind === 'cat' ? { id: 'cat:' + cur.cat, kind: 'cat', cat: cur.cat, level: 0 } : { id: `brand:${cur.cat}:${cur.brand}:${cur.level}`, kind: 'brand', cat: cur.cat, brand: cur.brand, level: cur.level };
+      el.replaceWith(fitPreview(F, o, sl.size));
+    });
+    dlg.querySelectorAll('[data-prev]').forEach((el) => {
+      const o = F.optionsFor(fit, st.pick, SLOTS[st.pick].size, y).find((x) => x.id === el.dataset.prev);
+      if (o) el.replaceWith(fitPreview(F, o, SLOTS[st.pick].size));
+    });
+    dlg.querySelectorAll('[data-opt]').forEach((b) => (b.onclick = () => { act('buySlot', { slot: st.pick, option: b.dataset.opt }); render(); }));
+    dlg.querySelectorAll('[data-sell]').forEach((b) => (b.onclick = () => { act('sellSlot', { slot: +b.dataset.sell }); render(); }));
+    dlg.querySelectorAll('[data-item]').forEach((b) => (b.onclick = () => { act('buyItem', { id: b.dataset.item }); render(); }));
+    live(render);
+  };
+  render();
 }
