@@ -51,6 +51,10 @@ export const COMMANDS = {
   fire: (g, { id }) => g.fire(id | 0),
   train: (g, { id, course }) => g.train(id | 0, String(course)),
   touchOrder: (g, { orderId }) => g.touchOrder(orderId | 0),
+  // avtal
+  setSupplier: (g, { id }) => g.setSupplier(String(id)),
+  joinPartner: (g, { brand }) => g.joinPartner(String(brand)),
+  leavePartner: (g, { brand }) => g.leavePartner(String(brand)),
   complete: (g, { orderId, result }) => {
     const o = g.orders.find((x) => x.id === orderId);
     return o ? g.complete(o, result) : null;

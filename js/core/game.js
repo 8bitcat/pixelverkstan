@@ -48,6 +48,8 @@ export class Game {
     this.staff = [];        // anställda (core/staff.js)
     this.staffing = { cands: [], candYear: null, payT: 0 };
     this.rival = null;      // konkurrenten (core/rival.js)
+    this.supplier = 'lokal'; // grossist (shops/dator/suppliers.js)
+    this.partners = [];     // märkesprogram man är med i
     this.years = [];        // bokslut per år som gått
     this.awards = [];       // galor: decenniets butik
     this.ledger = null;     // snapshot vid årets början
@@ -78,6 +80,7 @@ export class Game {
     this.fit = this.emptyFit(); this.demand = {}; this.deskPc = null;
     this.models = []; this.bulk = []; this.staff = []; this.staffing = { cands: [], candYear: null, payT: 0 };
     initRival(this); this.years = []; this.awards = []; this.ledger = this.newLedger(startYear);
+    this.supplier = 'lokal'; this.partners = [];
     // händelser före startåret har redan hänt
     this.events = { seen: (this.shop.events?.EVENTS || []).filter((e) => e.year < startYear).map((e) => e.id), active: [], pending: null, dyn: {} };
     this.save();
@@ -95,7 +98,7 @@ export class Game {
     const start = this.startInfo ? { template: this.startInfo.template, builds: (this.startInfo.builds || []).map((b) => (b || []).map((p) => p.id)) } : null;
     // lådor som är på väg sparas som framme
     const deliveries = this.deliveries.map((d) => ({ id: d.id, items: d.items, state: 'arrived' }));
-    const data = { v: 7, money, xp, stock, shown: this.shown, deliveries, stats: this.stats, tutorialStep, startYear: this.startYear, start, nextId: this.nextId, fit: this.fit, demand: this.demand, deskPc: this.deskPc, models: this.models, events: this.events, bulk: this.bulk, staff: this.staff, staffing: this.staffing, rival: this.rival, years: this.years, awards: this.awards, ledger: this.ledger };
+    const data = { v: 7, money, xp, stock, shown: this.shown, deliveries, stats: this.stats, tutorialStep, startYear: this.startYear, start, nextId: this.nextId, fit: this.fit, demand: this.demand, deskPc: this.deskPc, models: this.models, events: this.events, bulk: this.bulk, staff: this.staff, staffing: this.staffing, rival: this.rival, years: this.years, awards: this.awards, ledger: this.ledger, supplier: this.supplier, partners: this.partners };
     try { localStorage.setItem(this.saveKey, JSON.stringify(data)); } catch { /* privat läge */ }
   }
   load() {
@@ -120,6 +123,8 @@ export class Game {
       this.awards = Array.isArray(d.awards) ? d.awards : [];
       this.ledger = d.ledger && typeof d.ledger === 'object' ? d.ledger : this.newLedger(year);
       if (this.events && !this.events.dyn) this.events.dyn = d.events?.dyn || {};
+      this.supplier = typeof d.supplier === 'string' ? d.supplier : 'lokal';
+      this.partners = Array.isArray(d.partners) ? d.partners.filter((x) => typeof x === 'string') : [];
       const year = Math.min(this.lastYear, this.startYear + Math.floor((this.xp || 0) / XP_PER_YEAR));
       // äldre sparningar: det som redan hänt räknas som sett, så att inte alla händelser kommer på en gång
       this.events = d.events && typeof d.events === 'object' ? { seen: d.events.seen || [], active: d.events.active || [], pending: d.events.pending || null, dyn: d.events.dyn || {} }
@@ -173,7 +178,7 @@ export class Game {
     this.emit('fit'); this.save(); this.emit('change');
     return true;
   }
-  get fitStats() { return this.shop.fit ? this.shop.fit.statsFor(this.fit) : { drag: 0, trivsel: 0, rykte: 0, queue: 0 }; }
+  get fitStats() { const st = this.shop.fit ? this.shop.fit.statsFor(this.fit) : { drag: 0, trivsel: 0, rykte: 0, queue: 0 }; const S = this.shop.suppliers; if (S && this.partners?.length) st.drag += this.partners.reduce((n, b) => n + (S.PARTNER[b]?.drag || 0), 0); return st; }
   // ryktet växer med stjärnorna kunderna gett
   get rykte() { return Math.min(20, Math.floor((this.stats?.stars || 0) / 6) + this.fitStats.rykte); }
   capFor(p) { return this.shop.fit ? this.shop.fit.capFor(this.fit, p) : 9; }
@@ -532,7 +537,52 @@ export class Game {
   clampShown(id) { if ((this.shown[id] || 0) > (this.stock[id] || 0)) this.shown[id] = this.stock[id] || 0; if (!this.shown[id]) delete this.shown[id]; }
 
   // Köp: pengarna dras direkt, delarna kommer i en låda en stund senare
-  costOf(p) { return Math.round(p.cost * this.eventMul('price', p.cat) / 10) * 10; }
+  get priceIdx() { return this.shop.fit?.priceFor ? this.shop.fit.priceFor(1000, this.year) / 1000 : 1; }
+  get supplierInfo() { return this.shop.suppliers?.SUPPLIER[this.supplier] || this.shop.suppliers?.SUPPLIERS[0] || { disc: 0, time: 1, fee: 0, risk: 0 }; }
+  partnerFor(p) { const S = this.shop.suppliers; if (!S || !this.partners?.length) return null; const k = this.shop.fit?.brandKey?.(p); return k && this.partners.includes(k) ? S.PARTNER[k] : null; }
+  // grossistens pris: händelser, grossistens rabatt och märkesprogrammets rabatt
+  costOf(p) { const pr = this.partnerFor(p); return Math.round(p.cost * this.eventMul('price', p.cat) * (1 - (this.supplierInfo.disc || 0)) * (1 - (pr?.disc || 0)) / 10) * 10; }
+  // avgifter per månad: grossistens konto + märkesprogrammen
+  monthlyFees() { const S = this.shop.suppliers; if (!S) return 0; const idx = this.priceIdx; let f = Math.round((this.supplierInfo.fee || 0) * idx / 50) * 50; for (const b of this.partners || []) f += Math.round((S.PARTNER[b]?.fee || 0) * idx / 50) * 50; return f; }
+  setSupplier(id) {
+    const S = this.shop.suppliers, s = S?.SUPPLIER[id];
+    if (!s || s.year > this.year) return false;
+    this.supplier = id;
+    this.emit('toast', { text: `${s.icon} ${s.name} är din grossist nu.`, kind: 'good' });
+    this.save(); this.emit('change');
+    return true;
+  }
+  joinPartner(brand) {
+    const S = this.shop.suppliers, pr = S?.PARTNER[brand];
+    if (!pr || pr.year > this.year || pr.until < this.year) return false;
+    if ((this.partners || []).includes(brand)) return false;
+    if (!S.hasBooth(this.fit, brand)) { this.emit('toast', { text: `Kräver ett ${brand.toUpperCase()}-bås nivå 2 under 🏪 Butiken.`, kind: 'bad' }); return false; }
+    const fee = Math.round(pr.fee * this.priceIdx / 50) * 50;
+    if (this.money < fee) { this.emit('toast', { text: 'Inte tillräckligt med pengar till första avgiften!', kind: 'bad' }); return false; }
+    this.money -= fee;
+    (this.partners ||= []).push(brand);
+    this.emit('toast', { text: `${pr.icon} Välkommen till ${pr.name}! −${Math.round(pr.disc * 100)} % på ${brand.toUpperCase()}-delar.`, kind: 'good' });
+    this.emit('fit'); this.save(); this.emit('change');
+    return true;
+  }
+  leavePartner(brand, why = '') {
+    if (!(this.partners || []).includes(brand)) return false;
+    this.partners = this.partners.filter((x) => x !== brand);
+    this.emit('toast', { text: `Du lämnade ${this.shop.suppliers?.PARTNER[brand]?.name || brand}${why ? ` – ${why}` : '.'}`, kind: why ? 'bad' : '' });
+    this.emit('fit'); this.save(); this.emit('change');
+    return true;
+  }
+  // varje månad: avgifter dras, program utan bås eller ur tiden avslutas
+  feeTick() {
+    const S = this.shop.suppliers;
+    if (!S) return;
+    for (const b of [...(this.partners || [])]) { const pr = S.PARTNER[b]; if (!pr || pr.until < this.year) this.leavePartner(b, 'programmet finns inte längre'); else if (!S.hasBooth(this.fit, b)) this.leavePartner(b, 'märkesbåset är borta'); }
+    const fee = this.monthlyFees();
+    if (!fee) return;
+    if (this.money >= fee) { this.money -= fee; this.stats.fees = (this.stats.fees || 0) + fee; this.emit('toast', { text: `🤝 Avgifter: −${fmt(fee)} kr`, kind: '' }); }
+    else { this.partners = []; if (this.supplierInfo.fee) this.supplier = 'lokal'; this.emit('toast', { text: 'Avgifterna kunde inte betalas – kontona är spärrade, tillbaka till Datagrossisten.', kind: 'bad' }); this.emit('fit'); }
+    this.save(); this.emit('change');
+  }
   buy(id, n = 1) {
     const p = this.shop.part[id], cost = this.costOf(p) * n;
     if (!this.onSale(p)) { this.emit('toast', { text: p.year > this.year ? `${p.name} finns inte förrän ${p.year}.` : `${p.name} säljs inte längre.`, kind: 'bad' }); return false; }
@@ -540,7 +590,7 @@ export class Game {
     if (this.money < cost) { this.emit('toast', { text: 'Inte tillräckligt med pengar!', kind: 'bad' }); return false; }
     this.money -= cost;
     let box = this.deliveries.find((d) => d.state === 'coming' && d.packUntil > this.time);
-    if (!box) { box = { id: this.nextId++, items: {}, state: 'coming', eta: this.time + DELIVERY_TIME, packUntil: this.time + PACK_WINDOW }; this.deliveries.push(box); }
+    if (!box) { box = { id: this.nextId++, items: {}, state: 'coming', eta: this.time + DELIVERY_TIME * (this.supplierInfo.time || 1), packUntil: this.time + PACK_WINDOW }; this.deliveries.push(box); }
     box.items[id] = (box.items[id] || 0) + n;
     this.save(); this.emit('change');
     return true;
@@ -555,6 +605,9 @@ export class Game {
   unpack(boxId, show = true) {
     const d = this.deliveries.find((x) => x.id === boxId);
     if (!d || d.state !== 'arrived') return false;
+    // billiga grossister: ibland är en del trasig – reklamerad, pengarna tillbaka
+    const risk = this.supplierInfo.risk || 0;
+    if (risk > 0) for (const id of Object.keys(d.items)) if (Math.random() < risk) { const p = this.shop.part[id]; d.items[id]--; if (!d.items[id]) delete d.items[id]; if (p) { this.money += this.costOf(p); this.emit('toast', { text: `🧨 ${p.name} var trasig i lådan – reklamerad, ${fmt(this.costOf(p))} kr tillbaka.`, kind: 'bad' }); } }
     for (const [id, n] of Object.entries(d.items)) {
       this.stock[id] = (this.stock[id] || 0) + n;
       if (show) this.shown[id] = (this.shown[id] || 0) + n;
@@ -724,6 +777,8 @@ export class Game {
     // personalen jobbar, konkurrenten rör sig
     if (this.staff?.length) tickStaff(this, dt);
     if (this.rival) tickRival(this, dt);
+    this.feeT = (this.feeT || 0) + dt;
+    if (this.feeT >= 60) { this.feeT = 0; this.feeTick(); }
     // leveranser
     for (const d of this.deliveries) {
       if (d.state === 'coming' && this.time >= d.eta) {

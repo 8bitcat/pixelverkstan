@@ -530,3 +530,7 @@ body[data-screen="build"] #chatlog { bottom: 150px; left: 280px; }
 .gala > b { font: 24px var(--head); }
 .medals { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; margin: 6px 0 2px; }
 .medals div { background: #fff; border: 2px solid var(--ink); padding: 4px; } .medals .md { display: block; font-size: 30px; line-height: 1; } .medals b { display: block; font: 18px var(--head); } .medals small { display: block; font-size: 14px; color: var(--muted); line-height: 1.1; }
+
+/* avtal */
+.avrow.on { background: #cfeec9; }
+.chips i.bad { color: var(--red2); }

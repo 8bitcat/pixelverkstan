@@ -378,6 +378,7 @@ export function openShop(game, tab = null, onClose = null) {
         <input id="shop-q" type="search" placeholder="Sök märke, modell, sockel …" value="${esc(st.q)}">
         ${chip('sale', `Till salu ${y} (${counts.sale})`)}${chip('soon', `Kommande (${counts.soon})`)}${chip('own', `I lager (${counts.own})`)}${chip('all', 'Alla')}
         <select id="shop-sort"><option value="new">Nyast</option><option value="cheap">Billigast</option><option value="dear">Dyrast</option><option value="name">Namn</option></select>
+        ${shop.suppliers ? `<button class="btn btn-small" data-avtal title="Grossist och märkesprogram">🤝 ${esc(game.supplierInfo.name)}${game.partners?.length ? ` +${game.partners.length}` : ''}</button>` : ''}
       </div>
       <div class="plist">${rows}</div>
       <div class="pager"><button class="btn btn-small" data-page="-1" ${st.page ? '' : 'disabled'}>← Föregående</button><span>Sida ${st.page + 1} av ${pages} · ${list.length} delar</span><button class="btn btn-small" data-page="1" ${st.page < pages - 1 ? '' : 'disabled'}>Nästa →</button></div>`;
@@ -391,6 +392,7 @@ export function openShop(game, tab = null, onClose = null) {
     dlg.querySelectorAll('[data-lock]').forEach((b) => (b.onclick = () => { toast(`🔒 ${b.title}. Köp bås under 🏪 Butiken.`, 'bad'); }));
     dlg.querySelector('[data-kit]')?.addEventListener('click', () => { act('buyMany', { list: kit }); toast('🚚 Startpaketet är beställt – lådan kommer snart!', 'good'); closeModal(); onClose?.(); });
     live(() => render());
+    dlg.querySelector('[data-avtal]')?.addEventListener('click', () => openSuppliers(game, () => openShop(game, null, onClose)));
     dlg.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(shop.icon(shop.part[el.dataset.icon], 44, 38)));
     const sort = dlg.querySelector('#shop-sort'); sort.value = st.sort;
     sort.onchange = () => { st.sort = sort.value; st.page = 0; render(); };
@@ -666,3 +668,5 @@ export function openTvMenu(game, shownConsoles, onPlay) {
 // egna modeller och händelser (ui-models.js)
 export { openModels, showReview, openEvent, openNews } from './ui-models.js';
 export { openStaff } from './ui-staff.js';
+import { openSuppliers } from './ui-avtal.js';
+export { openSuppliers };

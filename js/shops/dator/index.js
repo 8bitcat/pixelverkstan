@@ -10,6 +10,7 @@ import * as faults from './faults.js';
 import * as models from './models.js';
 import * as events from './events.js';
 import * as staff from './staff.js';
+import * as suppliers from './suppliers.js';
 import { iconCanvas } from './art.js';
 import { Desk } from './desk.js';
 import { DB, loadParts, onSale } from './parts/index.js';
@@ -47,6 +48,8 @@ export default {
   events,
   // personalens kurser (core/staff.js sköter logiken)
   staff,
+  // grossister och märkesprogram (suppliers.js)
+  suppliers,
   // Stjärnobjektet: årets finaste grafikkort (RTX 5080 Astral när det finns)
   heroFor(game) {
     const list = onSale(game.year).filter((p) => p.cat === 'gpu');

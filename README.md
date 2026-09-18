@@ -131,6 +131,15 @@ De tre första kunderna är guidade.
   delar ut medaljer i ekonomi, service, rykte, modeller och butik – guld ger rykte.
   Allt syns under 📰 Händelser.
 
+## Grossister och märkesprogram
+
+- **🤝 Avtal** (knappen i Grossisten): välj grossist – Datagrossisten AB (snabb, ordinarie
+  pris), Fjärran Östern Import (−12 %, lådan tar 2,5× så lång tid, 7 % risk att en del är
+  trasig och reklameras), Nordisk Datalogistik (−7 %, avgift), Grossist.se (−10 %, avgift,
+  från 2001). **Märkesprogram** (Intel, ATI, 3dfx, NVIDIA, AMD) kräver ett märkesbås nivå 2
+  under 🏪 Butiken och ger rabatt på märkets delar plus 🪧 +1 – mot en avgift i månaden.
+  Säljs båset avslutas programmet; kan avgifterna inte betalas spärras kontona.
+
 ## Avatar och co-op
 
 - **👤 Min avatar** i menyn: bygg din figur (frisyr, kläder, glasögon, huvudbonad …),
@@ -228,6 +237,7 @@ node tools/modeller.mjs                  # egna modeller: guiden, recensionen, p
 node tools/handelser.mjs                 # Node: alla händelser giltiga, auto-förslag byggbara varje år, betyg 1–10
 node tools/personal.mjs                  # personal: anställ, säljaren tar emot, teknikern bygger, ta över, kurs, lön, sparka
 node tools/rival.mjs                     # konkurrenten: skylt, styrka, drag med val, arg kund, bokslut + gala 2000
+node tools/avtal.mjs                     # grossister och märkesprogram: rabatt, leveranstid, bås-krav, avgifter
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner
 ```
 
