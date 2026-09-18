@@ -16,7 +16,7 @@ await page.evaluate(() => localStorage.clear()); await page.reload(); await page
 await page.click('[data-shop="dator"]'); await page.click(`[data-year="${YEAR}"]`);
 await page.waitForFunction(() => window.PV?.game, null, { timeout: 30000 }); await page.waitForTimeout(1000);
 await page.evaluate(() => {
-  const g = PV.game; g.money = 300000; g.tutorialStep = 99; g.buyItem('lokal2');
+  const g = PV.game; g.money = 300000; g.tutorialStep = 99; g.buyItem('lokal2'); g.buyItem('lokal3');
   const F = g.shop.fit, y = g.year;
   g.buySlot(3, F.optionsFor(g.fit, 3, 'medium', y).find((o) => o.id === 'unit:tv').id);
   g.buySlot(4, F.optionsFor(g.fit, 4, 'wide', y).find((o) => o.id === 'unit:spelhylla').id);

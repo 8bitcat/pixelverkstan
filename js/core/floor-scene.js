@@ -108,18 +108,38 @@ export function paintRoom(theme, opts = {}) {
   const lokal = opts.lokal || 1, items = opts.items || {};
   let wall = T(theme, 'wall', 0x3d5a80), wallDk = T(theme, 'wallDark', 0x2c4463);
   let flA = T(theme, 'floorA', 0xe9e1d2), flB = T(theme, 'floorB', 0xd8ccb6);
-  if (lokal === 1) { wall = mix(wall, 0x6a6a5a, 0.35); wallDk = mix(wallDk, 0x4a4a40, 0.35); flA = mix(flA, 0x8a8478, 0.3); flB = mix(flB, 0x6f6a60, 0.3); }
-  if (lokal === 3) { flA = mix(flA, 0xffffff, 0.35); flB = mix(flB, 0xd9d0c8, 0.3); }
+  // 1 Källarhålan: smutsigt och mörkt · 2 Gatuplan: rent men slitet · 3 Kvartersbutiken: som det ska vara
+  // 4 Hörnbutiken: finare matta och mer ljus · 5 Datorhuset: stengolv · 6 Megastore: marmor och mässing
+  if (lokal === 1) { wall = mix(wall, 0x5a5a4a, 0.45); wallDk = mix(wallDk, 0x3a3a30, 0.45); flA = mix(flA, 0x7a7468, 0.4); flB = mix(flB, 0x5f5a50, 0.4); }
+  if (lokal === 2) { wall = mix(wall, 0x6a6a5a, 0.22); wallDk = mix(wallDk, 0x4a4a40, 0.22); flA = mix(flA, 0x8a8478, 0.15); flB = mix(flB, 0x6f6a60, 0.15); }
+  if (lokal >= 5) { flA = mix(flA, 0xffffff, 0.35); flB = mix(flB, 0xd9d0c8, 0.3); }
+  if (lokal === 6) { flA = mix(flA, 0xfff8f0, 0.5); flB = mix(flB, 0xe8e0d8, 0.4); }
   paintFloor(P, flA, flB, lokal, items, opts.openSlots ?? 3);
   paintWalls(P, wall, wallDk, lokal);
-  paintStorefront(P, wall, items, opts.sign);
+  paintStorefront(P, wall, items, opts.sign, lokal);
   paintWallDecor(P, wall, wallDk, theme, items, lokal);
-  if (lokal === 1) paintWorn(P, wall);
+  if (lokal === 1) { paintWorn(P, wall); paintShabby(P); }
+  if (lokal === 2) paintPlain(P, wall);
+  if (lokal === 6) paintLuxury(P);
   return P;
+}
+// Gatuplan: rent men enkelt – några lagade fläckar, en spricka kvar, sparsamt ljus
+function paintPlain(P, wall) {
+  for (const [x0, y0, w, h] of [[250, 60, 8, 6], [444, 62, 6, 5]]) for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) P.px(x, y, mix(wall, 0xffffff, 0.12));
+  let x = 300, y = 36;
+  for (let i = 0; i < 14; i++) { P.px(x, y, 0x1a1a24, 0.35); y += 1; x += hash(i, 1, 97) > 0.6 ? 1 : 0; }
+  P.darken(6, 7, 500, FH - 7, 0.94);
+}
+// Megastore: mässingslister, extra spotlights och en röd matta från dörren
+function paintLuxury(P) {
+  P.hl(6, 55, 500, 0xf0d070); P.hl(6, 56, 500, 0xc8a24a); P.hl(6, 80, 500, 0xf0d070);
+  for (const sx of [52, 132, 214, 318, 420, 478, 92, 173, 266, 369, 449]) { P.rect(sx - 3, 3, 7, 6, 0xd8b24a); P.hl(sx - 3, 3, 7, 0xfbe7a0); P.hl(sx - 2, 9, 5, 0xfff8e0); }
+  for (let y = WALL_Y + 16; y < WALL_Y + 90; y++) for (let x = DOOR.cx - 18; x < DOOR.cx + 18; x++) { const e = x === DOOR.cx - 18 || x === DOOR.cx + 17; P.px(x, y, e ? 0xd8b24a : mix(0x7a1a2a, 0x9e1b22, (bayer(x, y) - 0.5) * 0.3 + 0.5)); }
+  P.rect(DOOR.cx - 18, WALL_Y + 90, 36, 2, 0xd8b24a);
 }
 
 function paintFloor(P, flA, flB, lokal = 2, items = {}, openSlots = 3) {
-  const TW = lokal === 3 ? 48 : 32, TH = lokal === 3 ? 30 : 20;
+  const TW = lokal >= 5 ? 48 : 32, TH = lokal >= 5 ? 30 : 20;
   for (let y = WALL_Y; y < FH; y++) for (let x = 0; x < FW; x++) {
     const tx = Math.floor(x / TW), ty = Math.floor((y - WALL_Y) / TH);
     const lx = x - tx * TW, ly = (y - WALL_Y) - ty * TH;
@@ -127,12 +147,14 @@ function paintFloor(P, flA, flB, lokal = 2, items = {}, openSlots = 3) {
     c = mul(c, 0.97 + hash(tx, ty, 1) * 0.05);
     const h = hash(x, y, 2);
     if (h > 0.94) c = mul(c, 0.95); else if (h < 0.02) c = mix(c, 0xffffff, 0.25);
-    if (lokal === 3) { const vein = Math.sin(x * 0.17 + y * 0.31 + Math.sin(x * 0.05) * 4); if (vein > 0.96) c = mix(c, 0xb8b0c4, 0.3); }
+    if (lokal >= 5) { const vein = Math.sin(x * 0.17 + y * 0.31 + Math.sin(x * 0.05) * 4); if (vein > 0.96) c = mix(c, lokal === 6 ? 0xd8b24a : 0xb8b0c4, lokal === 6 ? 0.25 : 0.3); }
     if (lx === 0 || ly === 0) c = mul(c, 0.84);
     else if (lx === 1 || ly === 1) c = mix(c, 0xffffff, 0.2);
     else if (lx + ly > 9 && lx + ly < 12 && ly < 8) c = mix(c, 0xffffff, lokal === 1 ? 0.03 : 0.07); // glans
     P.px(x, y, c);
   }
+  // Hörnbutiken och uppåt: extra ljuskäglor på golvet
+  if (lokal >= 4) for (const sx of [92, 173, 266, 369, 449]) P.ell(sx, WALL_Y + 40, 30, 14, 0xfff3d0, 0.08, 4);
   // sliten lokal: sprickor, fläckar och skräp
   if (lokal === 1) {
     for (const [cx, cy, len, seed] of [[60, 200, 40, 1], [230, 380, 60, 2], [430, 400, 36, 3], [150, 300, 28, 4], [340, 190, 44, 5]]) {
@@ -162,8 +184,8 @@ function paintFloor(P, flA, flB, lokal = 2, items = {}, openSlots = 3) {
   // museimatta under stjärnobjektet
   paintRug(P, ROPE.x0 - 10, ROPE.back - 12, ROPE.x1 + 10, ROPE.front + 12, 0x5e1622, 0xd8b24a, 'museum');
   // väntrumsmatta (finare med prylen "ny matta")
-  if (items.matta) paintRug(P, SOFA.x0 - 14, SOFA.base - 36, ARMCHAIR.x1 + 10, TABLE.base + 26, 0x7a2a3e, 0xe8c26a, 'museum');
-  else paintRug(P, SOFA.x0 - 10, SOFA.base - 32, ARMCHAIR.x1 + 8, TABLE.base + 22, lokal === 1 ? 0x5a5a52 : 0x3f5667, lokal === 1 ? 0x8a8478 : 0xd9d2c3, 'stripe');
+  if (items.matta || lokal >= 4) paintRug(P, SOFA.x0 - 14, SOFA.base - 36, ARMCHAIR.x1 + 10, TABLE.base + 26, lokal >= 6 ? 0x2a2a4a : 0x7a2a3e, lokal >= 6 ? 0xd8b24a : 0xe8c26a, 'museum');
+  else paintRug(P, SOFA.x0 - 10, SOFA.base - 32, ARMCHAIR.x1 + 8, TABLE.base + 22, lokal <= 2 ? 0x5a5a52 : 0x3f5667, lokal <= 2 ? 0x8a8478 : 0xd9d2c3, 'stripe');
   // ljuskäglor på golvet
   P.ell(HERO.cx, HERO.base - 22, 88, 42, 0xfff3d0, 0.22, 6);
   SLOTS.forEach((v, i) => { if (i < openSlots) P.ell((v.x0 + v.x1) / 2, v.base - 8, (v.x1 - v.x0) * 0.62, 26, 0xfff3d0, 0.14); });
@@ -230,7 +252,7 @@ function paintWalls(P, wall, wallDk, lokal = 2) {
   P.hl(6, 55, 500, 0xd4b27c); P.hl(6, 56, 500, 0x8a6a45);
   // väggbelysning från spotlights (i den slitna lokalen är två trasiga)
   for (const sx of SPOT_X) for (let y = 9; y < 70; y++) {
-    if (lokal === 1 && (sx === 132 || sx === 420)) break;
+    if (lokal <= 2 && (sx === 132 || sx === 420)) break;
     const half = 2 + (y - 9) * 0.42, fade = 1 - (y - 9) / 61;
     for (let x = Math.floor(sx - half); x <= sx + half; x++) {
       const e = 1 - Math.abs(x - sx) / half;
@@ -242,10 +264,10 @@ function paintWalls(P, wall, wallDk, lokal = 2) {
   // tak + skenor + spotlights
   P.rect(0, 0, FW, 7, 0x1c1f2b); P.hl(0, 6, FW, 0x0f1118); P.hl(6, 3, 500, 0x5a5f6e); P.hl(6, 4, 500, 0x3a3e4a);
   for (const sx of SPOT_X) {
-    const dead = lokal === 1 && (sx === 132 || sx === 420);
+    const dead = lokal <= 2 && (sx === 132 || sx === 420);
     P.rect(sx - 2, 4, 5, 5, 0x2a2d36); P.vl(sx - 2, 4, 5, 0x4a4f5c); P.hl(sx - 2, 9, 5, dead ? 0x6a6a60 : 0xfff2c0); if (!dead) P.px(sx, 9, 0xffffff);
   }
-  if (lokal === 3) for (const sx of [92, 173, 266, 369, 449]) { P.rect(sx - 2, 4, 5, 5, 0x2a2d36); P.hl(sx - 2, 9, 5, 0xfff2c0); P.px(sx, 9, 0xffffff); }
+  if (lokal >= 4) for (const sx of [92, 173, 266, 369, 449]) { P.rect(sx - 2, 4, 5, 5, 0x2a2d36); P.hl(sx - 2, 9, 5, 0xfff2c0); P.px(sx, 9, 0xffffff); }
   // sidoväggar
   for (const x0 of [0, 506]) { P.rect(x0, 0, 6, FH, 0x1c1f2b); P.vl(x0 === 0 ? 5 : 506, 7, FH - 7, 0x363c50); }
 }
@@ -265,7 +287,7 @@ function frameRect(P, x0, y0, x1, y1, t = 3) {
   P.hl(x0 - 1, y0 - 1, x1 - x0 + 2, 0x23262f);
 }
 
-function paintStorefront(P, wall, items = {}, sign = '') {
+function paintStorefront(P, wall, items = {}, sign = '', lokal = 3) {
   for (const [x0, y0, x1, y1] of WIN) {
     glass(P, x0, y0, x1, y1);
     frameRect(P, x0, y0, x1, y1);
@@ -284,8 +306,8 @@ function paintStorefront(P, wall, items = {}, sign = '') {
     P.rect(104, 52, 30, 14, 0xc9323a); text(P, SMALL, 'NYHET!', 106, 55, 0xffffff);
     P.hl(104, 27, 30, 0x8a8f9c);
   }
-  // lysande fasadskylt ovanför fönstren (prylen "lysande fasadskylt")
-  if (items.logoskylt) {
+  // lysande fasadskylt ovanför fönstren (prylen "lysande fasadskylt" – ingår från Hörnbutiken)
+  if (items.logoskylt || lokal >= 4) {
     const x0 = 14, x1 = 170, y0 = 8, y1 = 17;
     for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) P.px(x, y, mix(0x1a1a24, 0x2a2a36, bayer(x, y)));
     P.box(x0, y0, x1 - x0, y1 - y0, 0xd8b24a);
@@ -384,6 +406,34 @@ function paintWallDecor(P, wall, wallDk, theme, items = {}, lokal = 2) {
     P.px(338, 68, 0x3a78d8); P.px(350, 68, 0x3a78d8); P.rect(343, 67, 4, 2, 0x45e06a); P.rect(343, 70, 4, 1, 0xe8b230); P.rect(343, 72, 4, 1, 0xe23b5a);
     P.rect(340, 62, 1, 2, 0x8a8f9c); P.rect(354, 60, 1, 4, 0x8a8f9c);
   }
+}
+
+// Sliten lokal, del två: plywood för ett fönster, spindelväv i hörnen, flagnande tapet och
+// smutsigare ljus – det ska synas på tre meters håll att butiken behöver renoveras
+function paintShabby(P) {
+  // plywoodskivor spikade över högra fönstret
+  const [x0, y0, x1, y1] = WIN[1];
+  for (let y = y0 - 1; y < y1 + 1; y++) for (let x = x0 - 2; x < x1 + 2; x++) {
+    const board = Math.floor((y - y0) / 12), edge = (y - y0) % 12 === 0 || (y - y0) % 12 === 11;
+    let c = mix(0xb08a58, 0xc9a36b, hash(x >> 2, board, 61) * 0.6 + (bayer(x, y) - 0.5) * 0.1);
+    if (edge) c = mul(c, 0.7);
+    if (hash(x, y, 62) > 0.985) c = 0x5a3d2b;
+    P.px(x, y, c);
+  }
+  for (let by = y0 + 3; by < y1; by += 12) { P.px(x0, by, 0x3a3a44); P.px(x1 - 2, by, 0x3a3a44); }
+  P.rect(x0 + 8, y0 + 20, 26, 12, 0xf4efe2); P.box(x0 + 8, y0 + 20, 26, 12, 0x17151a); text(P, SMALL, 'TRASIG', x0 + 10, y0 + 23, 0xc9323a);
+  // spindelväv i övre hörnen
+  const web = (cx, cy, dir) => { for (let i = 0; i < 14; i++) { P.px(cx + dir * i, cy + Math.round(i * 0.55), 0x9a9a90, 0.5); P.px(cx + dir * Math.round(i * 0.5), cy + i, 0x9a9a90, 0.5); P.px(cx + dir * i, cy + Math.round(i * 0.2), 0x9a9a90, 0.35); } for (let i = 3; i < 13; i += 4) for (let j = 0; j <= i; j++) P.px(cx + dir * (i - Math.round(j * 0.55)), cy + Math.round(j * (i / 13) + i * 0.3), 0xb8b8b0, 0.35); };
+  web(7, 8, 1); web(505, 8, -1); web(238, 8, 1);
+  // flagnande tapet vid pelaren och bakom disken
+  for (const [px, py, w, h] of [[250, 12, 8, 14], [300, 40, 10, 9], [446, 40, 7, 12]]) {
+    for (let y = 0; y < h; y++) for (let x = 0; x < w - Math.round(y * 0.4); x++) P.px(px + x, py + y, y < 2 ? 0xd8d0b8 : mix(0x6a5a4a, 0x8a7a5a, hash(x, y, 63)));
+    P.hl(px, py + h, w, 0x1a1a24, 0.4);
+  }
+  // en trasig takspot hänger i sladden
+  P.rect(131, 9, 3, 6, 0x2a2d36); P.px(132, 15, 0x4a4f5c); P.px(133, 16, 0x2a2d36);
+  // smutsigare ljus: hela rummet lite dunklare
+  P.darken(6, 7, 500, FH - 7, 0.86);
 }
 
 // Sliten lokal: fläckar, avflagad färg, hink under läckan

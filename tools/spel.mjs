@@ -18,7 +18,7 @@ await page.click('[data-shop="dator"]'); await page.click(`[data-year="${YEAR}"]
 await page.waitForFunction(() => window.PV?.game, null, { timeout: 30000 }); await page.waitForTimeout(1200);
 // rik butik med två arkadmaskiner och spelbord
 const r0 = await page.evaluate(() => {
-  const g = PV.game; g.money = 500000; g.buyItem('lokal2'); g.buyItem('lokal3'); g.buyItem('lager2'); g.buyItem('lager3'); g.buyItem('lager4');
+  const g = PV.game; g.money = 500000; g.buyItem('lokal2'); g.buyItem('lokal3'); g.buyItem('lokal4'); g.buyItem('lokal5'); g.buyItem('lager2'); g.buyItem('lager3'); g.buyItem('lager4');
   const F = g.shop.fit, y = g.year;
   const arc = F.optionsFor(g.fit, 5, 'small', y).filter((o) => /arkad:/.test(o.id)).sort((p, q) => q.hype - p.hype);
   g.buySlot(5, arc[0].id); g.buySlot(7, (arc[1] || arc[0]).id);

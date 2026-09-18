@@ -3,4 +3,4 @@
 // core/build.js hämtar riggen med rigFor(order).
 export { VIEW, MAX_K } from './geom.js';
 export { CONN, connectorIcon } from './connectors.js';
-export { rigFor, FACTS, fact } from './rig.js';
+export { rigFor, resetRig, FACTS, fact } from './rig.js';

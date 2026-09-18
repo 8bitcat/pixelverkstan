@@ -18,7 +18,7 @@ await page.waitForFunction(() => window.PV?.game, null, { timeout: 30000 }); awa
 // pengar, renovering, TV-hörna, spelhylla, spelbord och en arkadmaskin
 const r0 = await page.evaluate(() => {
   const g = PV.game; g.money = 400000;
-  g.buyItem('lokal2'); g.buyItem('lokal3');
+  g.buyItem('lokal2'); g.buyItem('lokal3'); g.buyItem('lokal4'); g.buyItem('lokal5');
   const F = g.shop.fit, y = g.year;
   const opt = (i, re) => F.optionsFor(g.fit, i, ['wide', 'medium', 'medium', 'medium', 'wide', 'small', 'wide', 'small'][i], y).find((o) => re.test(o.id));
   const a = g.buySlot(3, opt(3, /unit:tv/).id);

@@ -16,7 +16,7 @@ await page.evaluate(() => localStorage.clear()); await page.reload(); await page
 await page.click('[data-shop="dator"]'); await page.click(`[data-year="${YEAR}"]`);
 await page.waitForFunction(() => window.PV?.game, null, { timeout: 30000 }); await page.waitForTimeout(1000);
 ok(await page.evaluate(() => !document.querySelector('[data-h="arcade"]')), 'ingen arkadknapp i den lilla lokalen');
-await page.evaluate(() => { const g = PV.game; g.money = 600000; g.tutorialStep = 99; g.buyItem('lokal2'); g.buyItem('lokal3'); });
+await page.evaluate(() => { const g = PV.game; g.money = 600000; g.tutorialStep = 99; g.buyItem('lokal2'); g.buyItem('lokal3'); g.buyItem('lokal4'); g.buyItem('lokal5'); });
 await page.waitForTimeout(400);
 ok(await page.evaluate(() => !!document.querySelector('[data-h="arcade"]')), 'arkadknappen dyker upp med Datorhuset');
 // köp via fliken

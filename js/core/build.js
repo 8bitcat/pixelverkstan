@@ -4,7 +4,7 @@
 import { Raster } from './raster.js';
 import * as D from './build-draw.js';
 import * as U from './build-ui.js';
-import { modalOpen, closeModal } from './ui.js';
+import { modalOpen, closeModal, openPartPicker } from './ui.js';
 import { applyBuildOp, newBuild } from './build-ops.js';
 
 const $ = (s) => document.querySelector(s);
@@ -105,6 +105,22 @@ export class BuildView {
   get b() { return this.order.build; }
   get help() { return !!this.order?.build?.help; }
   get phase() { return this.order?.build?.phase || 'build'; }
+
+  // Lagret som delväljare: byt en ännu inte monterad del mot en som finns hemma
+  openStock() {
+    if (!this.order || this.phase !== 'build') return;
+    openPartPicker(this.game, { order: this.order, target: { orderId: this.order.id }, onDone: () => this.reopen() });
+  }
+  // delarna i beställningen ändrades: riggen byggs om, bygget behålls
+  reopen() {
+    if (!this.order) return;
+    this.rig = this.shop.layout.rigFor ? this.shop.layout.rigFor(this.order) : null;
+    // delar som inte längre finns i beställningen tas ur
+    const ids = {}; for (const it of this.order.items) if (it.part) ids[it.part] = (ids[it.part] || 0) + 1;
+    for (const [slot, p] of Object.entries(this.b.placed)) { if (ids[p.id] > 0) ids[p.id]--; else if (!this.order.chosen[p.cat] || this.order.chosen[p.cat] !== p.id) delete this.b.placed[slot]; }
+    this.selected = null; this.dirty = true; this.cablesDirty = true;
+    this.refresh();
+  }
 
   // ---------- Låda ----------
   partEntries() {

@@ -20,6 +20,19 @@ export const REQ = {
   's-witcher3':  { min: { cpu: 4500, ram: 6144, gfx: '3D', vram: 2048 }, rec: { cpu: 7500, ram: 8192, gfx: '3D', vram: 4096, fps: 60 }, year: 2015 },
   's-fortnite':  { min: { cpu: 3000, ram: 4096, gfx: '3D', vram: 1024 }, rec: { cpu: 6000, ram: 8192, gfx: '3D', vram: 4096, fps: 60 }, year: 2017 },
   's-cp2077':    { min: { cpu: 5500, ram: 8192, gfx: '3D', vram: 3072 }, rec: { cpu: 9500, ram: 12288, gfx: '3D', vram: 8192, fps: 60 }, year: 2020 },
+  's-simcity2000': { min: { cpu: 25, ram: 4, gfx: 'VGA' },        rec: { cpu: 66, ram: 8, gfx: 'SVGA', fps: 30 }, year: 1994 },
+  's-warcraft2': { min: { cpu: 33, ram: 8, gfx: 'SVGA' },           rec: { cpu: 75, ram: 16, gfx: 'SVGA', fps: 30 }, year: 1995 },
+  's-aoe':       { min: { cpu: 90, ram: 16, gfx: 'SVGA' },          rec: { cpu: 166, ram: 32, gfx: 'SVGA', fps: 30 }, year: 1997 },
+  's-starcraft': { min: { cpu: 90, ram: 16, gfx: 'SVGA' },          rec: { cpu: 200, ram: 32, gfx: 'SVGA', fps: 30 }, year: 1998 },
+  's-thesims':   { min: { cpu: 233, ram: 32, gfx: 'SVGA' },         rec: { cpu: 500, ram: 64, gfx: '3D', vram: 8, fps: 30 }, year: 2000 },
+  's-bf1942':    { min: { cpu: 500, ram: 128, gfx: '3D', vram: 16 }, rec: { cpu: 1200, ram: 256, gfx: '3D', vram: 64, fps: 40 }, year: 2002 },
+  's-hl2':       { min: { cpu: 1200, ram: 256, gfx: '3D', vram: 32 }, rec: { cpu: 2400, ram: 512, gfx: '3D', vram: 128, fps: 60 }, year: 2004 },
+  's-portal':    { min: { cpu: 1700, ram: 512, gfx: '3D', vram: 64 }, rec: { cpu: 3000, ram: 1024, gfx: '3D', vram: 256, fps: 60 }, year: 2007 },
+  's-skyrim':    { min: { cpu: 2000, ram: 2048, gfx: '3D', vram: 512 }, rec: { cpu: 4000, ram: 4096, gfx: '3D', vram: 1024, fps: 60 }, year: 2011 },
+  's-csgo':      { min: { cpu: 1800, ram: 2048, gfx: '3D', vram: 256 }, rec: { cpu: 3500, ram: 4096, gfx: '3D', vram: 1024, fps: 60 }, year: 2012 },
+  's-overwatch': { min: { cpu: 3000, ram: 4096, gfx: '3D', vram: 1024 }, rec: { cpu: 6000, ram: 6144, gfx: '3D', vram: 2048, fps: 60 }, year: 2016 },
+  's-valheim':   { min: { cpu: 3500, ram: 4096, gfx: '3D', vram: 1024 }, rec: { cpu: 6000, ram: 8192, gfx: '3D', vram: 3072, fps: 60 }, year: 2021 },
+  's-bg3':       { min: { cpu: 5000, ram: 8192, gfx: '3D', vram: 4096 }, rec: { cpu: 9000, ram: 16384, gfx: '3D', vram: 8192, fps: 60 }, year: 2023 },
 };
 
 // datorn på spelbordet → mått. parts = { cat: part }

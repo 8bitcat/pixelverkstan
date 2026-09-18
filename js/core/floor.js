@@ -826,7 +826,11 @@ export class Floor {
   drawWallLife(ctx) {
     const t = this.t, [nx0, ny0, nx1, ny1] = SC.NEON_BOX;
     // neonskylt med flimmer
-    const flick = (Math.sin(t * 23) > 0.985 || (t % 11) < 0.08) ? 0.55 : 0.93 + 0.07 * Math.sin(t * 3);
+    // neonskylten: i den slitna lokalen flimrar den och slocknar då och då
+    const shabby = this.lokal <= 2;
+    const flick = shabby
+      ? ((t % 4) < 0.25 || Math.sin(t * 19) > 0.9 ? 0.25 : 0.7 + 0.15 * Math.sin(t * 5))
+      : ((Math.sin(t * 23) > 0.985 || (t % 11) < 0.08) ? 0.55 : 0.93 + 0.07 * Math.sin(t * 3));
     ctx.globalAlpha = flick;
     const n = this.neon;
     ctx.drawImage(n.img, Math.round((nx0 + nx1 - n.img.width) / 2), Math.round((ny0 + ny1 - n.img.height) / 2) + 1);

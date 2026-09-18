@@ -48,6 +48,13 @@ export function renderTray(view) {
     tray.append(el);
   }
   if (!entries.length) tray.insertAdjacentHTML('beforeend', `<div class="tray-empty">${esc(view.trayEmptyText())}</div>`);
+  // lagret: byt ut delar i beställningen mot sådana som finns hemma
+  if (view.phase === 'build' && !view.order?.repair && view.order?.tutorial !== 0) {
+    const b = document.createElement('button');
+    b.className = 'btn tray-stock'; b.innerHTML = '📦<br><small>Lagret</small>'; b.title = 'Alla delar som finns hemma – byt in i beställningen';
+    b.onclick = () => view.openStock?.();
+    tray.prepend(b);
+  }
 }
 
 // ---------- Checklista ----------

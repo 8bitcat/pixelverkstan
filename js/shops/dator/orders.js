@@ -199,7 +199,10 @@ export function generateOrder(game, names) {
 
 // ---------- Start för ett valt år ----------
 export function startFor(year) {
-  const t = templatesFor(year).sort((a, b) => a.tier[0] - b.tier[0])[0] || TEMPLATES[0];
+  // billigaste mallen – men hellre en som vill ha grafikkort, så att man får sätta i ett tidigt
+  const sorted = templatesFor(year).sort((a, b) => a.tier[0] - b.tier[0]);
+  const minT = sorted[0]?.tier[0] ?? 1;
+  const t = sorted.find((x) => x.gpu === 'need' && x.tier[0] <= minT + 1) || sorted[0] || TEMPLATES[0];
   let a = null, b = null;
   const low = (p) => p.tier <= 2;
   for (let i = 0; i < 12 && !a; i++) a = composeBuild(t, year, cheapest, low);
@@ -239,11 +242,12 @@ export function tutorialOrder(i, game) {
       && C.cardsFit([...cards, g.bus], mb) && C.psuFits(psu, mb, cpu, g).ok && psu.watt >= C.wattNeed(cpu, g, 0, year)
       && (!game.canSell || game.canSell(g)) && g.cost <= (game.money || 0) * 0.8).sort((x, y) => x.cost - y.cost)[0];
     if (better && gpu) build = build.map((p) => (p === gpu ? better : p));
+    else if (better && !gpu) build = [...build, better];   // datorn hade inget grafikkort – nu får den ett
   }
   const msgs = {
     0: `Hej! Jag behöver min första dator – ${tpl.name.toLowerCase()}. Kan du hjälpa mig?`,
     1: 'Tjena! Jag vill ha en likadan dator som grannen fick.',
-    2: 'Jag vill ha en dator med ett bättre grafikkort – går det?',
+    2: build.some((p) => p.cat === 'gpu') && st.builds?.[1]?.some((p) => p.cat === 'gpu') ? 'Jag vill ha en dator med ett bättre grafikkort – går det?' : 'Jag vill ha en dator med ett riktigt grafikkort – går det?',
   };
   return {
     template: tpl.id, title: tpl.name, name: TUTOR_NAMES[i], msg: msgs[i], guided: i === 0, tutorial: i, year,

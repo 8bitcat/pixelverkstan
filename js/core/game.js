@@ -9,7 +9,7 @@ const MAX_ORDERS = 3;
 export const XP_PER_YEAR = 30;   // erfarenhet per år som går
 const DELIVERY_TIME = 12;        // sekunder från köp till att lådan står i butiken
 const PACK_WINDOW = 8;           // köp inom så här många sekunder hamnar i samma låda
-const SAVE_VERSIONS = [1, 2, 3, 4];
+const SAVE_VERSIONS = [1, 2, 3, 4, 5];
 
 // Sparningar: en per butik och startår (slot), t.ex. pixelverkstan_dator_1983
 export const saveKeyFor = (shopId, slot) => 'pixelverkstan_' + shopId + (slot != null ? '_' + slot : '');
@@ -78,7 +78,7 @@ export class Game {
     const start = this.startInfo ? { template: this.startInfo.template, builds: (this.startInfo.builds || []).map((b) => (b || []).map((p) => p.id)) } : null;
     // lådor som är på väg sparas som framme
     const deliveries = this.deliveries.map((d) => ({ id: d.id, items: d.items, state: 'arrived' }));
-    const data = { v: 4, money, xp, stock, shown: this.shown, deliveries, stats: this.stats, tutorialStep, startYear: this.startYear, start, nextId: this.nextId, fit: this.fit, demand: this.demand, deskPc: this.deskPc };
+    const data = { v: 5, money, xp, stock, shown: this.shown, deliveries, stats: this.stats, tutorialStep, startYear: this.startYear, start, nextId: this.nextId, fit: this.fit, demand: this.demand, deskPc: this.deskPc };
     try { localStorage.setItem(this.saveKey, JSON.stringify(data)); } catch { /* privat läge */ }
   }
   load() {
@@ -89,6 +89,8 @@ export class Game {
       Object.assign(this, { money: d.money, xp: d.xp, stock, stats: d.stats, tutorialStep: d.tutorialStep, startYear: d.startYear ?? 2021 });
       // äldre sparningar hade ingen inredning: de tre kategorihyllorna som förr
       this.fit = this.cleanFit(d.fit);
+      // v4 hade tre lokaler (Renovera = 6 platser, Datorhuset = 8): översätt till den nya stegen
+      if (d.v === 4 && this.fit.items) { const it = this.fit.items; if (it.lokal3) { it.lokal4 = 1; it.lokal5 = 1; } if (it.lokal2) { it.lokal3 = 1; it.lokal4 ||= it.lokal4; } }
       this.demand = d.demand && typeof d.demand === 'object' ? d.demand : {};
       this.deskPc = d.deskPc && d.deskPc.parts ? { parts: Object.fromEntries(Object.entries(d.deskPc.parts).filter(([, id]) => this.shop.part[id])) } : null;
       // äldre sparningar hade inget förråd: allt står framme
@@ -118,7 +120,7 @@ export class Game {
     return { slots, items: f.items && typeof f.items === 'object' ? { ...f.items } : {}, arcade };
   }
   // ---------- Arkadrummet (Datorhuset) ----------
-  get hasArcadeRoom() { return !!this.shop.fit && this.shop.fit.lokalOf(this.fit) >= 3; }
+  get hasArcadeRoom() { return !!this.shop.fit && this.shop.fit.lokalOf(this.fit) >= (this.shop.fit.ARCADE_LOKAL || 5); }
   buyArcade(id) {
     const p = this.shop.part[id];
     if (!p || p.cat !== 'arkad' || !this.hasArcadeRoom) return false;
@@ -336,6 +338,53 @@ export class Game {
     const miss = this.toBuyFor(order);
     if (!this.buyMany(miss.map((m) => [m.id, m.buy]))) return false;
     this.emit('toast', { text: '🚚 Delarna är beställda – packa upp lådan när den kommer.', kind: 'good' });
+    return true;
+  }
+
+  // ---------- Byta delar i en beställning ----------
+  // target = { customerId } (kunden står vid disken) eller { orderId } (jobbet är mottaget)
+  orderOf(target) {
+    if (target.orderId != null) return this.orders.find((x) => x.id === target.orderId) || null;
+    return this.customers.find((c) => c.id === target.customerId)?.order || null;
+  }
+  // sitter delen redan i datorn?
+  isPlaced(o, partId) { return !!o.build?.placed && Object.values(o.build.placed).some((q) => q.id === partId); }
+  swapItem(target, index, partId) {
+    const o = this.orderOf(target), p = this.shop.part[partId];
+    if (!o || !p || o.repair || o.product) return false;
+    const it = o.items[index];
+    if (!it || it.cat !== p.cat || it.part === partId) return false;
+    if (it.part && this.isPlaced(o, it.part)) { this.emit('toast', { text: 'Den delen sitter redan i datorn – ta ur den först.', kind: 'bad' }); return false; }
+    const others = o.items.filter((x, i) => i !== index && x.part).map((x) => this.shop.part[x.part]).filter(Boolean);
+    if (this.shop.fitsWith && !this.shop.fitsWith(p, others, this.year)) { this.emit('toast', { text: `${p.name} passar inte ihop med de andra delarna.`, kind: 'bad' }); return false; }
+    if (target.orderId != null) {
+      if (this.stockFree(partId) < 1) { this.emit('toast', { text: `${p.name} finns inte i lagret.`, kind: 'bad' }); return false; }
+      const i = it.part ? o.reserved.indexOf(it.part) : -1;
+      if (i >= 0) { o.reserved.splice(i, 1); this.returnStock(it.part); }
+      if (o.chosen[p.cat]) { this.returnStock(o.chosen[p.cat]); delete o.chosen[p.cat]; }
+      this.takeStock(partId); o.reserved.push(partId);
+      this.shop.layout?.resetRig?.(o);
+    }
+    it.part = partId; delete it.choice; delete it.gone;
+    this.emit('toast', { text: `🔁 ${p.name} i stället.`, kind: 'good' });
+    this.save(); this.emit('change');
+    return true;
+  }
+  addItem(target, partId) {
+    const o = this.orderOf(target), p = this.shop.part[partId];
+    if (!o || !p || o.repair || o.product) return false;
+    if (!['gpu', 'sound'].includes(p.cat) || o.items.some((x) => x.cat === p.cat)) return false;
+    const others = o.items.filter((x) => x.part).map((x) => this.shop.part[x.part]).filter(Boolean);
+    if (this.shop.fitsWith && !this.shop.fitsWith(p, others, this.year)) { this.emit('toast', { text: `${p.name} passar inte i den här datorn.`, kind: 'bad' }); return false; }
+    if (target.orderId != null) {
+      if (this.stockFree(partId) < 1) { this.emit('toast', { text: `${p.name} finns inte i lagret.`, kind: 'bad' }); return false; }
+      this.takeStock(partId); o.reserved.push(partId);
+      this.shop.layout?.resetRig?.(o);
+    }
+    o.items.push({ cat: p.cat, part: partId });
+    o.items.sort((a, b) => this.shop.catOrder.indexOf(a.cat) - this.shop.catOrder.indexOf(b.cat));
+    this.emit('toast', { text: `➕ ${p.name} läggs till – kunden betalar ${fmt(this.shop.retail(p))} kr extra.`, kind: 'good' });
+    this.save(); this.emit('change');
     return true;
   }
 

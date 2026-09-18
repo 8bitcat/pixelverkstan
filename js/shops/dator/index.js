@@ -83,6 +83,7 @@ export default {
   generateOrder: orders.generateOrder,
   replacementFor: orders.replacementFor,
   fixOrder: orders.fixOrder,
+  fitsWith: orders.fitsWith,
   priceFor: orders.priceFor,
   xpFor: orders.xpFor,
   feeFor: orders.feeFor,

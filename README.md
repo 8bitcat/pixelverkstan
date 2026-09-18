@@ -55,9 +55,15 @@ De tre första kunderna är guidade.
 
 ## Butiken: bås, konsoler och spelande
 
-- **Lokalen** börjar som en sliten källarbutik med tre platser. *Renovera och bygg ut*
-  öppnar sex, *Datorhuset* alla åtta. 🏪 Butiken visar platserna med pixelförhandsvisning
-  av allt som går att köpa.
+- **Lokalen** börjar som *Källarhålan*: plywood för fönstret, spindelväv, sprickor och tre
+  platser. Sex lokaler att jobba sig upp genom – Gatuplan (4 platser), Kvartersbutiken (5),
+  Hörnbutiken (6), Datorhuset (8 + arkadrum) och Megastore (röd matta, mässing, extra
+  spotlights). 🏪 Butiken visar platserna med pixelförhandsvisning av allt som går att köpa;
+  står det redan något på platsen frågar spelet innan det rivs (40 % tillbaka, avdraget
+  från priset – eller välj en annan plats).
+- **Byt delar ur lagret.** Vid disken kan du byta en del i kundens beställning mot en annan
+  du har hemma, eller lägga till ett grafikkort (kunden betalar extra). I bygget finns
+  📦 Lagret i lådan för samma sak – riggen byggs om och delar som inte längre ingår plockas ur.
 - **Bås låser upp sortimentet.** En kategorihylla får bara visa instegsvaror (tier 1–2).
   Ett **märkesbås** (NVIDIA, ATI, 3dfx, Intel, AMD, Kingston, Seagate …) i tre nivåer
   höjer taket för just det märket till tier 3/4/5. Grossisten visar hänglås med kravet i
@@ -68,7 +74,8 @@ De tre första kunderna är guidade.
 - **Konsoler och spel** (C64, Amiga, NES … Switch 2, Steam Deck) säljs över disk – men
   bara om de står i **TV-hörnan** respektive på **spelhyllan**. Kunder ber om årets heta
   maskin; är det nyaste du visar över fyra år gammalt klagar de på grafiken. Gammalt
-  lager tappar värde; efter tjugo år blir det samlarobjekt.
+  lager tappar värde; efter tjugo år blir det samlarobjekt. Alla 34 konsoler har spel i
+  grossisten varje år de är heta (158 titlar med pixlade omslag; `tools/konsolspel.mjs` vaktar).
 - **Arkadmaskiner** står på de små platserna, drar folk, drar in mynt – och går att
   **spela på riktigt**: klicka på kabinettet, mynt i, tre liv, highscore med initialer.
 - **Spelbordet**: sätt ihop butikens egen dator av delar i lagret och spela tidstypiska
@@ -171,6 +178,8 @@ node tools/produkter.mjs                 # TV-hörna, spelhylla, arkad, köp in,
 node tools/spel.mjs                      # spela på arkadmaskin, sätt ihop speldatorn, FPS
 node tools/repair.mjs 3                  # reparationer i Node: alla fel läggs in och går att laga
 node tools/laga.mjs [url] 1999           # reparation i webbläsaren: bänk → symptom → laga → betalt
+node tools/byt.mjs                       # sunkig start, grafikkort tidigt, byt/lägg till delar ur lagret, lokal 2–6
+node tools/konsolspel.mjs                # Node: varje konsol har spel varje år den är het, PC-spel har systemkrav
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner
 ```
 

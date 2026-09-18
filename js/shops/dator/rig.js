@@ -14,6 +14,7 @@ const ROW_NAME = { pcie: 'PCIe x16-slot', pcie1: 'PCIe x1-slot', agp: 'AGP-slot'
 
 // ---------- Riggen ----------
 const CACHE = new WeakMap();
+export function resetRig(order) { CACHE.delete(order); }
 export function rigFor(order) {
   if (CACHE.has(order)) return CACHE.get(order);
   const rig = makeRig(order);

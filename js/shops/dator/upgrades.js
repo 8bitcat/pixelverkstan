@@ -111,9 +111,12 @@ export const ITEMS = [
   { id: 'matta', name: 'Ny matta i väntrummet', icon: '🟥', group: 'trivsel', year: 1983, cost: 1800, trivsel: 2, desc: 'Mjukare, finare, fräschare.' },
   { id: 'ac', name: 'Luftkonditionering', icon: '❄️', group: 'trivsel', year: 2000, cost: 5000, trivsel: 2, desc: 'Svalt även när alla fläktar går.' },
   { id: 'kassa2', name: 'Extra kassadisk', icon: '🧾', group: 'trivsel', year: 1990, cost: 4000, queue: 1, desc: 'Plats för en kund till i kön.' },
-  // lokalen: man börjar i en sliten liten butik och jobbar sig uppåt
-  { id: 'lokal2', name: 'Renovera och bygg ut', icon: '🏗️', group: 'lokal', year: 1983, cost: 15000, lokal: 2, desc: 'Nytt golv, målade väggar, ordentlig belysning – och tre platser till längst in.' },
-  { id: 'lokal3', name: 'Datorhuset', icon: '🏢', group: 'lokal', year: 1983, cost: 60000, lokal: 3, needs: 'lokal2', desc: 'Hela huset: två platser till, fint golv och ett eget rum för arkadmaskiner.' },
+  // lokalen: alla börjar i Källarhålan och jobbar sig upp genom sex lokaler
+  { id: 'lokal2', name: 'Gatuplan', icon: '🧹', group: 'lokal', year: 1983, cost: 8000, lokal: 2, desc: 'Ta bort bräderna för fönstret, skura golvet, laga taket. Fortfarande enkelt – men en plats till.' },
+  { id: 'lokal3', name: 'Kvartersbutiken', icon: '🏗️', group: 'lokal', year: 1983, cost: 18000, lokal: 3, needs: 'lokal2', desc: 'Nytt golv, målade väggar och ordentlig belysning. Fem platser.' },
+  { id: 'lokal4', name: 'Hörnbutiken', icon: '🏪', group: 'lokal', year: 1983, cost: 35000, lokal: 4, needs: 'lokal3', desc: 'Skyltfönster åt två håll, finare matta och fler spotlights. Sex platser.' },
+  { id: 'lokal5', name: 'Datorhuset', icon: '🏢', group: 'lokal', year: 1983, cost: 70000, lokal: 5, needs: 'lokal4', desc: 'Hela huset: åtta platser, stengolv och ett eget rum för arkadmaskiner.' },
+  { id: 'lokal6', name: 'Megastore', icon: '🏬', group: 'lokal', year: 1990, cost: 150000, lokal: 6, needs: 'lokal5', drag: 4, rykte: 2, desc: 'Marmor, mässing och ljus överallt. Kunderna kommer från hela stan.' },
   // verkstaden
   { id: 'skruvdragare', name: 'Elektrisk skruvdragare', icon: '🪛', group: 'verkstad', year: 1990, cost: 1400, desc: 'Alla skruvar i ett moment på ett klick – bygget går fortare.' },
   { id: 'testbank', name: 'Testbänk med POST-kort', icon: '🧪', group: 'verkstad', year: 1996, cost: 3000, desc: 'Visar felorsaken direkt vid första misslyckade starten – även i proffsläget.' },
@@ -124,10 +127,13 @@ export const ITEMS = [
 ];
 export const itemInfo = (id) => ITEMS.find((i) => i.id === id) || null;
 
-// Lokalens storlek: 1 = sliten liten butik (3 platser), 2 = renoverad (6), 3 = Datorhuset (8)
-export const LOKAL_NAME = ['', 'Sliten källarbutik', 'Kvartersbutik', 'Datorhuset'];
-export const SLOTS_PER_LOKAL = [0, 3, 6, 8];
-export const lokalOf = (fit) => (fit.items.lokal3 ? 3 : fit.items.lokal2 ? 2 : 1);
+// Lokalerna: 1 Källarhålan (3 platser) → 2 Gatuplan (4) → 3 Kvartersbutiken (5) → 4 Hörnbutiken (6)
+// → 5 Datorhuset (8 + arkadrum) → 6 Megastore (8 + arkadrum, mer folk)
+export const LOKAL_NAME = ['', 'Källarhålan', 'Gatuplan', 'Kvartersbutiken', 'Hörnbutiken', 'Datorhuset', 'Megastore'];
+export const LOKAL_MAX = 6;
+export const SLOTS_PER_LOKAL = [0, 3, 4, 5, 6, 8, 8];
+export const lokalOf = (fit) => { for (let n = LOKAL_MAX; n >= 2; n--) if (fit.items['lokal' + n]) return n; return 1; };
+export const ARCADE_LOKAL = 5;
 export const slotOpen = (fit, i) => i < SLOTS_PER_LOKAL[lokalOf(fit)];
 
 // ---------- Beräkningar på butikens läge ----------
