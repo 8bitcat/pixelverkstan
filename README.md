@@ -78,6 +78,15 @@ De tre första kunderna är guidade.
   grossisten varje år de är heta (158 titlar med pixlade omslag; `tools/konsolspel.mjs` vaktar).
 - **Arkadmaskiner** står på de små platserna, drar folk, drar in mynt – och går att
   **spela på riktigt**: klicka på kabinettet, mynt i, tre liv, highscore med initialer.
+- **Varje titel är sitt eget spel.** `js/games/variants.js` ger alla 179 titlar (spel +
+  arkadmaskiner) en egen variant – motor, hjälte, fiender, palett, bana och känsla: Mario bumpar
+  ?-block, Sonic accelererar, rullar och fjädrar, Mega Man skjuter, Kong rullar tunnor, Zelda
+  är rum för rum uppifrån, Boulder Dash gräver med fallande stenar, Minecraft gräver och bygger
+  i sidovy, NHL 94 är hockey och FIFA fotboll, GTA är stad uppifrån med polis, Final Fight är
+  gatuslagsmål, Tetris/Columns/Lumines är tre olika blockspel, SimCity bygger stad. Femton
+  motorer i `js/games/`. **Era-filtret** (`era.js`) visar spelet som konsolen skulle: C64:s
+  16 färger med dubbelbreda pixlar, Game Boy-grönt, CGA:s fyra färger på en tidig PC,
+  NES/16-bit-posterisering – och grafikkortet i speldatorn (CGA/EGA/VGA) styr PC-spelens look.
 - **Spelbordet**: sätt ihop butikens egen dator av delar i lagret och spela tidstypiska
   PC-spel med **FPS-räknare** i hörnet. För lite minne ger `Not enough memory`, fel
   grafikkort `This game requires VGA`, inget 3D-kort mjukvaruläge – och på minimikraven
@@ -249,6 +258,8 @@ node tools/personal.mjs                  # personal: anställ, säljaren tar emo
 node tools/rival.mjs                     # konkurrenten: skylt, styrka, drag med val, arg kund, bokslut + gala 2000
 node tools/avtal.mjs                     # grossister och märkesprogram: rabatt, leveranstid, bås-krav, avgifter
 node tools/tjanster.mjs                  # tjänster (låst utan pryl, utför från kortet, teknikern) och tillval på bygget
+node tools/spelvarianter.mjs             # Node: alla 179 titlar kör 600 steg i sin motor, varianter skiljer sig, eran följer konsolen
+node tools/spel2.mjs                     # nio titlar spelas i webbläsaren – olika motorer och era-look, skärmdumpar titel-*.png
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner
 ```
 

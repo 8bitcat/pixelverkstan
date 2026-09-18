@@ -3,14 +3,18 @@
 // speldatorn kör så bra som delarna tillåter.
 import { W, H } from './common.js';
 import { SMALL, BIG, textW, eachTextPixel } from '../core/floor-pix.js';
+import { variantFor, eraFor } from './variants.js';
+import { applyEra, ERA_NAME } from './era.js';
 
 const ENGINES = {
   rymd: () => import('./rymd.js'), labyrint2d: () => import('./labyrint2d.js'), plattform: () => import('./plattform.js'),
   racer: () => import('./racer.js'), fight: () => import('./fight.js'), raycast: () => import('./raycast.js'),
   gun: () => import('./gun.js'), dance: () => import('./dance.js'), block: () => import('./block.js'),
+  aventyr: () => import('./aventyr.js'), dig: () => import('./dig.js'), city: () => import('./city.js'),
+  sport: () => import('./sport.js'), brawl: () => import('./brawl.js'), sim: () => import('./sim.js'),
 };
-// spel som saknar egen motor lånar en
-export const ENGINE_ALIAS = { rpg: 'plattform', aventyr: 'plattform', city: 'racer', sport: 'plattform', sim: 'plattform', kong: 'plattform', maze: 'labyrint2d', invaders: 'rymd', road: 'racer', basket: 'plattform', corridor: 'raycast', blocks: 'block', platform: 'plattform' };
+// genrer och attract-namn som saknar egen motor lånar en (titelns variant i variants.js går före)
+export const ENGINE_ALIAS = { rpg: 'aventyr', kong: 'plattform', maze: 'labyrint2d', invaders: 'rymd', road: 'racer', basket: 'sport', corridor: 'raycast', blocks: 'block', platform: 'plattform' };
 export const engineFor = (name) => (ENGINES[name] ? name : ENGINE_ALIAS[name] || 'plattform');
 
 const $ = (s) => document.querySelector(s);
@@ -57,17 +61,21 @@ export class Play {
     $('#play-title').textContent = opts.title || '';
     $('#play-sub').textContent = 'Laddar …';
     this.resize();
-    const name = engineFor(opts.engine);
+    // titelns egen variant: motor, hjälte, palett, känsla – och era-utseendet efter konsolen/datorn
+    const variant = variantFor(opts.product, opts.engine);
+    const name = engineFor(variant.engine);
+    this.variant = variant; this.era = eraFor(opts.product, opts.machine);
     const mod = await ENGINES[name]();
     if (this.opts !== opts) return;   // stängdes eller byttes medan motorn laddades
     this.engineName = name;
-    this.game = opts.machine?.error ? null : mod.create({ title: opts.title, ...(opts.skin || {}) }, { software: !!opts.machine?.software });
+    this.game = opts.machine?.error ? null : mod.create({ title: opts.title, ...variant, ...(opts.skin || {}) }, { software: !!opts.machine?.software });
     this.error = opts.machine?.error || null;
     this.targetFps = this.mode === 'arcade' ? 60 : Math.max(4, Math.min(70, opts.machine?.fps || 60));
     this.state = this.mode === 'arcade' ? 'coin' : (this.error ? 'error' : 'boot');
     this.bootLen = this.mode === 'console' ? 1.1 : 2.2;
     this.bootT = 0; this.acc = 0; this.frameT = 0; this.fpsSamples = []; this.savedHs = false;
-    $('#play-sub').textContent = this.mode === 'arcade' ? `${opts.product?.coin ? opts.product.coin + ' kr per spel' : 'gratis'} · ESC = gå därifrån` : this.mode === 'console' ? `${opts.console?.name || 'Konsolen'} i TV-hörnan · ESC = lägg ner handkontrollen` : `${opts.machine?.name || 'Speldatorn'} · ESC = res dig`;
+    const eraTxt = ERA_NAME[this.era] ? ` · ${ERA_NAME[this.era]}` : '';
+    $('#play-sub').textContent = this.mode === 'arcade' ? `${opts.product?.coin ? opts.product.coin + ' kr per spel' : 'gratis'}${eraTxt} · ESC = gå därifrån` : this.mode === 'console' ? `${opts.console?.name || 'Konsolen'} i TV-hörnan${eraTxt} · ESC = lägg ner handkontrollen` : `${opts.machine?.name || 'Speldatorn'}${eraTxt} · ESC = res dig`;
     window.addEventListener('keydown', this.onKey); window.addEventListener('keyup', this.onKey);
     this.canvas.addEventListener('pointerdown', this.onPtr); this.canvas.addEventListener('pointermove', this.onPtr);
     this.resize();
@@ -109,7 +117,7 @@ export class Play {
       let steps = 0;
       while (this.acc >= 1 / 60 && steps < 6) { this.game.update(1 / 60, steps === 0 ? inp : { ...inp, hit: false, aHit: false, startHit: false, leftHit: false, rightHit: false, upHit: false, downHit: false, bHit: false }); this.acc -= 1 / 60; steps++; }
       this.frameT += dt;
-      if (this.frameT >= frameLen) { this.frameT = 0; this.game.draw(this.g); this.fpsSamples.push(performance.now()); }
+      if (this.frameT >= frameLen) { this.frameT = 0; this.game.draw(this.g); applyEra(this.g, this.era); this.fpsSamples.push(performance.now()); }
       while (this.fpsSamples.length && performance.now() - this.fpsSamples[0] > 1000) this.fpsSamples.shift();
       if (this.game.over && !this.savedHs) { this.savedHs = true; this.saveHs(); }
       if (!this.game.over) this.savedHs = false;
