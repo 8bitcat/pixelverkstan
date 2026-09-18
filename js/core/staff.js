@@ -82,7 +82,7 @@ function levelUp(game, s) {
 // ---------- tekniker ----------
 function pickJob(game, s) {
   for (const o of game.orders) {
-    if (o.touched || o.staff || o.tutorial !== undefined) continue;
+    if (o.touched || o.staff || o.tutorial !== undefined || o.serviceT != null) continue;
     // valfria delar: ta något ur lagret som passar, annars kan hen inte bygga den
     const choice = o.items.filter((it) => !it.part && !o.chosen?.[it.cat]);
     const picks = [];
@@ -105,8 +105,9 @@ function tickTekniker(game, s, dt) {
   if (!s.job) { s.idleT = (s.idleT || 0) + dt; if (s.idleT < 2) return false; s.idleT = 0; return pickJob(game, s); }
   const o = game.orders.find((x) => x.id === s.job);
   if (!o || o.staff !== s.id) { s.job = null; s.progress = 0; return true; }
-  const stat = o.repair ? s.stats.service : s.stats.bygg;
-  const base = o.repair ? 75 : 50 + 10 * o.items.length;   // sekunder för en ovan
+  const sv = game.serviceOf ? game.serviceOf(o) : null;
+  const stat = sv ? s.stats[sv.stat] || 1 : o.repair ? s.stats.service : s.stats.bygg;
+  const base = sv ? sv.time : o.repair ? 75 : 50 + 10 * o.items.length;   // sekunder för en ovan
   const speed = (0.5 + 0.25 * stat) * (s.energy < 25 ? 0.5 : 1);
   s.progress += dt * speed / base;
   if (s.progress >= 1) {
@@ -117,7 +118,7 @@ function tickTekniker(game, s, dt) {
     s.energy = Math.max(0, s.energy - 18); s.xp += 8 + stars * 2; s.mood = Math.min(100, s.mood + 2);
     delete o.staff;
     game.complete(o, { stars, time: 0, errors: 0, help: true, staff: s.name });
-    toast(game, `${o.repair ? '🔍' : '🔧'} ${s.name} ${o.repair ? 'lagade' : 'byggde klart'} ${o.title} ${'★'.repeat(stars)} – ${o.name} hämtar vid utlämningen.`, 'good');
+    toast(game, `${sv ? '🛠️' : o.repair ? '🔍' : '🔧'} ${s.name} ${sv ? 'är klar med' : o.repair ? 'lagade' : 'byggde klart'} ${o.title} ${'★'.repeat(stars)} – ${o.name} hämtar vid utlämningen.`, 'good');
     levelUp(game, s);
     return true;
   }

@@ -534,3 +534,9 @@ body[data-screen="build"] #chatlog { bottom: 150px; left: 280px; }
 /* avtal */
 .avrow.on { background: #cfeec9; }
 .chips i.bad { color: var(--red2); }
+
+/* tillval på bygget */
+.optbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0 0; }
+.optbar b { font: 18px var(--head); margin-right: 4px; }
+.opt { font: inherit; font-size: 16px; border: 2px solid var(--ink); background: #fff; padding: 2px 8px; cursor: pointer; color: inherit; }
+.opt.on { background: #cfeec9; box-shadow: 2px 2px 0 var(--ink); } .opt small { color: var(--muted); }

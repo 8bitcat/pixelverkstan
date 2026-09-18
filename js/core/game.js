@@ -204,9 +204,12 @@ export class Game {
   needFor(p) { return this.canSell(p) ? '' : this.shop.fit.needFor(this.fit, p); }
   // kunden ville ha något butiken inte får sälja → efterfrågantavlan
   noteDemand(text) { if (!text) return; this.demand[text] = (this.demand[text] || 0) + 1; }
+  serviceOf(order) { return order?.service ? this.shop.services?.SERVICE[order.service] || null : null; }
+  canDoService(order) { const sv = this.serviceOf(order); return !!sv && this.shop.services.canDo(this, sv); }
   demandFor(order) {
     const out = new Set();
     if (order.repair) return [];
+    if (order.service) { const sv = this.serviceOf(order); return sv && !this.canDoService(order) ? [`${sv.name} (kräver ${this.shop.fit?.itemInfo?.(sv.needs)?.name || sv.needs})`] : []; }
     for (const it of order.items) if (it.part) { const n = this.needFor(this.shop.part[it.part]); if (n) out.add(n); }
     return [...out];
   }
@@ -653,6 +656,24 @@ export class Game {
 
   // ---------- Byta delar i en beställning ----------
   // target = { customerId } (kunden står vid disken) eller { orderId } (jobbet är mottaget)
+  setOpts(target, opts) {
+    const o = this.orderOf(target);
+    if (!o || o.product || o.repair || o.service) return false;
+    const allowed = new Set((this.shop.optsFor ? this.shop.optsFor(this.year) : []).map((x) => x.id));
+    o.opts = Object.fromEntries(Object.entries(opts || {}).filter(([k, v]) => allowed.has(k) && v).map(([k]) => [k, true]));
+    this.save(); this.emit('change');
+    return true;
+  }
+  // spelaren utför en tjänst från beställningskortet
+  doService(orderId) {
+    const o = this.orders.find((x) => x.id === orderId);
+    if (!o || !o.service || o.serviceT != null) return false;
+    this.touchOrder(orderId);
+    o.serviceT = 0;
+    this.emit('toast', { text: `🛠️ Du sätter igång med ${o.title.toLowerCase()} åt ${o.name}.`, kind: '' });
+    this.save(); this.emit('change');
+    return true;
+  }
   orderOf(target) {
     if (target.orderId != null) return this.orders.find((x) => x.id === target.orderId) || null;
     return this.customers.find((c) => c.id === target.customerId)?.order || null;
@@ -774,6 +795,15 @@ export class Game {
     }
     this.eventT = (this.eventT || 0) + dt;
     if (this.eventT >= 1) { this.eventT = 0; this.eventCheck(); }
+    // tjänster som spelaren utför
+    for (const o of [...this.orders]) {
+      if (o.serviceT == null || o.staff) continue;
+      const sv = this.serviceOf(o); if (!sv) continue;
+      o.serviceT += dt;
+      const pct = Math.floor(o.serviceT / sv.time * 10);
+      if (o.serviceT >= sv.time) { this.complete(o, { stars: 3, time: sv.time, errors: 0, help: true }); this.emit('toast', { text: `✅ ${o.title} klar – ${o.name} hämtar vid utlämningen.`, kind: 'good' }); }
+      else if (pct !== o.servicePct) { o.servicePct = pct; this.emit('change'); }
+    }
     // personalen jobbar, konkurrenten rör sig
     if (this.staff?.length) tickStaff(this, dt);
     if (this.rival) tickRival(this, dt);
@@ -837,6 +867,7 @@ export class Game {
   accept(c) {
     const order = c.order;
     if (this.missingFor(order).length || this.missingChoices(order).length) return false;
+    if (order.service && !this.canDoService(order)) return false;
     // färdiga produkter säljs direkt över disk: kunden går till utlämningen och betalar
     if (order.product) {
       const id = order.product;
@@ -883,6 +914,8 @@ export class Game {
   complete(o, result) {
     const c = this.customers.find((x) => x.id === o.customerId);
     const price = this.shop.priceFor(o, o.chosen);
+    if (o.opts?.oc && !o.opts.burnin && Math.random() < 0.3) { result = { ...result, stars: Math.max(1, (result.stars || 1) - 1) }; this.emit('toast', { text: `⚡ Överklockningen är ostabil – ${o.name} muttrar. Burn-in-test nästa gång?`, kind: 'bad' }); }
+    if (o.opts?.garanti) this.stats.stars = (this.stats.stars || 0) + 2;
     const tipMul = 1 + this.rykte / 40 + (this.fit.items.kaffe ? 0.05 : 0);
     const tip = result.stars >= 3 ? Math.round(this.shop.feeFor(o) * 0.5 * tipMul / 10) * 10 : result.stars === 2 ? Math.round(this.shop.feeFor(o) * 0.2 * tipMul / 10) * 10 : 0;
     const bonus = (result.help === false ? Math.round(price * 0.15 / 10) * 10 : 0) + (this.eventVal('bonus') || 0);

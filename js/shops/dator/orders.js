@@ -4,6 +4,7 @@ import { retail, CAT_ORDER } from './catalog.js';
 import { DB, onSale } from './parts/index.js';
 import * as C from './compat.js';
 import { KONSOLER, SPEL, hypeAt, valueAt, PLATFORM_NAME } from './products.js';
+import { priceFor as indexPrice } from './upgrades.js';
 
 // gpu: 'need' = alltid grafikkort, 'auto' = bara om kortet/processorn saknar grafik
 const TEMPLATES = [
@@ -194,6 +195,8 @@ export function generateOrder(game, names) {
   // var femte kund kommer med en trasig dator (faults.js kopplas in av butiksmodulen) – fler under vissa händelser
   const repairShare = (game.eventVal ? game.eventVal('repair') : null) ?? 0.2;
   if (game.shop.repairOrder && Math.random() < repairShare) { const o = game.shop.repairOrder(game, names); if (o) return o; }
+  // tjänster: hjälp med datorn man har (kräver verkstadsprylar)
+  if (game.shop.serviceOrder && Math.random() < 0.15) { const o = game.shop.serviceOrder(game, names); if (o) return o; }
   const pool = templatesFor(year);
   if (!pool.length) return null;
   const t = pickWeighted(pool, (x) => templateWeight(x, game));
@@ -348,11 +351,19 @@ export function fixOrder(order, year, stockFree = () => 0) {
 }
 
 export const DIAGNOSIS_FEE = 150;
-export function feeFor(order) { return order.model ? (order.fee || 700) : order.product ? 0 : order.repair ? 300 + 120 * (order.repair.stars || 1) : (TEMPLATE[order.template]?.fee || 700); }
-export function xpFor(order) { return order.model ? 18 : order.product ? (DB.part[order.product]?.cat === 'konsol' ? 6 : 3) : order.repair ? 10 + 4 * (order.repair.stars || 1) : (TEMPLATE[order.template]?.xp || 14); }
+export function feeFor(order) { return order.service ? (order.price || 300) : order.model ? (order.fee || 700) : order.product ? 0 : order.repair ? 300 + 120 * (order.repair.stars || 1) : (TEMPLATE[order.template]?.fee || 700); }
+export function xpFor(order) { return order.service ? 10 : order.model ? 18 : order.product ? (DB.part[order.product]?.cat === 'konsol' ? 6 : 3) : order.repair ? 10 + 4 * (order.repair.stars || 1) : (TEMPLATE[order.template]?.xp || 14); }
 
 // Vad kunden betalar: delarnas butikspris + montering (produkter: pris × värdefaktor för året)
+// tillval på ett bygge: överklockning +12 %, garanti +8 %, burn-in-test fast avgift
+export const OPTS = [
+  { id: 'oc', name: 'Överklocka', icon: '⚡', pct: 0.12, year: 1990, desc: '+12 % – men ostabilt utan burn-in: 30 % risk att kunden muttrar.' },
+  { id: 'burnin', name: 'Burn-in-test', icon: '🔥', fee: 200, year: 1983, desc: 'Ett dygn under last innan leverans. Tar bort risken med överklockning.' },
+  { id: 'garanti', name: '3 års garanti', icon: '🛡️', pct: 0.08, year: 1983, desc: '+8 % – och nöjda kunder berättar om det (rykte).' },
+];
+export const optsFor = (year) => OPTS.filter((o) => o.year <= year);
 export function priceFor(order, chosen = {}) {
+  if (order.service) return order.price || 0;   // tjänst: fast pris
   if (order.model) return order.price || 0;   // egen modell: fast pris
   if (order.product) { const p = DB.part[order.product]; return p ? Math.round(retail(p) * valueAt(p, order.year || p.year) / 10) * 10 : 0; }
   if (order.repair) return feeFor(order);   // delarna är kundens egna; diagnosavgiften betalades vid inlämningen
@@ -361,7 +372,10 @@ export function priceFor(order, chosen = {}) {
     const id = it.part || chosen[it.cat];
     if (id && DB.part[id]) sum += retail(DB.part[id]);
   }
-  return sum;
+  const o = order.opts || {};
+  let mul = 1, extra = 0;
+  for (const x of OPTS) if (o[x.id]) { mul += x.pct || 0; extra += x.fee ? indexPrice(x.fee, order.year || 2000) : 0; }
+  return Math.round(sum * mul / 10) * 10 + extra;
 }
 
 // Bakåtkompatibla namn

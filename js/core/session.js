@@ -55,6 +55,9 @@ export const COMMANDS = {
   setSupplier: (g, { id }) => g.setSupplier(String(id)),
   joinPartner: (g, { brand }) => g.joinPartner(String(brand)),
   leavePartner: (g, { brand }) => g.leavePartner(String(brand)),
+  // tjänster och tillval
+  doService: (g, { orderId }) => g.doService(orderId | 0),
+  setOpts: (g, { customerId, orderId, opts }) => g.setOpts({ customerId, orderId }, opts || {}),
   complete: (g, { orderId, result }) => {
     const o = g.orders.find((x) => x.id === orderId);
     return o ? g.complete(o, result) : null;

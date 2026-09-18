@@ -11,6 +11,7 @@ import * as models from './models.js';
 import * as events from './events.js';
 import * as staff from './staff.js';
 import * as suppliers from './suppliers.js';
+import * as services from './services.js';
 import { iconCanvas } from './art.js';
 import { Desk } from './desk.js';
 import { DB, loadParts, onSale } from './parts/index.js';
@@ -50,6 +51,9 @@ export default {
   staff,
   // grossister och märkesprogram (suppliers.js)
   suppliers,
+  // tjänster (services.js)
+  services,
+  serviceOrder: services.serviceOrder,
   // Stjärnobjektet: årets finaste grafikkort (RTX 5080 Astral när det finns)
   heroFor(game) {
     const list = onSale(game.year).filter((p) => p.cat === 'gpu');
@@ -98,4 +102,5 @@ export default {
   priceFor: orders.priceFor,
   xpFor: orders.xpFor,
   feeFor: orders.feeFor,
+  optsFor: orders.optsFor,
 };

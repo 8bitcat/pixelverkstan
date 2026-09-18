@@ -140,6 +140,16 @@ De tre första kunderna är guidade.
   under 🏪 Butiken och ger rabatt på märkets delar plus 🪧 +1 – mot en avgift i månaden.
   Säljs båset avslutas programmet; kan avgifterna inte betalas spärras kontona.
 
+## Tjänster och tillval
+
+- **🛠️ Tjänster**: kunder som vill ha hjälp med datorn de har – systeminstallation,
+  dataräddning (kräver dataräddningsstation, 1990), virussanering (antivirus-licens, 1996),
+  nätverksinstallation (nätverksväska, 1998), vattenkylning (kylstation, 2008). Prylarna köps
+  under 🏪 Butiken → Verkstad; utan dem är kunden låst och önskemålet hamnar på
+  efterfrågantavlan. Fast pris; utförs från beställningskortet (⏳) eller av en tekniker.
+- **⚙️ Tillval** på ett bygge (i kunddialogen): ⚡ överklocka (+12 %, ostabilt utan burn-in),
+  🔥 burn-in-test (fast avgift, tar bort risken), 🛡️ 3 års garanti (+8 % och rykte).
+
 ## Avatar och co-op
 
 - **👤 Min avatar** i menyn: bygg din figur (frisyr, kläder, glasögon, huvudbonad …),
@@ -238,6 +248,7 @@ node tools/handelser.mjs                 # Node: alla händelser giltiga, auto-f
 node tools/personal.mjs                  # personal: anställ, säljaren tar emot, teknikern bygger, ta över, kurs, lön, sparka
 node tools/rival.mjs                     # konkurrenten: skylt, styrka, drag med val, arg kund, bokslut + gala 2000
 node tools/avtal.mjs                     # grossister och märkesprogram: rabatt, leveranstid, bås-krav, avgifter
+node tools/tjanster.mjs                  # tjänster (låst utan pryl, utför från kortet, teknikern) och tillval på bygget
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner
 ```
 

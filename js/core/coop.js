@@ -43,7 +43,7 @@ export function applyEcon(g, e) {
   g.deliveries = e.deliveries.map((d) => ({ ...d, eta: g.time + d.left }));
   if (e.start) g.startInfo = { template: e.start.template, builds: e.start.builds.map((ids) => ids.map((id) => g.shop.part[id]).filter(Boolean)) };
 }
-const orderSnap = (o) => ({ id: o.id, customerId: o.customerId, template: o.template, title: o.title, name: o.name, msg: o.msg, items: o.items, guided: o.guided, tutorial: o.tutorial, year: o.year, reserved: o.reserved, chosen: o.chosen, startedAt: o.startedAt, staff: o.staff, touched: o.touched, model: o.model, price: o.price, fee: o.fee });
+const orderSnap = (o) => ({ id: o.id, customerId: o.customerId, template: o.template, title: o.title, name: o.name, msg: o.msg, items: o.items, guided: o.guided, tutorial: o.tutorial, year: o.year, reserved: o.reserved, chosen: o.chosen, startedAt: o.startedAt, staff: o.staff, touched: o.touched, model: o.model, price: o.price, fee: o.fee, service: o.service, serviceT: o.serviceT, opts: o.opts });
 const custFull = (c) => ({ id: c.id, name: c.name, look: c.look, order: c.order, phase: c.phase, patience: isFinite(c.patience) ? c.patience : -1, patienceMax: isFinite(c.patienceMax) ? c.patienceMax : -1, x: c.x, y: c.y, dir: c.dir });
 const num = (v) => (v === -1 ? Infinity : v);
 

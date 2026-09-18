@@ -285,6 +285,7 @@ async function startMirrorInner(m) {
 
 function openBuild(order) {
   if (!game.orders.includes(order)) return;
+  if (order.service) { act('doService', { orderId: order.id }); return; }   // tjänst: utförs från kortet
   const go = (o) => {
     if (!game.orders.includes(o)) return;
     // avataren går in i verkstaden

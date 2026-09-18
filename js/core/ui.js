@@ -133,7 +133,7 @@ export function renderOrders(game, onBuild, players = []) {
     const who2 = st ? ` · ${o.repair ? '🔍' : '🔧'} ${esc(st.name.split(' ')[0])} ${Math.round((st.progress || 0) * 100)} %` : '';
     cards.push({ o, c, html: `<div><b>${esc(o.title)}</b><small>${esc(o.name)} · ${n}/${o.items.length} delar${who}${who2}</small>
       <div class="pbar ${f < 0.35 ? 'low' : ''}"><i style="width:${Math.round(f * 100)}%"></i></div></div>
-      <button class="btn btn-go btn-small">${st ? '👀 Ta över' : o.repair ? '🔍 Laga' : '🔧 Bygg'}</button>` });
+      <button class="btn btn-go btn-small" ${o.service && o.serviceT != null ? 'disabled' : ''}>${o.service ? (o.serviceT != null ? `⏳ ${Math.round(o.serviceT / (game.serviceOf(o)?.time || 1) * 100)} %` : st ? '👀 Ta över' : '🛠️ Utför') : st ? '👀 Ta över' : o.repair ? '🔍 Laga' : '🔧 Bygg'}</button>` });
   }
   const front = game.queue()[0];
   const gd = game.guide ? game.guide() : null;
@@ -188,7 +188,8 @@ export function openOrderDialog(game, c, h) {
       }
     }
     const locked = miss.filter((m) => game.onSale(shop.part[m.id]) && !game.canSell(shop.part[m.id])).map((m) => game.needFor(shop.part[m.id]));
-    const repair = !!o.repair;
+    const repair = !!o.repair, svc = game.serviceOf ? game.serviceOf(o) : null, canSvc = svc ? game.canDoService(o) : false;
+    if (svc) rows = `<div class="prow" style="grid-template-columns:44px 1fr auto"><span style="font-size:30px;text-align:center">${svc.icon}</span><div><div class="nm">${esc(svc.name)}</div><div class="sp">${esc(svc.desc)} · ca ${svc.time} s</div></div><div class="st ${canSvc ? 'ok' : 'bad'}">${canSvc ? '✓ utrustning finns' : `🔒 kräver ${esc(shop.fit?.itemInfo?.(svc.needs)?.name || svc.needs)}<br><small>🏪 Butiken → Verkstad</small>`}</div></div>`;
     if (repair) rows = o.items.map((it) => { const p = shop.part[it.part]; return p ? `<div class="prow"><span data-icon="${p.id}"></span><div><div class="nm">${esc(p.name)}</div><div class="sp">${esc(shop.cats[p.cat].name)} · ${esc(shop.specLine(p))}</div></div><div class="st">kundens</div></div>` : ''; }).join('');
     const gone = game.hasGone(o) || miss.some((m) => !game.onSale(shop.part[m.id]));
     const waiting = miss.length && !toBuy.length && !gone && !locked.length;
@@ -199,29 +200,35 @@ export function openOrderDialog(game, c, h) {
     else if (locked.length) tip = `🔒 Kunden vill ha något finare än butiken får sälja (${esc([...new Set(locked)].join(', '))}). Tacka nej – önskemålet hamnar på efterfrågantavlan i 🏪 Butiken.`;
     else if (waiting) tip = '🚚 Delarna är på väg. Packa upp lådan vid dörren när den kommit – sedan kan du ta emot beställningen.';
     else if (prod && !miss.length) tip = '💰 Färdig vara – sälj direkt över disk, kunden hämtar vid utlämningen.';
+    else if (svc) tip = canSvc ? `🛠️ Ta emot jobbet – utför det från beställningskortet (eller låt en tekniker göra det). Fast pris.` : `🔒 Butiken saknar utrustningen. Köp den under 🏪 Butiken → Verkstad, eller tacka nej – önskemålet hamnar på efterfrågantavlan.`;
     else if (repair) tip = `🔧 Kunden lämnar in datorn. Diagnosavgiften (${fmt(shop.diagnosisFee || 150)} kr) får du direkt, resten när den fungerar. Ställ den på bänken, koppla in och starta – symptomet visar var felet sitter. Svårighet: ${'★'.repeat(o.repair.stars || 1)}`;
     else if (toBuy.length && buyCost > game.money) tip = `😬 Du har inte råd att köpa in det som saknas (${fmt(buyCost)} kr). Tacka nej, eller sälj fler datorer först.`;
     const price = shop.priceFor(o, {});
-    const canEdit = !prod && !repair && o.tutorial !== 0;
+    const canEdit = !prod && !repair && !svc && o.tutorial !== 0;
+    // tillval på bygget: överklocka, burn-in, garanti
+    const optList = canEdit && shop.optsFor ? shop.optsFor(game.year) : [];
+    const optBar = optList.length ? `<div class="optbar"><b>⚙️ Tillval</b>${optList.map((x) => `<button class="opt ${o.opts?.[x.id] ? 'on' : ''}" data-opt="${x.id}" title="${esc(x.desc)}">${x.icon} ${esc(x.name)} <small>${x.pct ? `+${Math.round(x.pct * 100)} %` : `+${fmt(shop.fit?.priceFor ? shop.fit.priceFor(x.fee, game.year) : x.fee)} kr`}</small></button>`).join('')}</div>` : '';
     const hasGpu = o.items.some((it) => it.cat === 'gpu');
     const body = `<div class="who">${'<span data-face></span>'}<div class="speech">${esc(o.msg)}</div></div>
-      <h3 style="margin:4px 0 8px">${prod ? 'Vill köpa' : repair ? 'Lämnar in' : 'Beställning'}: ${esc(o.title)}</h3>
+      <h3 style="margin:4px 0 8px">${prod ? 'Vill köpa' : repair ? 'Lämnar in' : svc ? 'Vill ha hjälp' : 'Beställning'}: ${esc(o.title)}</h3>
       <div class="plist">${rows}</div>
+      ${optBar}
       ${canEdit ? `<div class="swapbar"><button class="btn btn-small" data-stockpick>📦 Byt del ur lagret</button>${!hasGpu ? '<button class="btn btn-small btn-gold" data-addgpu>➕ Lägg till grafikkort</button>' : ''}<small>Kunden betalar delarnas pris – ett bättre kort ger mer betalt.</small></div>` : ''}
       <div class="sum"><span>Kunden betalar${o.items.some((i) => i.choice) ? ' ca' : ''}${repair ? ' när den är lagad' : ''}</span><b>${fmt(price)} kr</b></div>
-      <div class="sp" style="color:var(--muted)">${prod ? `${esc(shop.specLine(prod))}${shop.products && shop.products.valueAt(prod, game.year) < 1 ? ' · <b>värdet har sjunkit</b> – gammalt lager' : ''}` : repair ? 'Arbetskostnad efter svårighet – delarna är kundens egna.' : o.model ? '🧩 Din egen modell – fast pris, som i Datormagazin.' : `Delarnas pris + ${fmt(shop.feeFor(o))} kr i montering.`}</div>
+      <div class="sp" style="color:var(--muted)">${svc ? 'Fast pris för tjänsten.' : prod ? `${esc(shop.specLine(prod))}${shop.products && shop.products.valueAt(prod, game.year) < 1 ? ' · <b>värdet har sjunkit</b> – gammalt lager' : ''}` : repair ? 'Arbetskostnad efter svårighet – delarna är kundens egna.' : o.model ? '🧩 Din egen modell – fast pris, som i Datormagazin.' : `Delarnas pris + ${fmt(shop.feeFor(o))} kr i montering.`}</div>
       ${tip ? `<div class="speech" style="margin:10px 0 0;background:#fff4c7">${tip}</div>` : ''}`;
     const buttons = [
       { label: 'Tacka nej', cls: 'btn-red', onClick: () => { closeModal(); h.onDecline(c); } },
       { label: `🛒 Köp in det som saknas (${fmt(buyCost)} kr)`, cls: 'btn-gold', hidden: !toBuy.length, disabled: buyCost > game.money,
         onClick: () => { act('buyMissing', { customerId: c.id }); render(); } },
       { label: '🛒 Till grossisten', hidden: !missChoice.length, onClick: () => h.onShop(missChoice[0], () => openOrderDialog(game, c, h)) },
-      { label: gone ? '🛑 Går inte att bygga' : locked.length ? '🔒 Får inte säljas' : waiting ? '🚚 Väntar på lådan …' : prod ? `💰 Sälj för ${fmt(price)} kr` : repair ? '🔧 Ta emot jobbet' : '✓ Ta emot beställningen', cls: 'btn-go', disabled: miss.length || missChoice.length, onClick: () => { closeModal(); h.onAccept(c); } },
+      { label: gone ? '🛑 Går inte att bygga' : locked.length ? '🔒 Får inte säljas' : waiting ? '🚚 Väntar på lådan …' : prod ? `💰 Sälj för ${fmt(price)} kr` : svc ? (canSvc ? '🛠️ Ta emot jobbet' : '🔒 Saknar utrustning') : repair ? '🔧 Ta emot jobbet' : '✓ Ta emot beställningen', cls: 'btn-go', disabled: miss.length || missChoice.length || (svc && !canSvc), onClick: () => { closeModal(); h.onAccept(c); } },
     ];
     const dlg = openModal(`Ny kund: ${esc(c.name)}`, body, buttons);
     dlg.querySelector('[data-face]').replaceWith(portrait(c.look));
     dlg.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(shop.icon(shop.part[el.dataset.icon], 44, 38)));
     const back = () => openOrderDialog(game, c, h);
+    dlg.querySelectorAll('[data-opt]').forEach((b) => (b.onclick = () => { const opts = { ...(o.opts || {}) }; opts[b.dataset.opt] = !opts[b.dataset.opt]; act('setOpts', { customerId: c.id, opts }); render(); }));
     dlg.querySelector('[data-stockpick]')?.addEventListener('click', () => openPartPicker(game, { order: o, target: { customerId: c.id }, onDone: back }));
     dlg.querySelector('[data-addgpu]')?.addEventListener('click', () => openPartPicker(game, { order: o, target: { customerId: c.id }, cats: ['gpu'], add: true, onDone: back }));
     live(render);

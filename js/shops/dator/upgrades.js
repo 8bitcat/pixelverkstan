@@ -120,6 +120,11 @@ export const ITEMS = [
   // verkstaden
   { id: 'skruvdragare', name: 'Elektrisk skruvdragare', icon: '🪛', group: 'verkstad', year: 1990, cost: 1400, desc: 'Alla skruvar i ett moment på ett klick – bygget går fortare.' },
   { id: 'testbank', name: 'Testbänk med POST-kort', icon: '🧪', group: 'verkstad', year: 1996, cost: 3000, desc: 'Visar felorsaken direkt vid första misslyckade starten – även i proffsläget.' },
+  // tjänster (services.js): prylen låser upp kunder som vill ha jobbet gjort
+  { id: 'dataradd', name: 'Dataräddningsstation', icon: '🧲', group: 'verkstad', year: 1990, cost: 4000, desc: 'Räddar filer från klickande hårddiskar – tjänsten Dataräddning låses upp.' },
+  { id: 'antivirus', name: 'Antivirus-licens', icon: '🦠', group: 'verkstad', year: 1996, cost: 1500, desc: 'Sanera kundernas datorer – tjänsten Virussanering låses upp.' },
+  { id: 'natverkskit', name: 'Nätverksväska', icon: '🔌', group: 'verkstad', year: 1998, cost: 2500, desc: 'Kablar, kontakter och en switch – tjänsten Nätverksinstallation låses upp.' },
+  { id: 'kylstation', name: 'Kylstation', icon: '💧', group: 'verkstad', year: 2008, cost: 5000, desc: 'Fyll och trycktesta vattenkylning – tjänsten Vattenkylning låses upp.' },
   // lagerhyllan bakom disken (nivåer)
   { id: 'lager2', name: 'Lagerhylla nivå 2', icon: '🗄️', group: 'lager', year: 1983, cost: 4500, lager: 2, desc: 'Mellanklassens chassin, moderkort, nätagg och kylare får plats (tier 3).' },
   { id: 'lager3', name: 'Lagerhylla nivå 3', icon: '🗄️', group: 'lager', year: 1983, cost: 12000, lager: 3, needs: 'lager2', desc: 'Entusiastdelarna (tier 4).' },

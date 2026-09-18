@@ -1,0 +1,71 @@
+// Tjänster och tillval: kund utan utrustning (🔒, efterfrågantavlan), köp prylen, ta emot, utför
+// från kortet, teknikern gör nästa själv; tillval på ett bygge höjer priset och ger garanti-rykte.
+import { createRequire } from "module";
+const require = createRequire("D:/Qisy/QISYFrontend/QISYFrontend-1/package.json");
+const { chromium } = require("playwright");
+const OUT = "D:/GamesProjects/pixelverkstan/tools/out/";
+const URL = process.argv[2] || "http://localhost:8777/index.html";
+const YEAR = +(process.argv[3] || 1999);
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+const errors = [];
+page.on("pageerror", (e) => errors.push(`[pageerror] ${e.message}\n${e.stack}`));
+page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+const ok = (c, m) => { console.log((c ? 'OK   ' : 'FEL  ') + m); if (!c) errors.push(m); };
+const crash = async (e) => { const NL = String.fromCharCode(10); console.log('KRASCH ' + String(e.message).split(NL)[0]); try { console.log('DIALOG: ' + (await page.evaluate(() => document.querySelector('.dlg')?.innerText?.slice(0, 300) || '(ingen)'))); } catch {} console.log(errors.join(NL)); process.exit(1); };
+process.on('unhandledRejection', crash); process.on('uncaughtException', crash);
+const spawnFront = (o) => page.evaluate((o) => { const g = PV.game; const c = g.spawn(o); c.phase = 'queue'; c.x = 318; c.y = 176; c._fl = true; c._path = []; c._tkey = 'q0'; c.patience = Infinity; g.customers = [c, ...g.customers.filter((x) => x !== c)]; g.emit('change'); return c.id; }, o);
+await page.goto(URL);
+await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForTimeout(300);
+await page.click('[data-shop="dator"]'); await page.click(`[data-year="${YEAR}"]`);
+await page.waitForFunction(() => window.PV?.game, null, { timeout: 30000 }); await page.waitForTimeout(800);
+await page.evaluate(() => { const g = PV.game; g.money = 300000; g.tutorialStep = 99; for (const e of g.shop.events.EVENTS) if (!g.events.seen.includes(e.id)) g.events.seen.push(e.id); g.emit('change'); });
+await page.waitForTimeout(300);
+// 1) virussanering utan antivirus: låst i dialogen, tacka nej → efterfrågantavlan
+const o1 = await page.evaluate(() => { const g = PV.game; const S = g.shop.services; return { template: 'tjanst', service: 'virus', title: 'Virussanering', name: 'Bosse', msg: S.SERVICE.virus.msgs[0], items: [], year: g.year, price: 500 }; });
+await spawnFront(o1);
+await page.evaluate(() => PV.floor.onCustomerClick(PV.game.customers[0])); await page.waitForSelector('.dlg'); await page.waitForTimeout(200);
+const d1 = await page.evaluate(() => ({ txt: document.querySelector('.dlg').textContent, btn: [...document.querySelectorAll('.dlg-foot .btn')].map((b) => ({ t: b.textContent, d: b.disabled })) }));
+ok(/kräver Antivirus-licens/.test(d1.txt) && d1.btn.some((b) => /Saknar utrustning/.test(b.t) && b.d), 'virussanering kräver antivirus-licens');
+await page.screenshot({ path: OUT + "tjanst1-last.png" });
+await page.click('button:has-text("Tacka nej")'); await page.waitForTimeout(300);
+ok(await page.evaluate(() => Object.keys(PV.game.demand).some((k) => /Virussanering/.test(k))), 'önskemålet hamnade på efterfrågantavlan');
+// 2) köp antivirus-licensen, ta emot och utför från kortet
+await page.evaluate(() => { PV.game.buyItem('antivirus'); PV.game.customers = []; });
+await spawnFront(o1);
+await page.evaluate(() => PV.floor.onCustomerClick(PV.game.customers[0])); await page.waitForSelector('.dlg'); await page.waitForTimeout(200);
+await page.screenshot({ path: OUT + "tjanst2-dialog.png" });
+await page.click('button:has-text("Ta emot jobbet")'); await page.waitForTimeout(400);
+ok(await page.evaluate(() => PV.game.orders.length === 1 && /Utför/.test(document.querySelector('#orders').textContent)), 'jobbet i listan med knappen Utför');
+await page.click('#orders button:has-text("Utför")'); await page.waitForTimeout(1200);
+const r2 = await page.evaluate(() => ({ t: PV.game.orders[0]?.serviceT, txt: document.querySelector('#orders').textContent }));
+ok(r2.t > 0 && /%/.test(r2.txt), `tjänsten pågår (${r2.t?.toFixed(1)} s)`);
+await page.screenshot({ path: OUT + "tjanst3-pagar.png" });
+await page.evaluate(() => { PV.game.orders[0].serviceT = 29.5; });
+await page.waitForFunction(() => PV.game.orders.length === 0, null, { timeout: 8000 });
+const r3 = await page.evaluate(() => { const c = PV.game.customers.find((x) => x.phase === 'ready'); return { ready: !!c?.payout, total: c?.payout?.total }; });
+ok(r3.ready && r3.total >= 500, `klar: kunden betalar ${r3.total} kr`);
+// 3) teknikern utför nästa tjänst själv
+await page.evaluate(() => { const g = PV.game; g.customers = []; g.buyItem('lokal2'); });
+await page.evaluate(() => import('./js/core/staff.js').then((S) => { const g = PV.game; const c = S.candidatesFor(g).find((x) => x.role === 'tekniker'); g.hire(c.id); }));
+const o2 = { ...o1, name: 'Stina', price: 500 };
+const cid = await spawnFront(o2);
+await page.evaluate((id) => { const g = PV.game; g.accept(g.customers.find((c) => c.id === id)); }, cid);
+await page.waitForFunction(() => !!PV.game.orders[0]?.staff, null, { timeout: 15000 });
+await page.evaluate(() => { PV.game.staff[0].progress = 0.995; });
+await page.waitForFunction(() => PV.game.orders.length === 0, null, { timeout: 15000 });
+ok(await page.evaluate(() => PV.game.staff[0].jobs === 1 && PV.game.customers.some((c) => c.phase === 'ready')), 'teknikern gjorde tjänsten');
+// 4) tillval på ett vanligt bygge
+await page.evaluate(() => { const g = PV.game; g.customers = []; g.staff = []; let o = null; for (let i = 0; i < 120 && !o; i++) { const t = g.shop.generateOrder(g, ['Gunnar']); if (t && !t.product && !t.repair && !t.model && !t.service && t.items.every((it) => it.part)) o = t; } for (const it of o.items) g.stock[it.part] = (g.stock[it.part] || 0) + 1; const c = g.spawn(o); c.phase = 'queue'; c.x = 318; c.y = 176; c._fl = true; c._path = []; c._tkey = 'q0'; c.patience = Infinity; g.customers = [c]; g.emit('change'); });
+await page.evaluate(() => PV.floor.onCustomerClick(PV.game.customers[0])); await page.waitForSelector('[data-opt="oc"]'); await page.waitForTimeout(200);
+const p0 = await page.evaluate(() => PV.game.shop.priceFor(PV.game.customers[0].order, {}));
+await page.click('[data-opt="oc"]'); await page.waitForTimeout(200); await page.click('[data-opt="garanti"]'); await page.waitForTimeout(200);
+const p1 = await page.evaluate(() => ({ price: PV.game.shop.priceFor(PV.game.customers[0].order, {}), opts: PV.game.customers[0].order.opts, on: document.querySelectorAll('.opt.on').length }));
+ok(p1.opts.oc && p1.opts.garanti && p1.on === 2 && p1.price === Math.round(p0 * 1.2 / 10) * 10, `tillval: ${p0} → ${p1.price} kr (${JSON.stringify(p1.opts)})`);
+await page.screenshot({ path: OUT + "tjanst4-tillval.png" });
+await page.click('button:has-text("Ta emot beställningen")'); await page.waitForTimeout(300);
+const r4 = await page.evaluate(() => { const g = PV.game, o = g.orders[0]; const stars = g.stats.stars; const pay = g.complete(o, { stars: 3, time: 10, errors: 0, help: true }); return { opts: o.opts, total: pay.total, price: pay.price, stars: pay.stars, rykteUp: g.stats.stars - stars }; });
+ok(r4.opts?.oc && r4.price === p1.price && r4.stars >= 2 && r4.rykteUp === 2, `bygget klart med tillval (${JSON.stringify(r4)})`);
+console.log(errors.length ? 'FEL:\n' + errors.join('\n') : 'Inga fel.');
+await browser.close();
+process.exit(errors.length ? 1 : 0);
