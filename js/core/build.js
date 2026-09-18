@@ -233,6 +233,8 @@ export class BuildView {
   }
   doAction(a, i) {
     this.op({ t: 'act', id: a.id, i });
+    // skruvdragaren tar alla skruvar i samma moment
+    if (a.icon === '🪛' && this.game.fit?.items?.skruvdragare) for (let j = 0; j < a.points.length; j++) if (j !== i) this.op({ t: 'act', id: a.id, i: j });
     const set = this.L.actSet(this.b, a.id);
     this.dirty = true;
     this.toolAnim = { pt: a.points[i], t: 0, icon: a.icon };

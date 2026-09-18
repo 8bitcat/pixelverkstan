@@ -10,18 +10,34 @@ import { SHOPKEEPER, portrait } from './core/people.js';
 import { Net, cleanCode } from './core/net.js';
 import { CoopHost, CoopClient, applyEcon } from './core/coop.js';
 import { Play } from './games/runtime.js';
+import { ArcadeRoom } from './core/arcade-room.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = UI.esc;
-let game = null, floor = null, build = null, screen = 'menu', hudDirty = true;
+let game = null, floor = null, build = null, arcade = null, screen = 'menu', hudDirty = true;
+let playFrom = 'shop';   // vart man kommer tillbaka efter ett spel
 let net = null, coop = null, lobbyPlayers = [];
 // minispelen (arkadmaskiner och speldatorn)
 const play = new Play({
-  onExit: (r) => { if (screen === 'play') show('shop'); if (r.score > 0) UI.toast(`🕹️ ${r.score} poäng!`, 'good'); },
+  onExit: (r) => { if (screen === 'play') show(playFrom); if (r.score > 0) UI.toast(`🕹️ ${r.score} poäng!`, 'good'); },
   onScore: (product, score, record) => { if (record) UI.toast(`🏆 Nytt rekord på ${product.name}: ${score}!`, 'good'); },
   playerName: () => myAvatar().name,
 });
-function startPlay(opts) { show('play'); play.open(opts); }
+function startPlay(opts) { playFrom = screen === 'arcade' ? 'arcade' : 'shop'; show('play'); play.open(opts); }
+function openArcade() {
+  if (!game?.hasArcadeRoom) return UI.toast('Arkadrummet hör till Datorhuset – bygg ut under 🏪 Butiken.', '');
+  arcade ||= new ArcadeRoom($('#arcade-canvas'), game, {
+    avatar: () => myAvatar(),
+    onPlay: (p) => startPlay({ mode: 'arcade', product: p, engine: p.attract, title: p.name, skin: { title: p.name, dive: p.id === 'a-galaga' } }),
+    onExit: () => show('shop'),
+  });
+  arcade.game = game;
+  show('arcade');
+  const n = (game.fit.arcade || []).length;
+  $('#arcade-sub').textContent = `${n} ${n === 1 ? 'maskin' : 'maskiner'} · ${fmt(game.arcadeEarned || 0)} kr i myntinkast hittills · klicka på ett skåp för att spela`;
+}
+$('#arcade-back').onclick = () => show('shop');
+$('#arcade-buy').onclick = () => UI.openFittings(game, 'arkad');
 
 // avataren (js/core/avatar.js) laddas om den finns
 let AV = null;
@@ -53,9 +69,10 @@ function queueRefresh() { if (refreshQueued) return; refreshQueued = true; reque
 function show(name) {
   screen = name;
   document.body.dataset.screen = name;
-  for (const id of ['menu', 'shop', 'build', 'lobby', 'play']) $('#' + id)?.classList.toggle('hidden', id !== name);
+  for (const id of ['menu', 'shop', 'build', 'lobby', 'play', 'arcade']) $('#' + id)?.classList.toggle('hidden', id !== name);
   if (name === 'shop') { floor.resize(); hudDirty = true; }
   if (name === 'play') requestAnimationFrame(() => play.resize());
+  if (name === 'arcade') requestAnimationFrame(() => arcade?.resize());
   if (name === 'build') requestAnimationFrame(() => build.resize());
 }
 
@@ -285,6 +302,7 @@ function leaveWorkshop() {
 const hudHandlers = {
   shop: () => UI.openShop(game),
   fit: () => UI.openFittings(game),
+  arcade: () => openArcade(),
   stock: () => UI.openStock(game),
   room: () => openRoomInfo(),
   chat: () => openChat(),
@@ -296,7 +314,7 @@ const hudHandlers = {
       ]);
       return;
     }
-    game.save(); build.order = null; renderMenu(); show('menu');
+    game.save(); build.order = null; arcade = null; renderMenu(); show('menu');
   },
 };
 
@@ -464,7 +482,7 @@ function endCoop() {
   net = null; coop = null; lobbyState = null; lobbyPlayers = []; myColor = null;
   if (build) build.order = null;
   if (floor) floor.players = floor.players.filter((p) => p.local);
-  game = null; floor = null; build = null;
+  game = null; floor = null; build = null; arcade = null;
   UI.closeModal(); UI.closeChatBar();
   $('#friendbuilds').innerHTML = ''; $('#friendbuilds').dataset.key = '';
   friendAt.clear();
@@ -491,13 +509,14 @@ function loop(now) {
     }
     if (screen === 'build') build.frame(dt);
     if (screen === 'play') { try { play.frame(dt); } catch (e) { console.error(e); } }
+    if (screen === 'arcade' && arcade) { arcade.update(dt); arcade.draw(); }
     friendsTimer -= dt;
     if (friendsTimer <= 0) { updateFriendBuilds(); friendsTimer = 0.4; }
   }
   requestAnimationFrame(loop);
 }
 
-window.addEventListener('resize', () => { if (floor) floor.resize(); if (build && screen === 'build') build.resize(); if (screen === 'play') play.resize(); });
+window.addEventListener('resize', () => { if (floor) floor.resize(); if (build && screen === 'build') build.resize(); if (screen === 'play') play.resize(); if (screen === 'arcade') arcade?.resize(); });
 window.addEventListener('beforeunload', () => {
   if (!(coop instanceof CoopClient)) game?.save();
   if (coop instanceof CoopClient) net?.send({ t: 'bye' });

@@ -309,7 +309,7 @@ export class Desk {
     const f = run.fail;
     if (run.local) v.op({ t: 'err' });
     d.attempts[f.key] = (d.attempts[f.key] || 0) + 1;
-    const showCause = v.help || d.attempts[f.key] >= 2;
+    const showCause = v.help || d.attempts[f.key] >= 2 || !!v.game?.fit?.items?.testbank;
     const where = f.where === 'inside' ? 'Felet sitter <b>inne i datorn</b> – tryck på 🔧 Öppna datorn.' : 'Felet sitter <b>utanför datorn</b> – kolla kablarna på baksidan och bordet.';
     v.say(`<b>${esc(f.symptom)}</b> ${showCause ? esc(f.cause) + ' ' + (v.help ? where : '') : 'Vad kan vara fel?'} <button class="btn btn-small" data-act="retry">↻ Starta igen</button>`, 'err');
     v.refresh();

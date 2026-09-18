@@ -114,7 +114,31 @@ export class Game {
     });
     const nSlots = FLOOR_SLOTS.length;
     while (slots.length < nSlots) { const x = f.slots?.[slots.length]; slots.push(x && typeof x === 'object' && ['cat', 'brand', 'unit'].includes(x.kind) ? { kind: x.kind, cat: x.cat, brand: x.brand, level: Math.max(0, Math.min(3, x.level | 0)), unit: x.unit, ...(x.product ? { product: String(x.product) } : {}) } : null); }
-    return { slots, items: f.items && typeof f.items === 'object' ? { ...f.items } : {} };
+    const arcade = Array.isArray(f.arcade) ? f.arcade.filter((id) => typeof id === 'string' && this.shop.part[id]?.cat === 'arkad').slice(0, 8) : [];
+    return { slots, items: f.items && typeof f.items === 'object' ? { ...f.items } : {}, arcade };
+  }
+  // ---------- Arkadrummet (Datorhuset) ----------
+  get hasArcadeRoom() { return !!this.shop.fit && this.shop.fit.lokalOf(this.fit) >= 3; }
+  buyArcade(id) {
+    const p = this.shop.part[id];
+    if (!p || p.cat !== 'arkad' || !this.hasArcadeRoom) return false;
+    if (!this.onSale(p)) { this.emit('toast', { text: `${p.name} finns inte att köpa ${this.year}.`, kind: 'bad' }); return false; }
+    if ((this.fit.arcade || []).length >= 8) { this.emit('toast', { text: 'Arkadrummet är fullt – sälj en maskin först.', kind: 'bad' }); return false; }
+    if (p.cost > this.money) { this.emit('toast', { text: 'Inte tillräckligt med pengar!', kind: 'bad' }); return false; }
+    this.money -= p.cost;
+    (this.fit.arcade ||= []).push(id);
+    this.emit('toast', { text: `🕹️ ${p.name} står nu i arkadrummet!`, kind: 'good' });
+    this.emit('fit'); this.save(); this.emit('change');
+    return true;
+  }
+  sellArcade(i) {
+    const list = this.fit.arcade || [], id = list[i], p = this.shop.part[id];
+    if (!p) return false;
+    const back = Math.round(p.cost * (this.shop.hypeAt(p, this.year) > 0.5 ? 0.5 : 0.3) / 50) * 50;
+    this.money += back; list.splice(i, 1);
+    this.emit('toast', { text: `${p.name} såld – ${fmt(back)} kr tillbaka.`, kind: '' });
+    this.emit('fit'); this.save(); this.emit('change');
+    return true;
   }
   get fitStats() { return this.shop.fit ? this.shop.fit.statsFor(this.fit) : { drag: 0, trivsel: 0, rykte: 0, queue: 0 }; }
   // ryktet växer med stjärnorna kunderna gett
@@ -378,6 +402,8 @@ export class Game {
         this.arcadeT = 0;
         let earn = 0;
         for (const s of this.fit.slots) if (s && s.kind === 'unit' && s.unit === 'arkad') { const a = this.shop.part[s.product]; if (a) earn += Math.round(a.coin * 6 * (0.4 + this.shop.hypeAt(a, this.year))); }
+        for (const id of this.fit.arcade || []) { const a = this.shop.part[id]; if (a) earn += Math.round(a.coin * 9 * (0.4 + this.shop.hypeAt(a, this.year))); }
+        this.arcadeEarned = (this.arcadeEarned || 0) + earn;
         if (earn > 0) { this.money += earn; this.stats.earned += earn; this.emit('toast', { text: `🕹️ Arkadmaskinerna drog in ${fmt(earn)} kr.`, kind: 'good' }); this.save(); this.emit('change'); }
       }
     }

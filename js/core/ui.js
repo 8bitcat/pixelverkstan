@@ -108,6 +108,7 @@ export function renderHud(game, h, room = null) {
     ${room ? `<button class="chip room-chip" data-h="room" title="Rummet – koden och spelarna">👥 ${esc(room.code)} · ${room.count}</button><button class="btn" data-h="chat" title="Chatta (Enter)">💬</button>` : ''}
     <div class="hud-spacer"></div>
     ${game.shop.fit ? '<button class="btn" data-h="fit" title="Bås, hyllor, inredning och lokal">🏪 Butiken</button>' : ''}
+    ${game.hasArcadeRoom ? '<button class="btn" data-h="arcade" title="Arkadrummet – gå in och spela">🕹️ Arkad</button>' : ''}
     <button class="btn" data-h="stock" title="Förråd och skyltning">📦 Lager</button>
     <button class="btn" data-h="shop">🛒 Grossist</button>
     <button class="btn" data-h="menu" title="Meny – byt startår eller butik">☰</button>`;
@@ -461,7 +462,7 @@ export function openFittings(game, tab = null, slot = null) {
       <div class="fit-stats"><span title="Dragningskraft: fler kunder">🪧 ${S.drag}</span><span title="Trivsel: kunderna väntar längre">😊 ${S.trivsel}</span><span title="Rykte: stjärnor från nöjda kunder">⭐ ${game.rykte}</span></div></div>`;
     const dem = Object.entries(game.demand || {}).sort((a, b) => b[1] - a[1]).slice(0, 5);
     const demand = dem.length ? `<div class="demand"><b>📋 Kunder har frågat efter:</b> ${dem.map(([t, n]) => `<span>${esc(t)} <i>×${n}</i></span>`).join(' ')}</div>` : '';
-    const tabs = [['platser', '🏬 Platser'], ['skylt', '🪧 Skyltning'], ['trivsel', '😊 Trivsel'], ['lager', '🗄️ Lager & lokal']]
+    const tabs = [['platser', '🏬 Platser'], ['skylt', '🪧 Skyltning'], ['trivsel', '😊 Trivsel'], ['verkstad', '🔧 Verkstad'], ['lager', '🗄️ Lager & lokal'], ...(game.hasArcadeRoom ? [['arkad', '🕹️ Arkadrummet']] : [])]
       .map(([id, label]) => `<button class="tab ${st.tab === id ? 'on' : ''}" data-tab="${id}">${label}</button>`).join('');
     let body = '';
     if (st.tab === 'platser' && st.pick !== null) {
@@ -482,8 +483,14 @@ export function openFittings(game, tab = null, slot = null) {
           return `<button class="slot-card ${!isOpen ? 'closed' : cur ? '' : 'empty'}" data-slot="${i}" ${!isOpen ? 'disabled' : ''}>
             <div class="slot-prev">${prev}</div><b>Plats ${i + 1}</b><small>${!isOpen ? 'större lokal krävs' : esc(F.slotTitle(cur))}</small></button>`;
         }).join('')}</div>`;
+    } else if (st.tab === 'arkad') {
+      const owned = (fit.arcade || []).map((id) => shop.part[id]).filter(Boolean);
+      const forSale = shop.parts.filter((p) => p.cat === 'arkad' && game.onSale(p)).sort((a, b) => shop.hypeAt(b, y) - shop.hypeAt(a, y));
+      body = `<p style="font-size:18px;margin:0 0 8px">Arkadrummet rymmer <b>${F.ARCADE_MAX}</b> maskiner (${owned.length} nu). De drar folk till butiken, drar in mynt varje minut och går att spela på. Heta maskiner drar in mest – gamla blir samlarobjekt.</p>
+        ${owned.length ? `<h3>I rummet</h3><div class="plist">${owned.map((p, i) => `<div class="prow gamerow"><span data-icon="${p.id}"></span><div><div class="nm">${esc(p.name)}</div><div class="sp">${esc(shop.specLine(p))} · het ${Math.round(shop.hypeAt(p, y) * 100)} %</div></div><button class="btn btn-small btn-red" data-sellarc="${i}">Sälj</button></div>`).join('')}</div>` : ''}
+        <h3>Att köpa ${y}</h3><div class="plist">${forSale.map((p) => `<div class="prow gamerow"><span data-icon="${p.id}"></span><div><div class="nm">${esc(p.name)} <small style="color:var(--muted)">${p.year}</small></div><div class="sp">${esc(p.desc || '')} ${esc(shop.specLine(p))}</div></div><button class="btn btn-small btn-gold" data-buyarc="${p.id}" ${p.cost > game.money || owned.length >= F.ARCADE_MAX ? 'disabled' : ''}>Köp ${fmt(p.cost)} kr</button></div>`).join('')}</div>`;
     } else {
-      const group = { skylt: ['skylt'], trivsel: ['trivsel'], lager: ['lokal', 'lager'] }[st.tab] || [];
+      const group = { skylt: ['skylt'], trivsel: ['trivsel'], lager: ['lokal', 'lager'], verkstad: ['verkstad'] }[st.tab] || [];
       const list = F.ITEMS.filter((it) => group.includes(it.group));
       body = `<div class="plist">${list.map((it) => {
         const owned = !!fit.items[it.id], cost = F.priceFor(it.cost, y), soon = it.year > y, need = it.needs && !fit.items[it.needs];
@@ -509,6 +516,9 @@ export function openFittings(game, tab = null, slot = null) {
     dlg.querySelectorAll('[data-opt]').forEach((b) => (b.onclick = () => { act('buySlot', { slot: st.pick, option: b.dataset.opt }); render(); }));
     dlg.querySelectorAll('[data-sell]').forEach((b) => (b.onclick = () => { act('sellSlot', { slot: +b.dataset.sell }); render(); }));
     dlg.querySelectorAll('[data-item]').forEach((b) => (b.onclick = () => { act('buyItem', { id: b.dataset.item }); render(); }));
+    dlg.querySelectorAll('[data-buyarc]').forEach((b) => (b.onclick = () => { act('buyArcade', { id: b.dataset.buyarc }); render(); }));
+    dlg.querySelectorAll('[data-sellarc]').forEach((b) => (b.onclick = () => { act('sellArcade', { i: +b.dataset.sellarc }); render(); }));
+    dlg.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(shop.icon(shop.part[el.dataset.icon], 44, 38)));
     live(render);
   };
   render();

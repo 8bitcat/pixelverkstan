@@ -35,6 +35,8 @@ export const COMMANDS = {
   sellSlot: (g, { slot }) => g.sellSlot(slot | 0),
   buyItem: (g, { id }) => g.buyItem(String(id)),
   deskBuild: (g, { parts }) => g.deskBuild(parts || {}),
+  buyArcade: (g, { id }) => g.buyArcade(String(id)),
+  sellArcade: (g, { i }) => g.sellArcade(i | 0),
   deskUnbuild: (g) => g.deskUnbuild(),
   complete: (g, { orderId, result }) => {
     const o = g.orders.find((x) => x.id === orderId);

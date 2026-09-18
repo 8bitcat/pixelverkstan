@@ -474,3 +474,8 @@ body[data-screen="build"] #chatlog { bottom: 150px; left: 280px; }
 .news { background: #f4efe2; border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); padding: 8px 10px; margin: 8px 0; font-size: 18px; }
 .news b { font: 20px var(--head); }
 .news i { font-style: normal; display: block; margin-top: 2px; }
+
+#arcade { background: #05040a; display: flex; flex-direction: column; }
+#arcade-canvas { flex: 1; width: 100%; min-height: 0; }
+#arcade .play-top { background: #1a1030; color: #f4f2ec; border-bottom-color: #3a2a5a; }
+#arcade .play-top small { color: #b8a8d8; }

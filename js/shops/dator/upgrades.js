@@ -114,6 +114,9 @@ export const ITEMS = [
   // lokalen: man börjar i en sliten liten butik och jobbar sig uppåt
   { id: 'lokal2', name: 'Renovera och bygg ut', icon: '🏗️', group: 'lokal', year: 1983, cost: 15000, lokal: 2, desc: 'Nytt golv, målade väggar, ordentlig belysning – och tre platser till längst in.' },
   { id: 'lokal3', name: 'Datorhuset', icon: '🏢', group: 'lokal', year: 1983, cost: 60000, lokal: 3, needs: 'lokal2', desc: 'Hela huset: två platser till, fint golv och ett eget rum för arkadmaskiner.' },
+  // verkstaden
+  { id: 'skruvdragare', name: 'Elektrisk skruvdragare', icon: '🪛', group: 'verkstad', year: 1990, cost: 1400, desc: 'Alla skruvar i ett moment på ett klick – bygget går fortare.' },
+  { id: 'testbank', name: 'Testbänk med POST-kort', icon: '🧪', group: 'verkstad', year: 1996, cost: 3000, desc: 'Visar felorsaken direkt vid första misslyckade starten – även i proffsläget.' },
   // lagerhyllan bakom disken (nivåer)
   { id: 'lager2', name: 'Lagerhylla nivå 2', icon: '🗄️', group: 'lager', year: 1983, cost: 4500, lager: 2, desc: 'Mellanklassens chassin, moderkort, nätagg och kylare får plats (tier 3).' },
   { id: 'lager3', name: 'Lagerhylla nivå 3', icon: '🗄️', group: 'lager', year: 1983, cost: 12000, lager: 3, needs: 'lager2', desc: 'Entusiastdelarna (tier 4).' },
@@ -130,8 +133,9 @@ export const slotOpen = (fit, i) => i < SLOTS_PER_LOKAL[lokalOf(fit)];
 // ---------- Beräkningar på butikens läge ----------
 // fit = { slots: [{ kind:'cat'|'brand'|'unit', cat, brand, level, unit } | null …], items: { id: 1 } }
 export function emptyFit(showcases = []) {
-  return { slots: showcases.map((sc) => (sc ? { kind: 'cat', cat: sc.cat, level: 0 } : null)), items: {} };
+  return { slots: showcases.map((sc) => (sc ? { kind: 'cat', cat: sc.cat, level: 0 } : null)), items: {}, arcade: [] };
 }
+export const ARCADE_MAX = 8;
 
 // Vilken tier en del får ha för att köpas in och ställas ut
 const lagerLevel = (fit) => (fit.items.lager4 ? 4 : fit.items.lager3 ? 3 : fit.items.lager2 ? 2 : 1);
@@ -186,6 +190,9 @@ export function statsFor(fit) {
     if (s.kind === 'brand') { out.drag += s.level; if (s.level >= 3) out.rykte += 2; }
     if (s.kind === 'unit') { const u = unitInfo(s.unit); if (u) { out.trivsel += u.trivsel || 0; out.drag += u.drag || 0; } if (s.unit === 'arkad') { const a = ARKAD.find((x) => x.id === s.product); if (a) out.drag += a.drag; } }
   }
+  // arkadrummet: varje skåp drar lite folk, hallen som helhet ännu mer
+  const n = (fit.arcade || []).length;
+  if (n) out.drag += Math.min(8, n + (n >= 4 ? 2 : 0));
   out.drag = Math.min(20, out.drag); out.trivsel = Math.min(20, out.trivsel);
   return out;
 }
