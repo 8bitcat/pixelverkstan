@@ -46,6 +46,11 @@ export const COMMANDS = {
   sequelModel: (g, { id, spec }) => g.sequelModel(id | 0, spec || {}),
   buyForModel: (g, { id, n = 1 }) => g.buyForModel(id | 0, n | 0),
   chooseEvent: (g, { id, choice }) => g.chooseEvent(String(id), String(choice)),
+  // personal
+  hire: (g, { id }) => g.hire(id | 0),
+  fire: (g, { id }) => g.fire(id | 0),
+  train: (g, { id, course }) => g.train(id | 0, String(course)),
+  touchOrder: (g, { orderId }) => g.touchOrder(orderId | 0),
   complete: (g, { orderId, result }) => {
     const o = g.orders.find((x) => x.id === orderId);
     return o ? g.complete(o, result) : null;

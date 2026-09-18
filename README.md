@@ -108,6 +108,16 @@ De tre första kunderna är guidade.
   och modellförsäljningen i ett par år. Pågående händelser syns som en 📰-chip i HUD:en.
   Katalog i `js/shops/dator/events.js`, modellogik i `models.js`.
 
+## Personal
+
+- **👥 Personal** (från Gatuplan; fler platser med större lokal): sökande med stats 1–5
+  (🔧 bygg, 🩺 service, 🛍️ sälj), lön varje månad (60 s), energi och humör. **Tekniker**
+  tar beställningar som du inte rört till verkstaden och bygger/lagar dem själva – fart och
+  stjärnor efter stat, halv fart när energin är slut; du kan alltid **ta över** ett bygge.
+  **Säljare** tar emot kunden vid disken när delarna finns hemma och säljer på ett
+  grafikkort ur lagret. Kurser (MS-DOS, lödkurs, Novell CNE, CompTIA A+, MCSE, CCNA …)
+  ger +1 stat; jobb ger XP och nivåer. Obetalda löner sänker humöret – till uppsägning.
+
 ## Avatar och co-op
 
 - **👤 Min avatar** i menyn: bygg din figur (frisyr, kläder, glasögon, huvudbonad …),
@@ -203,6 +213,7 @@ node tools/byt.mjs                       # sunkig start, grafikkort tidigt, byt/
 node tools/konsolspel.mjs                # Node: varje konsol har spel varje år den är het, PC-spel har systemkrav
 node tools/modeller.mjs                  # egna modeller: guiden, recensionen, postorder, uppföljare, händelse med val, avtal
 node tools/handelser.mjs                 # Node: alla händelser giltiga, auto-förslag byggbara varje år, betyg 1–10
+node tools/personal.mjs                  # personal: anställ, säljaren tar emot, teknikern bygger, ta över, kurs, lön, sparka
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner
 ```
 

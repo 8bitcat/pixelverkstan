@@ -290,6 +290,7 @@ function openBuild(order) {
     // avataren går in i verkstaden
     const me = floor.localPlayer();
     if (me) { me.path = []; me.act = null; me.x = WALK_SPOTS.workshop[0]; me.y = WALK_SPOTS.workshop[1]; me.away = 'workshop'; me.orderId = o.id; }
+    act('touchOrder', { orderId: o.id });   // teknikern släpper bygget till spelaren
     show('build');
     build.open(o);
   };
@@ -306,6 +307,7 @@ const hudHandlers = {
   fit: () => UI.openFittings(game),
   arcade: () => openArcade(),
   models: () => UI.openModels(game),
+  staff: () => UI.openStaff(game),
   news: () => UI.openNews(game),
   stock: () => UI.openStock(game),
   room: () => openRoomInfo(),

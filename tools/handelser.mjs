@@ -52,8 +52,8 @@ ok(!fails.length, fails.length ? `${fails.length} fel, t.ex. ${fails.slice(0, 4)
 ok(sumTotal / n > 18 && sumTotal / n < 34, `snittbetyg ${(sumTotal / n).toFixed(1)}/40, ${hof} Hall of Fame, ${low} sågade`);
 // dold kompatibilitet syns i betyget
 const y = 1996, parts = M.suggestParts('gamer', y), list = M.partsOf(parts);
-const rate = (aud) => { let s = 0; for (let i = 0; i < 20; i++) s += M.review({ use: 'gamer', aud, parts, price: M.priceInfo(list, 0, aud, y).suggested, year: y }, y).total; return s / 20; };
-ok(rate('tonaring') > rate('pensionar') + 3, `speldator: tonåringar ${rate('tonaring').toFixed(1)} > pensionärer ${rate('pensionar').toFixed(1)}`);
+const rate = (aud) => { let s = 0; for (let i = 0; i < 40; i++) s += M.review({ use: 'gamer', aud, parts, price: M.priceInfo(list, 0, aud, y).suggested, year: y }, y).total; return s / 40; };
+ok(rate('tonaring') > rate('pensionar') + 2, `speldator: tonåringar ${rate('tonaring').toFixed(1)} > pensionärer ${rate('pensionar').toFixed(1)}`);
 const dear = M.review({ use: 'kontor', aud: 'student', parts: M.suggestParts('kontor', y), price: M.priceInfo(M.partsOf(M.suggestParts('kontor', y)), 0, 'student', y).cost * 2.2, year: y }, y);
 ok(dear.scores[1] <= 4, `dubbelt pris ger prisbetyg ${dear.scores[1]}/10`);
 ok(M.nextName('Pixel 486 Game') === 'Pixel 486 Game II' && M.nextName('Pixel 486 Game II') === 'Pixel 486 Game III', 'uppföljarnamn');

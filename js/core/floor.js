@@ -491,6 +491,13 @@ export class Floor {
       if (pl.away) continue;
       S.push([pl.y, () => drawPerson(ctx, pl.x, pl.y, pl.look || SHOPKEEPER, pl.dir || 'down', pl.moving ? WALK_SEQ[Math.floor(pl.walk || 0) % 4] : (Math.sin(t * 2.1 + (pl.seed || 0)) > 0.7 ? 4 : 0))]);
     }
+    // personalen: säljare bakom disken, tekniker vid verkstadsdörren (på kurs = borta)
+    for (const st of g.staff || []) {
+      if (st.course) continue;
+      const p = this.staffPos(st);
+      const frame = st.job ? WALK_SEQ[Math.floor(t * 5 + st.id) % 4] : (Math.sin(t * 1.7 + st.id) > 0.75 ? 4 : 0);
+      S.push([p.y, () => drawPerson(ctx, p.x, p.y, st.look, p.dir, frame)]);
+    }
     this.arrivedBoxes().forEach((d, i) => {
       const [bx, by] = this.boxPos(i);
       if (!this.boxDrop.has(d.id)) this.boxDrop.set(d.id, t);
@@ -520,6 +527,7 @@ export class Floor {
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
 
     for (const c of g.customers) if (c.y >= LY.WALL_Y) this.drawBubble(ctx, c);
+    this.drawStaffTags(ctx);
     this.drawNameTags(ctx);
     if (this.hoverBox) { const i = this.arrivedBoxes().findIndex((d) => d.id === this.hoverBox); if (i >= 0) this.drawBoxTip(ctx, this.arrivedBoxes()[i], ...this.boxPos(i)); }
     for (const p of this.particles) {
@@ -1024,6 +1032,23 @@ export class Floor {
     ctx.fillStyle = '#c9a36b'; ctx.fillRect(bx, by, w, 8);
     ctxText(ctx, SMALL, head, bx + 4, by + 2, INK);
     shown.forEach((l, i) => ctxText(ctx, SMALL, l, bx + 4, by + 11 + i * 7, INK));
+  }
+  staffPos(s) {
+    const same = (this.game.staff || []).filter((x) => x.role === s.role), k = Math.max(0, same.indexOf(s));
+    if (s.role === 'saljare') return { x: [306, 372, 396, 290][k % 4], y: LY.KEEPER_HOME[1], dir: 'down' };
+    return { x: 478 - (k % 3) * 20, y: 126, dir: s.job ? 'up' : 'down' };
+  }
+  // namnskylt med rollfärg och en liten stapel för pågående jobb
+  drawStaffTags(ctx) {
+    for (const s of this.game.staff || []) {
+      if (s.course) continue;
+      const p = this.staffPos(s), name = s.name.split(' ')[0].toUpperCase().slice(0, 10), w = textW(SMALL, name) + 4;
+      const x = Math.round(p.x - w / 2), y = Math.round(p.y - 50);
+      ctx.fillStyle = '#17151a'; ctx.fillRect(x - 1, y - 1, w + 2, 9);
+      ctx.fillStyle = s.role === 'tekniker' ? '#f5a142' : '#8be36b'; ctx.fillRect(x, y, w, 7);
+      ctxText(ctx, SMALL, name, x + 2, y + 1, '#17151a');
+      if (s.job) { ctx.fillStyle = '#17151a'; ctx.fillRect(x - 1, y + 9, w + 2, 4); ctx.fillStyle = '#7ee8fa'; ctx.fillRect(x, y + 10, Math.round(w * Math.min(1, s.progress || 0)), 2); }
+    }
   }
   drawNameTags(ctx) {
     if (this.players.length < 2) return;

@@ -20,7 +20,7 @@ export const PLAYER_COLORS = ['#7ee8fa', '#f5c542', '#ff7ab6', '#8be36b', '#b58c
 
 export function econSnap(g) {
   return {
-    money: g.money, xp: g.xp, stock: g.stock, shown: g.shown, stats: g.stats, tutorialStep: g.tutorialStep, startYear: g.startYear, fit: g.fit, demand: g.demand, deskPc: g.deskPc, models: g.models, events: g.events, bulk: g.bulk,
+    money: g.money, xp: g.xp, stock: g.stock, shown: g.shown, stats: g.stats, tutorialStep: g.tutorialStep, startYear: g.startYear, fit: g.fit, demand: g.demand, deskPc: g.deskPc, models: g.models, events: g.events, bulk: g.bulk, staff: g.staff, staffing: g.staffing,
     deliveries: g.deliveries.map((d) => ({ id: d.id, items: d.items, state: d.state, left: Math.max(0, (d.eta ?? 0) - g.time) })),
     start: g.startInfo ? { template: g.startInfo.template, builds: (g.startInfo.builds || []).map((b) => (b || []).map((p) => p.id)) } : null,
   };
@@ -32,11 +32,13 @@ export function applyEcon(g, e) {
   if (e.models) g.models = e.models;
   if (e.events) g.events = e.events;
   if (e.bulk) g.bulk = e.bulk;
+  if (e.staff) g.staff = e.staff;
+  if (e.staffing) g.staffing = e.staffing;
   if (e.deskPc !== undefined) { const before = JSON.stringify(g.deskPc); g.deskPc = e.deskPc; if (JSON.stringify(e.deskPc) !== before) g.emit('fit'); }
   g.deliveries = e.deliveries.map((d) => ({ ...d, eta: g.time + d.left }));
   if (e.start) g.startInfo = { template: e.start.template, builds: e.start.builds.map((ids) => ids.map((id) => g.shop.part[id]).filter(Boolean)) };
 }
-const orderSnap = (o) => ({ id: o.id, customerId: o.customerId, template: o.template, title: o.title, name: o.name, msg: o.msg, items: o.items, guided: o.guided, tutorial: o.tutorial, year: o.year, reserved: o.reserved, chosen: o.chosen, startedAt: o.startedAt });
+const orderSnap = (o) => ({ id: o.id, customerId: o.customerId, template: o.template, title: o.title, name: o.name, msg: o.msg, items: o.items, guided: o.guided, tutorial: o.tutorial, year: o.year, reserved: o.reserved, chosen: o.chosen, startedAt: o.startedAt, staff: o.staff, touched: o.touched, model: o.model, price: o.price, fee: o.fee });
 const custFull = (c) => ({ id: c.id, name: c.name, look: c.look, order: c.order, phase: c.phase, patience: isFinite(c.patience) ? c.patience : -1, patienceMax: isFinite(c.patienceMax) ? c.patienceMax : -1, x: c.x, y: c.y, dir: c.dir });
 const num = (v) => (v === -1 ? Infinity : v);
 

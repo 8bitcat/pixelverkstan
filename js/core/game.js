@@ -2,6 +2,7 @@
 // Känner inte till datorer – allt specifikt kommer från shop-modulen.
 import { FIRST_NAMES, makeLook } from './people.js';
 import { SLOTS as FLOOR_SLOTS } from './floor-layout.js';
+import { tickStaff, hire as staffHire, fire as staffFire, train as staffTrain, release as staffRelease } from './staff.js';
 
 const QUEUE_PATIENCE = 75;   // sekunder i kön
 const MAX_QUEUE = 3;
@@ -9,7 +10,7 @@ const MAX_ORDERS = 3;
 export const XP_PER_YEAR = 30;   // erfarenhet per år som går
 const DELIVERY_TIME = 12;        // sekunder från köp till att lådan står i butiken
 const PACK_WINDOW = 8;           // köp inom så här många sekunder hamnar i samma låda
-const SAVE_VERSIONS = [1, 2, 3, 4, 5, 6];
+const SAVE_VERSIONS = [1, 2, 3, 4, 5, 6, 7];
 const MODEL_TICK = 40;           // sekunder mellan postorderförsäljningarna
 const REVIEW_TIME = 25;          // sekunder från lansering till Datormagazins recension
 
@@ -43,6 +44,8 @@ export class Game {
     this.models = [];       // egna datormodeller (shops/dator/models.js)
     this.events = { seen: [], active: [], pending: null };   // händelser med val (shops/dator/events.js)
     this.bulk = [];         // avtal: leverera n st av en modell
+    this.staff = [];        // anställda (core/staff.js)
+    this.staffing = { cands: [], candYear: null, payT: 0 };
     // mirror = klient i co-op: läget kommer från värden, ingen egen simulering eller sparning
     this.mirror = !!opts.mirror;
     if (this.mirror) { this.startYear = opts.startYear ?? 2021; this.xp = 0; this.money = 0; this.stock = {}; this.stats = { served: 0, declined: 0, lost: 0, earned: 0, stars: 0 }; this.tutorialStep = 99; }
@@ -68,7 +71,7 @@ export class Game {
     this.tutorialStep = 0;
     this.customers = []; this.orders = [];
     this.fit = this.emptyFit(); this.demand = {}; this.deskPc = null;
-    this.models = []; this.bulk = [];
+    this.models = []; this.bulk = []; this.staff = []; this.staffing = { cands: [], candYear: null, payT: 0 };
     // händelser före startåret har redan hänt
     this.events = { seen: (this.shop.events?.EVENTS || []).filter((e) => e.year < startYear).map((e) => e.id), active: [], pending: null };
     this.save();
@@ -86,7 +89,7 @@ export class Game {
     const start = this.startInfo ? { template: this.startInfo.template, builds: (this.startInfo.builds || []).map((b) => (b || []).map((p) => p.id)) } : null;
     // lådor som är på väg sparas som framme
     const deliveries = this.deliveries.map((d) => ({ id: d.id, items: d.items, state: 'arrived' }));
-    const data = { v: 6, money, xp, stock, shown: this.shown, deliveries, stats: this.stats, tutorialStep, startYear: this.startYear, start, nextId: this.nextId, fit: this.fit, demand: this.demand, deskPc: this.deskPc, models: this.models, events: this.events, bulk: this.bulk };
+    const data = { v: 7, money, xp, stock, shown: this.shown, deliveries, stats: this.stats, tutorialStep, startYear: this.startYear, start, nextId: this.nextId, fit: this.fit, demand: this.demand, deskPc: this.deskPc, models: this.models, events: this.events, bulk: this.bulk, staff: this.staff, staffing: this.staffing };
     try { localStorage.setItem(this.saveKey, JSON.stringify(data)); } catch { /* privat läge */ }
   }
   load() {
@@ -103,6 +106,9 @@ export class Game {
       this.deskPc = d.deskPc && d.deskPc.parts ? { parts: Object.fromEntries(Object.entries(d.deskPc.parts).filter(([, id]) => this.shop.part[id])) } : null;
       this.models = Array.isArray(d.models) ? d.models.filter((m) => m && Array.isArray(m.parts)).map((m) => ({ ...m, parts: m.parts.filter((id) => this.shop.part[id]), reviewAt: m.state === 'recension' ? Math.min(m.reviewAt || 0, REVIEW_TIME) : m.reviewAt })) : [];
       this.bulk = Array.isArray(d.bulk) ? d.bulk : [];
+      // beställningar sparas inte, så ingen har ett jobb när man laddar
+      this.staff = Array.isArray(d.staff) ? d.staff.filter((x) => x && x.stats && x.role).map((x) => ({ ...x, job: null, progress: 0, pct: 0 })) : [];
+      this.staffing = d.staffing && typeof d.staffing === 'object' ? { cands: d.staffing.cands || [], candYear: d.staffing.candYear ?? null, payT: d.staffing.payT || 0 } : { cands: [], candYear: null, payT: 0 };
       const year = Math.min(this.lastYear, this.startYear + Math.floor((this.xp || 0) / XP_PER_YEAR));
       // äldre sparningar: det som redan hänt räknas som sett, så att inte alla händelser kommer på en gång
       this.events = d.events && typeof d.events === 'object' ? { seen: d.events.seen || [], active: d.events.active || [], pending: d.events.pending || null }
@@ -322,6 +328,18 @@ export class Game {
     }
     for (const t of notes.slice(0, 3)) this.emit('toast', { text: t, kind: /^[⚠🕰]/u.test(t) ? 'bad' : 'good' });
     if (notes.length) { this.save(); this.emit('change'); }
+  }
+  // ---------- Personal (core/staff.js) ----------
+  hire(id) { const ok = staffHire(this, id); if (ok) { this.save(); this.emit('change'); } return ok; }
+  fire(id) { const ok = staffFire(this, id); if (ok) { this.save(); this.emit('change'); } return ok; }
+  train(id, courseId) { const ok = staffTrain(this, id, courseId); if (ok) { this.save(); this.emit('change'); } return ok; }
+  // spelaren tar över en beställning: teknikern släpper den
+  touchOrder(orderId) {
+    const o = this.orders.find((x) => x.id === orderId);
+    if (!o) return false;
+    o.touched = true;
+    if (o.staff) { const s = this.staff.find((x) => x.id === o.staff); if (s) staffRelease(this, s); else delete o.staff; this.emit('change'); }
+    return true;
   }
   // ---------- Händelser (shops/dator/events.js) ----------
   get activeEvents() { const E = this.shop.events; return E ? (this.events?.active || []).map((a) => ({ ...a, ev: E.EVENT[a.id] })).filter((a) => a.ev) : []; }
@@ -652,6 +670,8 @@ export class Game {
     }
     this.eventT = (this.eventT || 0) + dt;
     if (this.eventT >= 1) { this.eventT = 0; this.eventCheck(); }
+    // personalen jobbar
+    if (this.staff?.length) tickStaff(this, dt);
     // leveranser
     for (const d of this.deliveries) {
       if (d.state === 'coming' && this.time >= d.eta) {

@@ -512,3 +512,12 @@ body[data-screen="build"] #chatlog { bottom: 150px; left: 280px; }
 .choice:hover:not(:disabled) { background: #cfeec9; } .choice:disabled { opacity: .55; cursor: default; }
 .choice b { font: 21px var(--head); } .choice small { display: block; font-size: 15px; color: var(--muted); }
 .news-chip { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* personal */
+.slist { display: flex; flex-direction: column; gap: 8px; }
+.scard { display: grid; grid-template-columns: 60px 1fr auto; gap: 10px; align-items: center; background: #fff; border: 2px solid var(--ink); padding: 6px 10px 6px 6px; }
+.scard canvas { width: 60px; height: 72px; image-rendering: pixelated; }
+.scard .nm { font: 23px var(--head); line-height: 1; } .scard .nm small { font: 15px var(--font); color: var(--muted); }
+.scard .sp { font-size: 16px; color: var(--muted); margin-top: 2px; }
+.stat { font-family: var(--font); letter-spacing: 1px; margin-right: 6px; white-space: nowrap; }
+.sbar { display: inline-block; width: 70px; height: 9px; border: 2px solid var(--ink); background: #fff; vertical-align: middle; } .sbar i { display: block; height: 100%; background: var(--green); } .sbar.low i { background: var(--red2); }

@@ -112,6 +112,7 @@ export function renderHud(game, h, room = null) {
     ${game.shop.fit ? '<button class="btn" data-h="fit" title="Bås, hyllor, inredning och lokal">🏪 Butiken</button>' : ''}
     ${game.hasArcadeRoom ? '<button class="btn" data-h="arcade" title="Arkadrummet – gå in och spela">🕹️ Arkad</button>' : ''}
     ${game.shop.models ? '<button class="btn" data-h="models" title="Egna datormodeller – lansera, recenseras, sälj">🧩 Modeller</button>' : ''}
+    ${game.shop.staff ? `<button class="btn" data-h="staff" title="Personal – tekniker och säljare">👥 Personal${game.staff?.length ? ` ${game.staff.length}` : ''}</button>` : ''}
     <button class="btn" data-h="stock" title="Förråd och skyltning">📦 Lager</button>
     <button class="btn" data-h="shop">🛒 Grossist</button>
     <button class="btn" data-h="menu" title="Meny – byt startår eller butik">☰</button>`;
@@ -128,9 +129,11 @@ export function renderOrders(game, onBuild, players = []) {
     const f = c && isFinite(c.patienceMax) ? Math.max(0, c.patience / c.patienceMax) : 1;
     const builders = players.filter((p) => p.away === 'workshop' && p.orderId === o.id);
     const who = builders.length ? ` · 🔧 ${builders.map((p) => `<i style="color:${esc(p.color || '#555')};font-style:normal">■</i>${esc(p.name)}`).join(' ')}` : '';
-    cards.push({ o, c, html: `<div><b>${esc(o.title)}</b><small>${esc(o.name)} · ${n}/${o.items.length} delar${who}</small>
+    const st = o.staff ? (game.staff || []).find((x) => x.id === o.staff) : null;
+    const who2 = st ? ` · ${o.repair ? '🔍' : '🔧'} ${esc(st.name.split(' ')[0])} ${Math.round((st.progress || 0) * 100)} %` : '';
+    cards.push({ o, c, html: `<div><b>${esc(o.title)}</b><small>${esc(o.name)} · ${n}/${o.items.length} delar${who}${who2}</small>
       <div class="pbar ${f < 0.35 ? 'low' : ''}"><i style="width:${Math.round(f * 100)}%"></i></div></div>
-      <button class="btn btn-go btn-small">${o.repair ? '🔍 Laga' : '🔧 Bygg'}</button>` });
+      <button class="btn btn-go btn-small">${st ? '👀 Ta över' : o.repair ? '🔍 Laga' : '🔧 Bygg'}</button>` });
   }
   const front = game.queue()[0];
   const gd = game.guide ? game.guide() : null;
@@ -657,3 +660,4 @@ export function openTvMenu(game, shownConsoles, onPlay) {
 
 // egna modeller och händelser (ui-models.js)
 export { openModels, showReview, openEvent, openNews } from './ui-models.js';
+export { openStaff } from './ui-staff.js';
