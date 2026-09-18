@@ -7,6 +7,8 @@ import * as upgrades from './upgrades.js';
 import * as products from './products.js';
 import * as compat from './compat.js';
 import * as faults from './faults.js';
+import * as models from './models.js';
+import * as events from './events.js';
 import { iconCanvas } from './art.js';
 import { Desk } from './desk.js';
 import { DB, loadParts, onSale } from './parts/index.js';
@@ -39,6 +41,9 @@ export default {
   makeRepairBuild: faults.makeRepairBuild,
   faults,
   diagnosisFee: orders.DIAGNOSIS_FEE,
+  // egna datormodeller och händelser med val (models.js, events.js)
+  models,
+  events,
   // Stjärnobjektet: årets finaste grafikkort (RTX 5080 Astral när det finns)
   heroFor(game) {
     const list = onSale(game.year).filter((p) => p.cat === 'gpu');

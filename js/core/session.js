@@ -40,6 +40,12 @@ export const COMMANDS = {
   addItem: (g, { customerId, orderId, part }) => g.addItem({ customerId, orderId }, String(part)),
   sellArcade: (g, { i }) => g.sellArcade(i | 0),
   deskUnbuild: (g) => g.deskUnbuild(),
+  // egna modeller och händelser
+  createModel: (g, { spec }) => g.createModel(spec || {}),
+  retireModel: (g, { id }) => g.retireModel(id | 0),
+  sequelModel: (g, { id, spec }) => g.sequelModel(id | 0, spec || {}),
+  buyForModel: (g, { id, n = 1 }) => g.buyForModel(id | 0, n | 0),
+  chooseEvent: (g, { id, choice }) => g.chooseEvent(String(id), String(choice)),
   complete: (g, { orderId, result }) => {
     const o = g.orders.find((x) => x.id === orderId);
     return o ? g.complete(o, result) : null;

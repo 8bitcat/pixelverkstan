@@ -147,19 +147,56 @@ export function productOrder(game, names) {
   return { template: 'produkt', title: p.name, name: rnd(names), msg, items: [{ cat: p.cat, part: p.id }], year, product: p.id };
 }
 
+// Kunder som läst om en av butikens egna modeller och vill ha just den (fast pris)
+export function modelOrder(game, names) {
+  const list = (game.models || []).filter((m) => m.state === 'sale' && m.review);
+  if (!list.length) return null;
+  const w = (m) => Math.max(0.05, m.hype) * (m.review.total / 40);
+  let r = Math.random() * list.reduce((s, m) => s + w(m), 0), m = list[list.length - 1];
+  for (const x of list) { r -= w(x); if (r <= 0) { m = x; break; } }
+  const items = m.parts.filter((id) => DB.part[id]).map((id) => ({ cat: DB.part[id].cat, part: id }));
+  if (!items.length) return null;
+  const msg = rnd([`Jag läste om ${m.name} i Datormagazin – jag vill ha en!`, `Grannen har en ${m.name}. Jag vill ha en likadan.`, `Har ni ${m.name} kvar?`, ...(m.review.hof ? [`${m.name}, tack. Den med de fina betygen.`] : [])]);
+  const cost = items.reduce((s, it) => s + DB.part[it.part].cost, 0);
+  return { template: 'modell', title: m.name, name: rnd(names), msg, items, year: game.year, model: m.id, price: m.price, fee: Math.max(300, m.price - cost) };
+}
+// händelser gör vissa mallar vanligare (DOOM → grafikkort och ljud, finanskris → billigt …)
+function templateWeight(t, game) {
+  if (!game.eventMul) return 1;
+  let w = 1;
+  if (t.gpu === 'need') w *= game.eventMul('cats', 'gpu');
+  if (t.sound) w *= game.eventMul('cats', 'sound');
+  if (t.optical) w *= game.eventMul('cats', 'media');
+  const mid = t.tier[0] >= 2 ? 1 : 0.4;
+  for (const c of ['ram', 'cpu', 'storage']) { const m = game.eventMul('cats', c); if (m !== 1) w *= 1 + (m - 1) * mid; }
+  if (t.tier[0] >= 3) w *= game.eventMul('hi');
+  if (t.tier[1] <= 2) w *= game.eventMul('lo');
+  return w;
+}
+function pickWeighted(list, wf) {
+  const ws = list.map(wf), sum = ws.reduce((a, b) => a + b, 0);
+  let r = Math.random() * sum;
+  for (let i = 0; i < list.length; i++) { r -= ws[i]; if (r <= 0) return list[i]; }
+  return list[list.length - 1];
+}
+
 // game: { year, stockFree(id), progress }
 export function generateOrder(game, names) {
   const year = game.year;
+  const em = (k, s) => (game.eventMul ? game.eventMul(k, s) : 1);
+  // egna modeller: kunder som läst recensionen
+  if (game.models?.some((m) => m.state === 'sale') && Math.random() < 0.25) { const o = modelOrder(game, names); if (o) return o; }
   // konsoler och spel: oftare när det finns en TV-hörna, ibland även utan (efterfrågan)
   if (game.shop.fit) {
     const hasTv = game.shop.fit.hasUnit(game.fit, 'tv');
-    if (Math.random() < (hasTv ? 0.35 : 0.1)) { const o = productOrder(game, names); if (o) return o; }
+    if (Math.random() < (hasTv ? 0.35 : 0.1) * em('products')) { const o = productOrder(game, names); if (o) return o; }
   }
-  // var femte kund kommer med en trasig dator (faults.js kopplas in av butiksmodulen)
-  if (game.shop.repairOrder && Math.random() < 0.2) { const o = game.shop.repairOrder(game, names); if (o) return o; }
+  // var femte kund kommer med en trasig dator (faults.js kopplas in av butiksmodulen) – fler under vissa händelser
+  const repairShare = (game.eventVal ? game.eventVal('repair') : null) ?? 0.2;
+  if (game.shop.repairOrder && Math.random() < repairShare) { const o = game.shop.repairOrder(game, names); if (o) return o; }
   const pool = templatesFor(year);
   if (!pool.length) return null;
-  const t = rnd(pool);
+  const t = pickWeighted(pool, (x) => templateWeight(x, game));
   const wantMissing = Math.random() < 0.28;
   // butiken får bara sälja det montrarna och lagerhyllan tillåter; ibland kommer en kund
   // som vill ha något finare ändå – då får man tacka nej och se det på efterfrågantavlan
@@ -311,11 +348,12 @@ export function fixOrder(order, year, stockFree = () => 0) {
 }
 
 export const DIAGNOSIS_FEE = 150;
-export function feeFor(order) { return order.product ? 0 : order.repair ? 300 + 120 * (order.repair.stars || 1) : (TEMPLATE[order.template]?.fee || 700); }
-export function xpFor(order) { return order.product ? (DB.part[order.product]?.cat === 'konsol' ? 6 : 3) : order.repair ? 10 + 4 * (order.repair.stars || 1) : (TEMPLATE[order.template]?.xp || 14); }
+export function feeFor(order) { return order.model ? (order.fee || 700) : order.product ? 0 : order.repair ? 300 + 120 * (order.repair.stars || 1) : (TEMPLATE[order.template]?.fee || 700); }
+export function xpFor(order) { return order.model ? 18 : order.product ? (DB.part[order.product]?.cat === 'konsol' ? 6 : 3) : order.repair ? 10 + 4 * (order.repair.stars || 1) : (TEMPLATE[order.template]?.xp || 14); }
 
 // Vad kunden betalar: delarnas butikspris + montering (produkter: pris × värdefaktor för året)
 export function priceFor(order, chosen = {}) {
+  if (order.model) return order.price || 0;   // egen modell: fast pris
   if (order.product) { const p = DB.part[order.product]; return p ? Math.round(retail(p) * valueAt(p, order.year || p.year) / 10) * 10 : 0; }
   if (order.repair) return feeFor(order);   // delarna är kundens egna; diagnosavgiften betalades vid inlämningen
   let sum = feeFor(order);

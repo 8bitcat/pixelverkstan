@@ -87,6 +87,27 @@ De tre första kunderna är guidade.
   öppnar lådan och lagar. Diagnosavgift direkt, resten när den fungerar. Felkatalogen
   ligger i `js/shops/dator/faults.js`; design i `docs/FELSOKNING.md`.
 
+## Egna modeller och händelser (à la Game Dev Story)
+
+- **🧩 Modeller**: sätt ihop en egen datormodell i tre steg – *användning* (speldator, kontor,
+  skola, budget, mediastudio) × *målgrupp* (tonåringar, familjer, studenter, företag,
+  pensionärer), delar ur årets grossistkatalog (auto-förslag eller välj själv), pris och
+  lanseringskampanj (flygblad → tidningsannons → TV-reklam → nätkampanj). Kombinationerna
+  har en **dold kompatibilitet** som man lär sig genom att prova.
+- **Datormagazin testar** varje modell: fyra kritiker (teknik, pris, målgrupp, helhet) ger
+  1–10 med citat; 32/40 är Hall of Fame och ger rykte. Betyget styr **postorder**-
+  försäljningen (delarna dras ur lagret, så köp in till flera datorer) och hur ofta kunder
+  kommer in och frågar efter modellen med namn – till fast pris. När delarna går ur tiden gör
+  du en **uppföljare** (namnet får II, III …) med årets delar, ett snäpp bättre.
+- **📰 Händelser** ur Sveriges datorhistoria dyker upp när åren går – Hemdatorvågen,
+  Datormagazin startar, DOOM, Pentium FDIV-buggen, Windows 95-natten, Hem-PC-reformen,
+  Y2K, kondensatorpesten, Thailand-översvämningen, kryptobristen, pandemin, chipbristen,
+  AI-vågen … 35 stycken. Varje händelse är ett **val** (nattöppet LAN? byta processorer
+  gratis? köpa in innan priset sticker? teckna avtal om 12 kontorsdatorer?) som styr
+  kundflöde, tålamod, reparationsandel, vilka datorer kunderna vill ha, grossistens priser
+  och modellförsäljningen i ett par år. Pågående händelser syns som en 📰-chip i HUD:en.
+  Katalog i `js/shops/dator/events.js`, modellogik i `models.js`.
+
 ## Avatar och co-op
 
 - **👤 Min avatar** i menyn: bygg din figur (frisyr, kläder, glasögon, huvudbonad …),
@@ -180,6 +201,8 @@ node tools/repair.mjs 3                  # reparationer i Node: alla fel läggs 
 node tools/laga.mjs [url] 1999           # reparation i webbläsaren: bänk → symptom → laga → betalt
 node tools/byt.mjs                       # sunkig start, grafikkort tidigt, byt/lägg till delar ur lagret, lokal 2–6
 node tools/konsolspel.mjs                # Node: varje konsol har spel varje år den är het, PC-spel har systemkrav
+node tools/modeller.mjs                  # egna modeller: guiden, recensionen, postorder, uppföljare, händelse med val, avtal
+node tools/handelser.mjs                 # Node: alla händelser giltiga, auto-förslag byggbara varje år, betyg 1–10
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner
 ```
 

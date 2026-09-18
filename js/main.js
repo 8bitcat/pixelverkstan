@@ -205,6 +205,8 @@ function setupGame(shopModule, opts) {
     if (type === 'toast') UI.toast(data.text, data.kind);
     if (type === 'levelup') setTimeout(() => UI.showLevelUp(game, data), 900);
     if (type === 'delivery') floor.spawnVan();
+    if (type === 'event') setTimeout(() => UI.openEvent(game, data), 1500);
+    if (type === 'review') setTimeout(() => UI.showReview(game, data), 600);
   });
   floor.onBoxClick = (d) => { if (!UI.modalOpen()) UI.openDelivery(game, d); };
   floor.onShowcaseClick = (what) => {
@@ -303,6 +305,8 @@ const hudHandlers = {
   shop: () => UI.openShop(game),
   fit: () => UI.openFittings(game),
   arcade: () => openArcade(),
+  models: () => UI.openModels(game),
+  news: () => UI.openNews(game),
   stock: () => UI.openStock(game),
   room: () => openRoomInfo(),
   chat: () => openChat(),

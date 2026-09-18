@@ -20,7 +20,7 @@ export const PLAYER_COLORS = ['#7ee8fa', '#f5c542', '#ff7ab6', '#8be36b', '#b58c
 
 export function econSnap(g) {
   return {
-    money: g.money, xp: g.xp, stock: g.stock, shown: g.shown, stats: g.stats, tutorialStep: g.tutorialStep, startYear: g.startYear, fit: g.fit, demand: g.demand, deskPc: g.deskPc,
+    money: g.money, xp: g.xp, stock: g.stock, shown: g.shown, stats: g.stats, tutorialStep: g.tutorialStep, startYear: g.startYear, fit: g.fit, demand: g.demand, deskPc: g.deskPc, models: g.models, events: g.events, bulk: g.bulk,
     deliveries: g.deliveries.map((d) => ({ id: d.id, items: d.items, state: d.state, left: Math.max(0, (d.eta ?? 0) - g.time) })),
     start: g.startInfo ? { template: g.startInfo.template, builds: (g.startInfo.builds || []).map((b) => (b || []).map((p) => p.id)) } : null,
   };
@@ -29,6 +29,9 @@ export function applyEcon(g, e) {
   Object.assign(g, { money: e.money, xp: e.xp, stock: e.stock, shown: e.shown, stats: e.stats, tutorialStep: e.tutorialStep, startYear: e.startYear });
   if (e.fit) { const before = JSON.stringify(g.fit); g.fit = g.cleanFit(e.fit); if (JSON.stringify(g.fit) !== before) g.emit('fit'); }
   if (e.demand) g.demand = e.demand;
+  if (e.models) g.models = e.models;
+  if (e.events) g.events = e.events;
+  if (e.bulk) g.bulk = e.bulk;
   if (e.deskPc !== undefined) { const before = JSON.stringify(g.deskPc); g.deskPc = e.deskPc; if (JSON.stringify(e.deskPc) !== before) g.emit('fit'); }
   g.deliveries = e.deliveries.map((d) => ({ ...d, eta: g.time + d.left }));
   if (e.start) g.startInfo = { template: e.start.template, builds: e.start.builds.map((ids) => ids.map((id) => g.shop.part[id]).filter(Boolean)) };

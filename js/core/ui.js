@@ -13,6 +13,7 @@ export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '
 // Alla ändringar av spelet går via kommandon (i co-op skickas de till värden)
 let act = null;
 export function setAct(fn) { act = fn; }
+export const doAct = (name, args) => act(name, args);
 // Öppen dialog som ska ritas om när spelet ändras (t.ex. när värden svarat)
 let liveRefresh = null;
 export function refreshOpen() { if (liveRefresh && modalOpen()) liveRefresh(); }
@@ -105,10 +106,12 @@ export function renderHud(game, h, room = null) {
     <div class="chip" title="${li.next ? `Nästa år: ${esc(li.next.title)}` : 'Nutid!'}">📅 ${li.year ?? li.level} <small style="font-family:var(--font);font-size:15px">${esc(li.era?.title || li.title)}</small> <span class="xpbar"><i style="width:${Math.round(li.frac * 100)}%"></i></span></div>
     <div class="chip">😊 ${game.stats.served}</div>
     ${game.shop.fit ? `<button class="chip fit-chip" data-h="fit" title="Butiken: dragningskraft, trivsel och rykte">🪧${game.fitStats.drag} 😊${game.fitStats.trivsel} ⭐${game.rykte}</button>` : ''}
+    ${(game.activeEvents || []).length ? `<button class="chip news-chip" data-h="news" title="Pågående händelser">📰 ${esc(game.activeEvents[0].ev.title)}${game.activeEvents.length > 1 ? ` +${game.activeEvents.length - 1}` : ''}</button>` : ''}
     ${room ? `<button class="chip room-chip" data-h="room" title="Rummet – koden och spelarna">👥 ${esc(room.code)} · ${room.count}</button><button class="btn" data-h="chat" title="Chatta (Enter)">💬</button>` : ''}
     <div class="hud-spacer"></div>
     ${game.shop.fit ? '<button class="btn" data-h="fit" title="Bås, hyllor, inredning och lokal">🏪 Butiken</button>' : ''}
     ${game.hasArcadeRoom ? '<button class="btn" data-h="arcade" title="Arkadrummet – gå in och spela">🕹️ Arkad</button>' : ''}
+    ${game.shop.models ? '<button class="btn" data-h="models" title="Egna datormodeller – lansera, recenseras, sälj">🧩 Modeller</button>' : ''}
     <button class="btn" data-h="stock" title="Förråd och skyltning">📦 Lager</button>
     <button class="btn" data-h="shop">🛒 Grossist</button>
     <button class="btn" data-h="menu" title="Meny – byt startår eller butik">☰</button>`;
@@ -203,7 +206,7 @@ export function openOrderDialog(game, c, h) {
       <div class="plist">${rows}</div>
       ${canEdit ? `<div class="swapbar"><button class="btn btn-small" data-stockpick>📦 Byt del ur lagret</button>${!hasGpu ? '<button class="btn btn-small btn-gold" data-addgpu>➕ Lägg till grafikkort</button>' : ''}<small>Kunden betalar delarnas pris – ett bättre kort ger mer betalt.</small></div>` : ''}
       <div class="sum"><span>Kunden betalar${o.items.some((i) => i.choice) ? ' ca' : ''}${repair ? ' när den är lagad' : ''}</span><b>${fmt(price)} kr</b></div>
-      <div class="sp" style="color:var(--muted)">${prod ? `${esc(shop.specLine(prod))}${shop.products && shop.products.valueAt(prod, game.year) < 1 ? ' · <b>värdet har sjunkit</b> – gammalt lager' : ''}` : repair ? 'Arbetskostnad efter svårighet – delarna är kundens egna.' : `Delarnas pris + ${fmt(shop.feeFor(o))} kr i montering.`}</div>
+      <div class="sp" style="color:var(--muted)">${prod ? `${esc(shop.specLine(prod))}${shop.products && shop.products.valueAt(prod, game.year) < 1 ? ' · <b>värdet har sjunkit</b> – gammalt lager' : ''}` : repair ? 'Arbetskostnad efter svårighet – delarna är kundens egna.' : o.model ? '🧩 Din egen modell – fast pris, som i Datormagazin.' : `Delarnas pris + ${fmt(shop.feeFor(o))} kr i montering.`}</div>
       ${tip ? `<div class="speech" style="margin:10px 0 0;background:#fff4c7">${tip}</div>` : ''}`;
     const buttons = [
       { label: 'Tacka nej', cls: 'btn-red', onClick: () => { closeModal(); h.onDecline(c); } },
@@ -352,9 +355,9 @@ export function openShop(game, tab = null, onClose = null) {
     for (const p of shown) {
       const sale = game.onSale(p), lock = sale && !game.canSell(p);
       const btn = lock
-        ? `<button class="btn btn-small" data-lock="1" title="${esc(game.needFor(p))}">🔒 ${fmt(p.cost)} kr</button>`
+        ? `<button class="btn btn-small" data-lock="1" title="${esc(game.needFor(p))}">🔒 ${fmt(game.costOf(p))} kr</button>`
         : sale
-          ? `<button class="btn btn-small btn-gold" data-buy="${p.id}" ${p.cost > game.money ? 'disabled' : ''}>Köp ${fmt(p.cost)} kr</button>`
+          ? `<button class="btn btn-small btn-gold" data-buy="${p.id}" ${game.costOf(p) > game.money ? 'disabled' : ''}>Köp ${fmt(game.costOf(p))} kr${game.costOf(p) !== p.cost ? ` <small title="händelse: ${game.costOf(p) > p.cost ? 'dyrare' : 'billigare'} än vanligt">${game.costOf(p) > p.cost ? '📈' : '📉'}</small>` : ''}</button>`
           : `<button class="btn btn-small" disabled>${p.year > y ? `📅 ${p.year}` : 'Utgången'}</button>`;
       rows += `<div class="prow shoprow ${lock ? 'locked' : ''}" style="${sale ? '' : 'opacity:.55'}"><span data-icon="${p.id}"></span>
         <div><div class="nm">${esc(p.name)}</div><div class="sp">${esc(shop.specLine(p))} · ${p.year}${lock ? ` · <b class="lock-need">🔒 ${esc(game.needFor(p))}</b>` : ''}</div></div>
@@ -363,7 +366,7 @@ export function openShop(game, tab = null, onClose = null) {
     if (!shown.length) rows = `<p style="font-size:19px">Inga delar matchar.${st.filter === 'sale' ? ' Prova filtret "Kommande".' : ''}</p>`;
     const chip = (f, label) => `<button class="tab ${st.filter === f ? 'on' : ''}" data-filter="${f}">${label}</button>`;
     const kit = shop.starterKit ? shop.starterKit(game) : [];
-    const kitCost = kit.reduce((s, [id, n]) => s + shop.part[id].cost * n, 0);
+    const kitCost = kit.reduce((s, [id, n]) => s + game.costOf(shop.part[id]) * n, 0);
     const kitBox = kit.length && game.tutorialStep < (shop.tutorialCount || 0)
       ? `<div class="kit"><div><b>📦 Startpaket</b><small>${kit.reduce((s, [, n]) => s + n, 0)} delar till dina första kunders datorer – allt i en låda.</small></div><button class="btn btn-gold" data-kit ${kitCost > game.money ? 'disabled' : ''}>Köp ${fmt(kitCost)} kr</button></div>` : '';
     const pending = game.deliveries.filter((d) => d.state === 'coming');
@@ -651,3 +654,6 @@ export function openTvMenu(game, shownConsoles, onPlay) {
   dlg.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(shop.icon(shop.part[el.dataset.icon], 44, 38)));
   dlg.querySelectorAll('[data-play]').forEach((b) => (b.onclick = () => { closeModal(); onPlay(shop.part[b.dataset.play], shop.part[b.dataset.con]); }));
 }
+
+// egna modeller och händelser (ui-models.js)
+export { openModels, showReview, openEvent, openNews } from './ui-models.js';
