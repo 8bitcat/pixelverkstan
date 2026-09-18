@@ -254,8 +254,11 @@ export function openStock(game) {
       ...cats.map((c) => `<button class="tab ${c === st.tab ? 'on' : ''}" data-tab="${c}">${shop.cats[c].icon} ${esc(shop.cats[c].name)}</button>`)].join('');
     const rows = list.map((p) => {
       const n = game.stockFree(p.id), sh = game.shownFree(p.id);
+      // produkter: hett just nu, gammalt lager (värdet har sjunkit) eller samlarobjekt
+      let tag = '';
+      if (shop.isProduct?.(p)) { const v = shop.products.valueAt(p, game.year), h = shop.hypeAt(p, game.year); tag = v > 1.5 ? ' · <b style="color:#8a6a2a">💎 samlarobjekt</b>' : v < 1 ? ` · <b style="color:var(--red2)">🏷 REA – värde ${Math.round(v * 100)} %</b>` : h >= 0.85 ? ' · <b style="color:#c9323a">🔥 hett</b>' : ''; }
       return `<div class="prow stockrow"><span data-icon="${p.id}"></span>
-        <div><div class="nm">${esc(p.name)}</div><div class="sp">${esc(shop.cats[p.cat].name)} · ${p.year}</div></div>
+        <div><div class="nm">${esc(p.name)}</div><div class="sp">${esc(shop.cats[p.cat].name)} · ${p.year}${tag}</div></div>
         <div class="own">framme<br><b>${sh}</b> / ${n}</div>
         <div class="stock-btns"><button class="btn btn-small" data-less="${p.id}" ${sh ? '' : 'disabled'} title="Ta in en till förrådet">−</button><button class="btn btn-small btn-go" data-more="${p.id}" ${sh < n ? '' : 'disabled'} title="Ställ ut en till">+</button></div></div>`;
     }).join('');
@@ -371,7 +374,10 @@ export function showLevelUp(game, info) {
   const top = [];
   for (const cat of shop.catOrder) { const p = fresh.find((x) => x.cat === cat); if (p) top.push(p); }
   const gone = shop.parts.filter((p) => p.until === y - 1).length;
-  const body = `<p style="font-size:21px;margin-top:0">Det har blivit <b>${y}</b>${info.era?.title ? ` – ${esc(info.era.title)}` : ''}! Grossisten har <b>${fresh.length}</b> nya delar${gone ? ` och ${gone} gamla har slutat säljas` : ''}.</p>
+  // tidningsnotiser: konsoler och arkadmaskiner som lanseras i år
+  const launches = shop.parts.filter((p) => (p.cat === 'konsol' || p.cat === 'arkad') && p.year === y);
+  const news = launches.length ? `<div class="news"><b>📰 Datortidningen:</b> ${launches.map((p) => p.cat === 'arkad' ? `<i>${esc(p.brand || 'Spelhallen')} ställer ut ${esc(p.name)} – köerna ringlar långa.</i>` : `<i>${esc(p.brand ? p.brand[0].toUpperCase() + p.brand.slice(1) : '')} lanserar ${esc(p.name)}${p.cost ? ` för ${fmt(Math.round(p.cost * 1.3 / 10) * 10)} kr` : ''}.</i>`).join(' ')} ${launches.some((p) => p.cat === 'konsol') ? 'Kunderna kommer att fråga efter den – ha en TV-hörna och köp in.' : ''}</div>` : '';
+  const body = `<p style="font-size:21px;margin-top:0">Det har blivit <b>${y}</b>${info.era?.title ? ` – ${esc(info.era.title)}` : ''}! Grossisten har <b>${fresh.length}</b> nya delar${gone ? ` och ${gone} gamla har slutat säljas` : ''}.</p>${news}
     ${top.length ? `<h3>Nyheter i år</h3><div class="plist">${top.map((p) => `<div class="prow" style="grid-template-columns:44px 1fr"><span data-icon="${p.id}"></span><div><div class="nm">${esc(p.name)}</div><div class="sp">${esc(shop.cats[p.cat].name)} · ${esc(shop.specLine(p))}</div></div></div>`).join('')}</div>` : ''}`;
   const dlg = openModal(`📅 Nytt år: ${y}`, body, [{ label: 'Grymt!', cls: 'btn-go', onClick: closeModal }]);
   dlg.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(shop.icon(shop.part[el.dataset.icon], 44, 38)));
@@ -558,4 +564,25 @@ export function openPlayMenu(game, onPlay, onRebuild) {
   dlg.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(shop.icon(shop.part[el.dataset.icon], 44, 38)));
   dlg.querySelectorAll('[data-play]').forEach((b) => (b.onclick = () => { closeModal(); onPlay(shop.part[b.dataset.play], m, evaluate(b.dataset.play, m)); }));
   dlg.querySelector('[data-rebuild]').onclick = () => { closeModal(); onRebuild?.(); };
+}
+
+
+// ---------- TV-hörnan: välj konsol och spel att prova ----------
+export function openTvMenu(game, shownConsoles, onPlay) {
+  const shop = game.shop, y = game.year;
+  const cons = shownConsoles.length ? shownConsoles : [];
+  if (!cons.length) { toast('Inga konsoler står i TV-hörnan – köp in hos 🛒 Grossisten och ställ ut dem.', ''); return openShowcase(game, { cats: ['konsol'], title: 'TV-hörnan' }); }
+  const blocks = cons.map((c) => {
+    const all = shop.products.gamesFor(c.look.shape).filter((g) => g.year <= y);
+    const owned = all.filter((g) => game.stockFree(g.id) > 0);
+    const demo = !owned.length && all.length ? [all.sort((a, b) => shop.hypeAt(b, y) - shop.hypeAt(a, y))[0]] : [];
+    const list = owned.length ? owned : demo;
+    const rows = list.map((g) => `<div class="prow gamerow"><span data-icon="${g.id}"></span><div><div class="nm">${esc(g.name)} <small style="color:var(--muted)">${g.year}</small></div><div class="sp">${owned.length ? `${game.stockFree(g.id)} i lager` : 'demoexemplar – köp in spelet så säljer det'}</div></div><button class="btn btn-small btn-go" data-play="${g.id}" data-con="${c.id}">▶ Spela</button></div>`).join('');
+    return `<h3 style="margin:10px 0 4px"><span data-icon="${c.id}" style="display:inline-block;vertical-align:middle"></span> ${esc(c.name)}</h3><div class="plist">${rows || '<p class="sp">Inga spel till den här konsolen än.</p>'}</div>`;
+  }).join('');
+  const body = `<p style="font-size:18px;margin:0 0 6px">Prova konsolerna som står framme. Kunder som ser dig spela vill köpa – och den som köper konsolen kommer tillbaka efter spel.</p>${blocks}`;
+  const dlg = openModal('📺 TV-hörnan', body, [{ label: 'Stäng', onClick: closeModal }]);
+  dlg.classList.add('dlg-wide');
+  dlg.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(shop.icon(shop.part[el.dataset.icon], 44, 38)));
+  dlg.querySelectorAll('[data-play]').forEach((b) => (b.onclick = () => { closeModal(); onPlay(shop.part[b.dataset.play], shop.part[b.dataset.con]); }));
 }

@@ -65,8 +65,9 @@ export class Play {
     this.error = opts.machine?.error || null;
     this.targetFps = this.mode === 'arcade' ? 60 : Math.max(4, Math.min(70, opts.machine?.fps || 60));
     this.state = this.mode === 'arcade' ? 'coin' : (this.error ? 'error' : 'boot');
+    this.bootLen = this.mode === 'console' ? 1.1 : 2.2;
     this.bootT = 0; this.acc = 0; this.frameT = 0; this.fpsSamples = []; this.savedHs = false;
-    $('#play-sub').textContent = this.mode === 'arcade' ? `${opts.product?.coin ? opts.product.coin + ' kr per spel' : 'gratis'} · ESC = gå därifrån` : `${opts.machine?.name || 'Speldatorn'} · ESC = res dig`;
+    $('#play-sub').textContent = this.mode === 'arcade' ? `${opts.product?.coin ? opts.product.coin + ' kr per spel' : 'gratis'} · ESC = gå därifrån` : this.mode === 'console' ? `${opts.console?.name || 'Konsolen'} i TV-hörnan · ESC = lägg ner handkontrollen` : `${opts.machine?.name || 'Speldatorn'} · ESC = res dig`;
     window.addEventListener('keydown', this.onKey); window.addEventListener('keyup', this.onKey);
     this.canvas.addEventListener('pointerdown', this.onPtr); this.canvas.addEventListener('pointermove', this.onPtr);
     this.resize();
@@ -98,7 +99,7 @@ export class Play {
     this.hits = {};
     // tillstånd före spelet
     if (this.state === 'coin') { if (inp.hit || inp.startHit || inp.aHit) { this.state = 'run'; this.hooks.onCoin?.(this.opts.product); } }
-    else if (this.state === 'boot') { this.bootT += dt; if (this.bootT > 2.2 || inp.startHit) this.state = 'run'; }
+    else if (this.state === 'boot') { this.bootT += dt; if (this.bootT > (this.bootLen || 2.2) || inp.startHit) this.state = 'run'; }
     else if (this.state === 'error') { if (inp.startHit || inp.hit) this.exit(); }
     if (this.state === 'run' && this.game) {
       // hack-simulering: spelet räknar i fasta steg men bilden ritas bara i målhastigheten (med ryck)
@@ -127,7 +128,7 @@ export class Play {
   draw() {
     const ctx = this.ctx, g = this.g;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.fillStyle = this.mode === 'arcade' ? '#08060c' : '#1c1a22'; ctx.fillRect(0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
+    ctx.fillStyle = this.mode === 'arcade' ? '#08060c' : this.mode === 'console' ? '#2a2430' : '#1c1a22'; ctx.fillRect(0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
     if (this.state === 'coin') this.drawCoin(g);
     else if (this.state === 'boot') this.drawBoot(g);
     else if (this.state === 'error') this.drawError(g);
@@ -135,7 +136,7 @@ export class Play {
     ctx.imageSmoothingEnabled = false;
     // ram runt skärmen
     const x = this.ox, y = this.oy, w = W * this.s, h = H * this.s;
-    ctx.fillStyle = this.mode === 'arcade' ? '#2a2a34' : '#d8d0b8'; ctx.fillRect(x - 12, y - 12, w + 24, h + 24);
+    ctx.fillStyle = this.mode === 'arcade' ? '#2a2a34' : this.mode === 'console' ? '#3a3a44' : '#d8d0b8'; ctx.fillRect(x - 12, y - 12, w + 24, h + 24);
     ctx.fillStyle = '#0a0a0e'; ctx.fillRect(x - 3, y - 3, w + 6, h + 6);
     ctx.drawImage(this.buf, x, y, w, h);
     // fps-räknare på speldatorn
@@ -165,6 +166,14 @@ export class Play {
   }
   drawBoot(g) {
     const m = this.opts.machine || {}, era = m.year || 2000, t = this.bootT;
+    if (this.mode === 'console') {
+      g.fillStyle = '#05060a'; g.fillRect(0, 0, W, H);
+      const c = this.opts.console;
+      txt(g, (c?.maker || '').toUpperCase(), 56, '#8a8f9c', true);
+      txt(g, (c?.name || '').toUpperCase(), 72, '#f4f2ec', true, 1);
+      if (t > 0.5) txt(g, (this.opts.title || '').toUpperCase(), 98, '#f0e030', true);
+      return;
+    }
     g.fillStyle = era < 1995 ? '#000000' : era < 2007 ? '#000080' : '#0a0a0e'; g.fillRect(0, 0, W, H);
     const lines = era < 1995
       ? [`C:\\> ${(this.opts.title || 'GAME').replace(/\s+/g, '').toUpperCase().slice(0, 8)}.EXE`, 'Checking memory ... ' + m.ram + ' KB OK', 'Video: ' + (m.gfx || 'VGA') + ' detected', m.sound ? 'Sound Blaster at 220h IRQ 5' : 'No sound card - PC speaker', 'Loading ...']

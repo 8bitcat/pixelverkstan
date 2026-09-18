@@ -470,3 +470,7 @@ body[data-screen="build"] #chatlog { bottom: 150px; left: 280px; }
 .gamerow { grid-template-columns: 44px 1fr auto; }
 .fpsbadge { font: 20px var(--head); padding: 2px 8px; border: 2px solid var(--ink); background: #fff; min-width: 70px; text-align: center; }
 .fpsbadge.good { background: #d8f5df; } .fpsbadge.mid { background: #fff4c7; } .fpsbadge.bad { background: #ffe3e3; } .fpsbadge.err { background: #e8e6e0; color: var(--muted); }
+
+.news { background: #f4efe2; border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); padding: 8px 10px; margin: 8px 0; font-size: 18px; }
+.news b { font: 20px var(--head); }
+.news i { font-style: normal; display: block; margin-top: 2px; }

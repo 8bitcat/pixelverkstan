@@ -194,7 +194,10 @@ function setupGame(shopModule, opts) {
     if (UI.modalOpen()) return;
     if (what.empty) return UI.openFittings(game, 'platser', what.slot);
     if (what.closed) { UI.toast('Den här delen av lokalen är stängd – bygg ut butiken under 🏪 Butiken.', ''); return UI.openFittings(game, 'lager'); }
-    if (what.unit === 'tv') return UI.openShowcase(game, { cats: ['konsol'], title: 'TV-hörnan' });
+    if (what.unit === 'tv') {
+      const cons = floor.units[what.slot]?.shownCons || [];
+      return UI.openTvMenu(game, cons, (g, con) => startPlay({ mode: 'console', product: g, console: con, engine: g.engine, title: g.name, skin: { title: g.name } }));
+    }
     if (what.unit === 'spelhylla') return UI.openShowcase(game, { cats: ['spel'], title: 'Spelhyllan' });
     if (what.unit === 'arkad') {
       const p = game.shop.part[game.fit.slots[what.slot]?.product];
