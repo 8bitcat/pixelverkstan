@@ -155,6 +155,8 @@ export function generateOrder(game, names) {
     const hasTv = game.shop.fit.hasUnit(game.fit, 'tv');
     if (Math.random() < (hasTv ? 0.35 : 0.1)) { const o = productOrder(game, names); if (o) return o; }
   }
+  // var femte kund kommer med en trasig dator (faults.js kopplas in av butiksmodulen)
+  if (game.shop.repairOrder && Math.random() < 0.2) { const o = game.shop.repairOrder(game, names); if (o) return o; }
   const pool = templatesFor(year);
   if (!pool.length) return null;
   const t = rnd(pool);
@@ -304,12 +306,14 @@ export function fixOrder(order, year, stockFree = () => 0) {
   return swaps;
 }
 
-export function feeFor(order) { return order.product ? 0 : (TEMPLATE[order.template]?.fee || 700); }
-export function xpFor(order) { return order.product ? (DB.part[order.product]?.cat === 'konsol' ? 6 : 3) : (TEMPLATE[order.template]?.xp || 14); }
+export const DIAGNOSIS_FEE = 150;
+export function feeFor(order) { return order.product ? 0 : order.repair ? 300 + 120 * (order.repair.stars || 1) : (TEMPLATE[order.template]?.fee || 700); }
+export function xpFor(order) { return order.product ? (DB.part[order.product]?.cat === 'konsol' ? 6 : 3) : order.repair ? 10 + 4 * (order.repair.stars || 1) : (TEMPLATE[order.template]?.xp || 14); }
 
 // Vad kunden betalar: delarnas butikspris + montering (produkter: pris × värdefaktor för året)
 export function priceFor(order, chosen = {}) {
   if (order.product) { const p = DB.part[order.product]; return p ? Math.round(retail(p) * valueAt(p, order.year || p.year) / 10) * 10 : 0; }
+  if (order.repair) return feeFor(order);   // delarna är kundens egna; diagnosavgiften betalades vid inlämningen
   let sum = feeFor(order);
   for (const it of order.items) {
     const id = it.part || chosen[it.cat];

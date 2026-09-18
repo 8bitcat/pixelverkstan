@@ -219,6 +219,7 @@ function setupGame(shopModule, opts) {
         const o = game.orders.find((x) => x.id === id);
         if (!o) return;
         if (o.tutorial !== undefined) { openBuild(o); }
+        else if (o.repair) UI.toast('Datorn står på bänken i verkstaden – tryck på 🔍 Laga.', 'good');
         else UI.toast('Beställningen är mottagen – tryck på 🔧 Bygg när du är redo.', 'good');
       },
       onDecline: (cust) => act('decline', { customerId: cust.id }),

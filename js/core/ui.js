@@ -126,7 +126,7 @@ export function renderOrders(game, onBuild, players = []) {
     const who = builders.length ? ` · 🔧 ${builders.map((p) => `<i style="color:${esc(p.color || '#555')};font-style:normal">■</i>${esc(p.name)}`).join(' ')}` : '';
     cards.push({ o, c, html: `<div><b>${esc(o.title)}</b><small>${esc(o.name)} · ${n}/${o.items.length} delar${who}</small>
       <div class="pbar ${f < 0.35 ? 'low' : ''}"><i style="width:${Math.round(f * 100)}%"></i></div></div>
-      <button class="btn btn-go btn-small">🔧 Bygg</button>` });
+      <button class="btn btn-go btn-small">${o.repair ? '🔍 Laga' : '🔧 Bygg'}</button>` });
   }
   const front = game.queue()[0];
   const gd = game.guide ? game.guide() : null;
@@ -181,6 +181,8 @@ export function openOrderDialog(game, c, h) {
       }
     }
     const locked = miss.filter((m) => game.onSale(shop.part[m.id]) && !game.canSell(shop.part[m.id])).map((m) => game.needFor(shop.part[m.id]));
+    const repair = !!o.repair;
+    if (repair) rows = o.items.map((it) => { const p = shop.part[it.part]; return p ? `<div class="prow"><span data-icon="${p.id}"></span><div><div class="nm">${esc(p.name)}</div><div class="sp">${esc(shop.cats[p.cat].name)} · ${esc(shop.specLine(p))}</div></div><div class="st">kundens</div></div>` : ''; }).join('');
     const gone = game.hasGone(o) || miss.some((m) => !game.onSale(shop.part[m.id]));
     const waiting = miss.length && !toBuy.length && !gone && !locked.length;
     let tip = '';
@@ -190,20 +192,21 @@ export function openOrderDialog(game, c, h) {
     else if (locked.length) tip = `🔒 Kunden vill ha något finare än butiken får sälja (${esc([...new Set(locked)].join(', '))}). Tacka nej – önskemålet hamnar på efterfrågantavlan i 🏪 Butiken.`;
     else if (waiting) tip = '🚚 Delarna är på väg. Packa upp lådan vid dörren när den kommit – sedan kan du ta emot beställningen.';
     else if (prod && !miss.length) tip = '💰 Färdig vara – sälj direkt över disk, kunden hämtar vid utlämningen.';
+    else if (repair) tip = `🔧 Kunden lämnar in datorn. Diagnosavgiften (${fmt(shop.diagnosisFee || 150)} kr) får du direkt, resten när den fungerar. Ställ den på bänken, koppla in och starta – symptomet visar var felet sitter. Svårighet: ${'★'.repeat(o.repair.stars || 1)}`;
     else if (toBuy.length && buyCost > game.money) tip = `😬 Du har inte råd att köpa in det som saknas (${fmt(buyCost)} kr). Tacka nej, eller sälj fler datorer först.`;
     const price = shop.priceFor(o, {});
     const body = `<div class="who">${'<span data-face></span>'}<div class="speech">${esc(o.msg)}</div></div>
-      <h3 style="margin:4px 0 8px">${prod ? 'Vill köpa' : 'Beställning'}: ${esc(o.title)}</h3>
+      <h3 style="margin:4px 0 8px">${prod ? 'Vill köpa' : repair ? 'Lämnar in' : 'Beställning'}: ${esc(o.title)}</h3>
       <div class="plist">${rows}</div>
-      <div class="sum"><span>Kunden betalar${o.items.some((i) => i.choice) ? ' ca' : ''}</span><b>${fmt(price)} kr</b></div>
-      <div class="sp" style="color:var(--muted)">${prod ? `${esc(shop.specLine(prod))}${shop.products && shop.products.valueAt(prod, game.year) < 1 ? ' · <b>värdet har sjunkit</b> – gammalt lager' : ''}` : `Delarnas pris + ${fmt(shop.feeFor(o))} kr i montering.`}</div>
+      <div class="sum"><span>Kunden betalar${o.items.some((i) => i.choice) ? ' ca' : ''}${repair ? ' när den är lagad' : ''}</span><b>${fmt(price)} kr</b></div>
+      <div class="sp" style="color:var(--muted)">${prod ? `${esc(shop.specLine(prod))}${shop.products && shop.products.valueAt(prod, game.year) < 1 ? ' · <b>värdet har sjunkit</b> – gammalt lager' : ''}` : repair ? 'Arbetskostnad efter svårighet – delarna är kundens egna.' : `Delarnas pris + ${fmt(shop.feeFor(o))} kr i montering.`}</div>
       ${tip ? `<div class="speech" style="margin:10px 0 0;background:#fff4c7">${tip}</div>` : ''}`;
     const buttons = [
       { label: 'Tacka nej', cls: 'btn-red', onClick: () => { closeModal(); h.onDecline(c); } },
       { label: `🛒 Köp in det som saknas (${fmt(buyCost)} kr)`, cls: 'btn-gold', hidden: !toBuy.length, disabled: buyCost > game.money,
         onClick: () => { act('buyMissing', { customerId: c.id }); render(); } },
       { label: '🛒 Till grossisten', hidden: !missChoice.length, onClick: () => h.onShop(missChoice[0], () => openOrderDialog(game, c, h)) },
-      { label: gone ? '🛑 Går inte att bygga' : locked.length ? '🔒 Får inte säljas' : waiting ? '🚚 Väntar på lådan …' : prod ? `💰 Sälj för ${fmt(price)} kr` : '✓ Ta emot beställningen', cls: 'btn-go', disabled: miss.length || missChoice.length, onClick: () => { closeModal(); h.onAccept(c); } },
+      { label: gone ? '🛑 Går inte att bygga' : locked.length ? '🔒 Får inte säljas' : waiting ? '🚚 Väntar på lådan …' : prod ? `💰 Sälj för ${fmt(price)} kr` : repair ? '🔧 Ta emot jobbet' : '✓ Ta emot beställningen', cls: 'btn-go', disabled: miss.length || missChoice.length, onClick: () => { closeModal(); h.onAccept(c); } },
     ];
     const dlg = openModal(`Ny kund: ${esc(c.name)}`, body, buttons);
     dlg.querySelector('[data-face]').replaceWith(portrait(c.look));

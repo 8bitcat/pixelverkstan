@@ -1071,8 +1071,8 @@ export class Floor {
       for (let i = 0; i < 3; i++) if (Math.floor(t * 2.5 + c.id) % 4 > i) ctx.fillRect(bx + 3 + i * 4, by + 4, 2, 2);
     }
     // produktkunder: en liten bubbla med det de vill ha
-    if (c.order?.product && (c.phase === 'queue' || c.phase === 'arriving') && !c.moving && !(this.clickable(c))) {
-      const p = this.shop.part[c.order.product], label = (p ? (PLATE[p.look?.shape] || p.name.toUpperCase().slice(0, 9)) : '?') + '?';
+    if ((c.order?.product || c.order?.repair) && (c.phase === 'queue' || c.phase === 'arriving') && !c.moving && !(this.clickable(c))) {
+      const p = c.order.product ? this.shop.part[c.order.product] : null, label = c.order.repair ? 'LAGA?' : (p ? (PLATE[p.look?.shape] || p.name.toUpperCase().slice(0, 9)) : '?') + '?';
       const w = textW(SMALL, label) + 6, bx = x - Math.round(w / 2), by = head - 18;
       ctx.fillStyle = INK; ctx.fillRect(bx - 1, by - 1, w + 2, 10); ctx.fillRect(x - 1, by + 9, 3, 2);
       ctx.fillStyle = '#ffffff'; ctx.fillRect(bx, by, w, 8); ctx.fillRect(x, by + 8, 1, 2);

@@ -82,7 +82,8 @@ export class BuildView {
     order.build ||= newBuild();
     order.build.seen ||= new Set();
     this.selected = null; this.msg = null; this.guideKey = null; this.dirty = true; this.cablesDirty = true; this.userCam = false;
-    $('#build-title').innerHTML = `<span class="r">${esc(order.title)}</span> åt ${esc(order.name)}`;
+    const gen = /[sxz]$/i.test(order.name) ? order.name : order.name + 's';
+    $('#build-title').innerHTML = order.repair ? `<span class="r">🔧 ${esc(order.title)}</span> – ${esc(gen)} dator` : `<span class="r">${esc(order.title)}</span> åt ${esc(order.name)}`;
     if (order.build.help === null) {
       if (order.guided) this.op({ t: 'mode', help: true });
       else { this.refresh(); this.choosingMode = true; U.chooseMode(this, (help) => { this.choosingMode = false; this.op({ t: 'mode', help }); this.start(); }); return; }

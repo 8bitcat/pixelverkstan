@@ -53,6 +53,33 @@ python -m http.server 8777
 
 De tre första kunderna är guidade.
 
+## Butiken: bås, konsoler och spelande
+
+- **Lokalen** börjar som en sliten källarbutik med tre platser. *Renovera och bygg ut*
+  öppnar sex, *Datorhuset* alla åtta. 🏪 Butiken visar platserna med pixelförhandsvisning
+  av allt som går att köpa.
+- **Bås låser upp sortimentet.** En kategorihylla får bara visa instegsvaror (tier 1–2).
+  Ett **märkesbås** (NVIDIA, ATI, 3dfx, Intel, AMD, Kingston, Seagate …) i tre nivåer
+  höjer taket för just det märket till tier 3/4/5. Grossisten visar hänglås med kravet i
+  klartext; kunder som vill ha finare saker hamnar på **efterfrågantavlan**. Märken dör –
+  3dfx-båset är värdelöst år 2001.
+- **🪧 Dragningskraft, 😊 trivsel, ⭐ rykte** styr kundflöde, tålamod och dricks. Skyltar,
+  kaffeautomat, matta, stereo, växter, extra kassa och lagerhyllans nivå påverkar dem.
+- **Konsoler och spel** (C64, Amiga, NES … Switch 2, Steam Deck) säljs över disk – men
+  bara om de står i **TV-hörnan** respektive på **spelhyllan**. Kunder ber om årets heta
+  maskin; är det nyaste du visar över fyra år gammalt klagar de på grafiken. Gammalt
+  lager tappar värde; efter tjugo år blir det samlarobjekt.
+- **Arkadmaskiner** står på de små platserna, drar folk, drar in mynt – och går att
+  **spela på riktigt**: klicka på kabinettet, mynt i, tre liv, highscore med initialer.
+- **Spelbordet**: sätt ihop butikens egen dator av delar i lagret och spela tidstypiska
+  PC-spel med **FPS-räknare** i hörnet. För lite minne ger `Not enough memory`, fel
+  grafikkort `This game requires VGA`, inget 3D-kort mjukvaruläge – och på minimikraven
+  hackar det synligt. Nio små spelmotorer under `js/games/`.
+- **Reparationsuppdrag**: var femte kund lämnar in en trasig dator. Den står på bänken,
+  du kopplar in och startar, ser symptomet (rök, pip, `CPU FAN ERROR`, svart skärm …),
+  öppnar lådan och lagar. Diagnosavgift direkt, resten när den fungerar. Felkatalogen
+  ligger i `js/shops/dator/faults.js`; design i `docs/FELSOKNING.md`.
+
 ## Avatar och co-op
 
 - **👤 Min avatar** i menyn: bygg din figur (frisyr, kläder, glasögon, huvudbonad …),
@@ -138,6 +165,12 @@ node tools/coop.mjs                      # två webbläsare: lobby, delad butik,
 node tools/avatar.mjs                    # avatarredigeraren
 node tools/mobile.mjs                    # mobilvy (iPhone 13)
 node tools/zoom.mjs                      # renderingstider vid zoom
+node tools/customers.mjs 1991 fast       # kundflöde i Node över flera år (0 omöjliga, 0 köpfel)
+node tools/shopfit.mjs                   # sliten lokal → bås → hänglås → renovering → Datorhuset
+node tools/produkter.mjs                 # TV-hörna, spelhylla, arkad, köp in, sälj över disk
+node tools/spel.mjs                      # spela på arkadmaskin, sätt ihop speldatorn, FPS
+node tools/repair.mjs 3                  # reparationer i Node: alla fel läggs in och går att laga
+node tools/laga.mjs [url] 1999           # reparation i webbläsaren: bänk → symptom → laga → betalt
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner
 ```
 

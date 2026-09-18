@@ -8,6 +8,7 @@ import { drawCaseStanding, standDims } from './art-case.js';
 import { drawMonitor, drawKeyboard, drawMouse, drawDeskDecor, monitorFace, screenSize } from './desk-props.js';
 import { fan, hash } from './art-common.js';
 import { drawInternals, drawScreen, drawRear, switchRect, plugIcon, drawPlugHead } from './desk-art.js';
+import { Fx, heatShimmer } from '../../core/fx.js';
 
 const DV = { w: 840, h: 612, k: 18, hz: 14, ox: 256, oy: 200 };
 const CASE_AT = [20, 2.5, 6];
@@ -23,6 +24,7 @@ export class Desk {
     this.screen = document.createElement('canvas'); this.screen.width = 160; this.screen.height = 90;
     this.rear = document.createElement('canvas'); this.rear.width = 90; this.rear.height = 160;
     this.t = 0;
+    this.fx = new Fx();
   }
   get b() { return this.view.b; }
   get L() { return this.view.L; }
@@ -48,8 +50,10 @@ export class Desk {
     for (const id of Object.keys(this.d.plugs)) if (!this.plugs[id]) delete this.d.plugs[id];
     this.state = { powered: false, lit: {}, screen: 'off', mouse: false, t: 0 };
     this.d.success = false;
+    this.fx.clear();
     const v = this.view;
-    v.say(v.help
+    if (v.order?.repair) v.say(`<b>${esc(v.order.name)} lämnade in datorn:</b> «${esc(v.order.msg || '')}» Koppla in den på baksidan, starta – och se vad som händer. Sedan öppnar du lådan och letar.`, 'info');
+    else v.say(v.help
       ? `Datorn står på skrivbordet! Koppla in kablarna på <b>datorns baksida</b> (${window.innerWidth <= 760 ? 'knappen 🔌 Baksidan' : 'till vänster'}), slå på nätagget och tryck på startknappen.`
       : 'Datorn står på skrivbordet. Koppla in allt och starta den!', 'info');
     this.resize(v.cw, v.ch, window.innerWidth <= 760);
@@ -218,6 +222,7 @@ export class Desk {
     const need = L.wattNeed(b);
     if (p.psu.watt < need) return fail('blip', 'Fläktarna snurrar en halv sekund – sen stängs datorn av.', `Nätagget ger ${p.psu.watt} W, men delarna behöver runt ${need} W.`, 'inside');
     if (L.CABLE.cpu_pwr && !ok('cpu_pwr')) return fail('black', 'Fläktarna snurrar, men skärmen förblir svart.', `${L.PORTS.CPU_PWR?.label || 'CPU'}-strömmen saknas – processorn startar inte.`, 'inside');
+    if (!p.ram) return fail('beep', 'Datorn piper – ett långt och två korta – och skärmen är svart.', 'Det sitter inget minne i moderkortet.', 'inside');
     if (L.ACTION.jumpers && !L.actDone(b, 'jumpers')) return fail('black', 'Hårddisken surrar, men skärmen förblir svart.', L.mb.form === 'XT' ? 'DIP-switcharna på kortet är inte inställda – datorn vet inte hur mycket minne och vilket grafikkort den har.' : 'Jumprarna på moderkortet är inte inställda för processorn (klockfrekvens och spänning).', 'inside');
     if (!p.gpu && era.needsGpu) return fail('nosignal', 'Skärmen får ingen bild.', 'Moderkortet har ingen inbyggd grafik – datorn behöver ett grafikkort.', 'inside');
     if (p.gpu?.pwr && !ok('gpu_pwr')) return fail('nosignal', 'Fläktarna snurrar, men skärmen får ingen bild.', 'Grafikkortet saknar sin strömkabel från nätagget.', 'inside');
@@ -269,12 +274,13 @@ export class Desk {
     const lit = { cooler: L.cableOk(b, 'argb_cooler'), case: L.cableOk(b, 'argb_case'), fans: L.cableOk(b, 'argb_fans'), ram: true, gpu: true, mb: true, power: true };
     const monOn = !!d.plugs.mon_power;
     let end = 1.4;
-    if (k === 'smoke') { st.powered = t < 0.35; st.screen = monOn ? 'black' : 'off'; st.smoke = t; end = 2.2; }
+    if (k === 'smoke') { st.powered = t < 0.35; st.screen = monOn ? 'black' : 'off'; st.smoke = t; end = 3; }
     else if (k === 'dead') { st.powered = false; st.screen = monOn ? 'black' : 'off'; end = 1.4; }
     else if (k === 'blip') { st.powered = t < 0.6; st.lit = lit; st.screen = monOn ? 'black' : 'off'; end = 1.8; }
     else {
       st.powered = true; st.lit = lit;
       if (k === 'black') { st.screen = monOn ? 'black' : 'off'; end = 2.6; }
+      else if (k === 'beep') { st.screen = monOn ? 'black' : 'off'; st.beep = t; end = 3.2; }
       else if (k === 'nosignal') { st.screen = t > 0.8 ? 'nosignal' : 'black'; end = 3; }
       else if (k === 'monoff') { st.screen = 'off'; end = 2.6; }
       else {
@@ -354,6 +360,7 @@ export class Desk {
     this.mapFace(ctx, this.screen, ...monitorFace(this.era));
     // sladdar på bordet
     this.drawDeskCables(ctx);
+    this.drawFx(ctx);
     // startknapp (tryckt)
     const [bx, by] = this.powerButton();
     if (this.pressAnim > 0) { ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.beginPath(); ctx.arc(bx, by, 10, 0, Math.PI * 2); ctx.fill(); }
@@ -372,6 +379,23 @@ export class Desk {
       ctx.fillText(this.showRear ? '🖥️ Skrivbordet' : '🔌 Baksidan', tx + tw / 2, ty + th / 2 + 1);
       ctx.restore();
     }
+  }
+
+  // rök, gnistor, pipnoter och värmedaller ur datorn (partiklar i skärmpixlar)
+  drawFx(ctx) {
+    const run = this.run, st = this.state, S = this.dims, s = Math.max(1, Math.round(this.s * 1.5));
+    const top = this.proj(CASE_AT[0] + S.D * 0.5, CASE_AT[1] + S.W * 0.5, CASE_AT[2] + S.H);
+    const rear = this.proj(CASE_AT[0] + S.D * 0.2, CASE_AT[1] + S.W * 0.5, CASE_AT[2] + S.H * 0.8);
+    const dt = 1 / 60;
+    if (run && !run.done) {
+      const k = run.kind, t = run.t;
+      if (k === 'smoke') { if (t > 0.3 && t < 2.1) this.fx.spawn('smoke', rear[0], rear[1], 2 + (Math.random() < 0.5 ? 1 : 0), s * 1.5); if (t > 0.25 && t < 0.55) this.fx.spawn('spark', rear[0], rear[1], 4, s); }
+      if (k === 'beep' && t > 0.6 && t < 3 && Math.floor(t * 4) % 4 !== 3 && Math.random() < 0.35) this.fx.spawn('note', rear[0] - 6 * s, rear[1] + 8 * s, 1, s);
+      if (k === 'overheat' && t > 3.5) heatShimmer(ctx, top[0], top[1], S.D * 8 * this.s, 22 * this.s, this.t, s);
+      if (k === 'blip' && t > 0.5 && t < 0.7) this.fx.spawn('spark', rear[0], rear[1], 1, s);
+    }
+    this.fx.update(dt);
+    this.fx.draw(ctx);
   }
 
   mapFace(ctx, img, p00, p10, p01) {
@@ -396,7 +420,7 @@ export class Desk {
       clock: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
       postLines: [
         `CPU: ${p.cpu.name} ${mhz}`.toUpperCase().slice(0, 38),
-        `MINNE: ${ramText} ${p.ram.type} OK`.toUpperCase(),
+        `MINNE: ${p.ram ? ramText + ' ' + p.ram.type + ' OK' : 'SAKNAS'}`.toUpperCase(),
         `LAGRING: ${st ? st.name : 'SAKNAS'}`.toUpperCase().slice(0, 38),
         `GRAFIK: ${p.gpu ? p.gpu.name.replace(/^(NVIDIA|AMD|ASUS|MSI|PowerColor) /, '') : 'INBYGGD'}`.toUpperCase().slice(0, 38),
         ...(p.gpu?.vram ? [`VIDEOMINNE: ${this.view.shop.partTag(p.gpu).replace(' videominne', '')}`.toUpperCase()] : []),

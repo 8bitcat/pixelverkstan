@@ -144,6 +144,7 @@ export class Game {
   noteDemand(text) { if (!text) return; this.demand[text] = (this.demand[text] || 0) + 1; }
   demandFor(order) {
     const out = new Set();
+    if (order.repair) return [];
     for (const it of order.items) if (it.part) { const n = this.needFor(this.shop.part[it.part]); if (n) out.add(n); }
     return [...out];
   }
@@ -294,6 +295,7 @@ export class Game {
 
   // Delar som behövs men saknas för en beställning → [{id, need, have}]
   missingFor(order) {
+    if (order.repair) return [];   // kunden kommer med sina egna delar
     const need = {};
     for (const it of order.items) if (it.part) need[it.part] = (need[it.part] || 0) + 1;
     const out = [];
@@ -301,6 +303,7 @@ export class Game {
     return out;
   }
   missingChoices(order) {
+    if (order.repair) return [];
     return order.items.filter((it) => it.choice && !Object.keys(this.stock).some((id) => this.stock[id] > 0 && this.shop.part[id]?.cat === it.cat)).map((it) => it.cat);
   }
   // saknade delar som inte redan är på väg
@@ -315,7 +318,7 @@ export class Game {
   // ---------- Kunder ----------
   // Delar som slutat säljas byts mot likvärdiga som finns i år (kunden ändrar sig)
   refreshOrder(order) {
-    if (!order || !this.shop.fixOrder || order.product) return null;
+    if (!order || !this.shop.fixOrder || order.product || order.repair) return null;
     return this.shop.fixOrder(order, this.year, (id) => this.stockFree(id));
   }
   hasGone(order) { return order.items.some((it) => it.gone); }
@@ -446,9 +449,16 @@ export class Game {
       return { id: 'sale', product: id };
     }
     const reserved = [];
-    for (const it of order.items) if (it.part) { this.stock[it.part]--; this.clampShown(it.part); reserved.push(it.part); }
+    if (!order.repair) for (const it of order.items) if (it.part) { this.stock[it.part]--; this.clampShown(it.part); reserved.push(it.part); }
     const nParts = order.items.length;
     const o = { id: this.nextId++, customerId: c.id, ...order, reserved, chosen: {}, build: null, startedAt: this.time };
+    if (order.repair) {
+      // datorn står på bänken med felet inlagt; diagnosavgiften betalas direkt
+      o.build = this.shop.makeRepairBuild ? this.shop.makeRepairBuild(o) : null;
+      const fee = this.shop.diagnosisFee || 150;
+      this.money += fee; this.stats.earned += fee;
+      this.emit('toast', { text: `🔧 ${c.name} lämnar in datorn. Diagnosavgift +${fmt(fee)} kr.`, kind: 'good' });
+    }
     this.orders.push(o);
     c.phase = 'waiting';
     if (order.tutorial === undefined) { c.patience = c.patienceMax = Math.round((240 + nParts * 25) * this.patienceMul); }
