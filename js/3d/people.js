@@ -6,6 +6,61 @@ import { clone as cloneRig } from 'three/addons/utils/SkeletonUtils.js';
 import { loadRig } from './assets.js';
 import { tag, marker } from './textures.js';
 
+
+// ---------- Kläder ----------
+// 0 hud, 1 tröja, 2 byxor, 3 skor, 4 underarm/hand (hud eller ärm), 5 underben (byxa eller hud), 6 huvud
+const GROUP_RE = [[/Head|Eye|Neck/, 6], [/ForeArm|Hand/, 4], [/Shoulder|Arm|Spine/, 1], [/UpLeg|Hips/, 2], [/Foot|Toe/, 3], [/Leg/, 5]];
+function groupOf(name) { for (const [re, g] of GROUP_RE) if (re.test(name)) return g; return 1; }
+function clothColors(look, fallback) {
+  const c = (v, d) => new THREE.Color(v || d);
+  const skin = c(look.skin, '#e0b090'), shirt = c(look.shirt, fallback || '#7ea0c8'), pants = c(look.pants, '#2d3a5c'), shoes = c(look.shoes, '#222222');
+  const longSleeve = look.top && look.top !== 'tee' && look.top !== 'vest';
+  const shorts = look.bottom === 'shorts' || look.bottom === 'skirt';
+  return [skin, shirt, pants, shoes, longSleeve ? shirt : skin, shorts ? skin : pants, skin, skin];
+}
+// ett material per figur: färgen räknas ut per vertex ur benvikterna (mjuka övergångar vid lederna)
+function clothMaterial(groups, cols, joints) {
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: joints ? 0.55 : 0.8, metalness: joints ? 0.15 : 0.0 });
+  const uCols = { value: cols.map((c) => (joints ? c.clone().multiplyScalar(0.72) : c)) };
+  const uGroup = { value: Array.from(groups) };
+  m.customProgramCacheKey = () => 'cloth' + groups.length;
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uCols = uCols; sh.uniforms.uGroup = uGroup;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', `#include <common>\nuniform vec3 uCols[8]; uniform float uGroup[${Math.max(1, groups.length)}]; varying vec3 vCloth;`)
+      .replace('#include <skinbase_vertex>', `#include <skinbase_vertex>\n#ifdef USE_SKINNING\n vec3 cc = skinWeight.x * uCols[int(uGroup[int(skinIndex.x)])] + skinWeight.y * uCols[int(uGroup[int(skinIndex.y)])] + skinWeight.z * uCols[int(uGroup[int(skinIndex.z)])] + skinWeight.w * uCols[int(uGroup[int(skinIndex.w)])];\n vCloth = cc / max(0.001, skinWeight.x + skinWeight.y + skinWeight.z + skinWeight.w);\n#else\n vCloth = uCols[1];\n#endif`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vCloth;')
+      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= vCloth;');
+  };
+  return m;
+}
+function findBone(root, re) { let b = null; root.traverse((o) => { if (!b && o.isBone && re.test(o.name)) b = o; }); return b; }
+function dressHead(head, look, cols) {
+  const hair = new THREE.Color(look.hair || '#4a2f1d');
+  const mat = (c, r = 0.85) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
+  if (look.style && look.style !== 'bald') {
+    const full = !/buzz/.test(look.style);
+    const h = new THREE.Mesh(new THREE.SphereGeometry(full ? 10.6 : 10.2, 20, 14, 0, Math.PI * 2, 0, Math.PI * (full ? 0.62 : 0.5)), mat(hair, full ? 0.9 : 0.7));
+    h.position.set(0, full ? 8.5 : 9.5, -0.5); h.castShadow = true; head.add(h);
+    if (/long|pony|bob/.test(look.style)) { const back = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 7.5, 16, 16, 1, false, Math.PI, Math.PI), mat(hair, 0.9)); back.position.set(0, 2, -3); head.add(back); }
+  }
+  if (look.hat === 'cap') {
+    const cap = new THREE.Color(look.cap || '#c9323a');
+    const crown = new THREE.Mesh(new THREE.SphereGeometry(11.2, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), mat(cap, 0.75)); crown.position.set(0, 10.5, -0.5); crown.castShadow = true; head.add(crown);
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(10.5, 10.5, 1.2, 20, 1, false, 0, Math.PI), mat(cap, 0.75)); brim.position.set(0, 10.6, 5); brim.rotation.y = -Math.PI / 2; head.add(brim);
+  } else if (look.hat === 'beanie') {
+    const b = new THREE.Mesh(new THREE.SphereGeometry(11.4, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.6), mat(new THREE.Color(look.cap || '#8a2a2a'), 0.95)); b.position.set(0, 9, -0.5); head.add(b);
+  }
+  if (look.glasses) {
+    const g = new THREE.Mesh(new THREE.TorusGeometry(2.6, 0.4, 6, 16), mat(0x222222, 0.4)); g.position.set(-3.2, 10, 9.5); head.add(g);
+    const g2 = g.clone(); g2.position.x = 3.2; head.add(g2);
+  }
+  if (look.beard) {
+    const bd = new THREE.Mesh(new THREE.SphereGeometry(6.5, 14, 10, 0, Math.PI * 2, Math.PI * 0.45, Math.PI * 0.4), mat(hair, 0.95)); bd.position.set(0, 4.5, 5.5); head.add(bd);
+  }
+}
+
 export class People {
   constructor(scene) {
     this.scene = scene;
@@ -20,11 +75,14 @@ export class People {
     if (!g) return;
     this.rig = g.scene;
     for (const c of g.animations) this.clips[c.name] = c;
-    // höjden ur vilopositionens geometri (skinnade positioner går inte att lita på före första renderingen)
+    // höjden i viloposition: benens världsmatriser måste vara uppdaterade innan skinnade positioner mäts
     this.rig.updateMatrixWorld(true);
-    const box = new THREE.Box3();
-    this.rig.traverse((o) => { if (o.isSkinnedMesh || o.isMesh) { o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });
-    this.height = Math.max(0.5, box.max.y - box.min.y);
+    const box = new THREE.Box3().setFromObject(this.rig, true);
+    this.height = Math.max(1.0, box.max.y - box.min.y);
+    // bengrupp per benindex (samma ordning i alla kloner): kläderna målas per grupp i skinningen
+    let sk = null; this.rig.traverse((o) => { if (o.isSkinnedMesh && !sk) sk = o; });
+    this.groups = new Float32Array(sk ? sk.skeleton.bones.length : 0);
+    if (sk) sk.skeleton.bones.forEach((b, i) => { this.groups[i] = groupOf(b.name); });
   }
   // en ny figur
   make(a) {
@@ -32,16 +90,17 @@ export class People {
     let root, mixer = null, actions = null;
     if (this.rig) {
       root = cloneRig(this.rig);
+      const cols = clothColors(a.look || {}, a.color);
       root.traverse((o) => {
         if (!o.isMesh && !o.isSkinnedMesh) return;
         o.castShadow = true; o.receiveShadow = false; o.frustumCulled = false;
         o.raycast = () => {};   // siktet träffar kapseln nedan i stället (billigare och pålitligt)
-        o.material = o.material.clone();
-        const surf = /surface/i.test(o.name) || /surface/i.test(o.material.name || '');
-        const col = new THREE.Color(a.color || '#8899aa');
-        if (surf) { o.material.color.copy(col); o.material.roughness = 0.75; o.material.metalness = 0.05; }
-        else { o.material.color.copy(col).multiplyScalar(0.35); o.material.roughness = 0.5; o.material.metalness = 0.3; }
+        const joints = /joint/i.test(o.name) || /joint/i.test(o.material?.name || '');
+        o.material = clothMaterial(this.groups, cols, joints);
       });
+      // hår och keps på huvudbenet (benens lokala enhet är cm)
+      const head = findBone(root, /Head$/);
+      if (head) dressHead(head, a.look || {}, cols);
       const s = (a.kid ? 1.25 : 1.76) / this.height;
       root.scale.setScalar(s);
       mixer = new THREE.AnimationMixer(root);

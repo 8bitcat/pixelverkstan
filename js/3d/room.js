@@ -169,7 +169,7 @@ export function buildRoom(scene, ctx) {
   }
 
   // disken (röd panel + mörk skiva) och skåpet bakom
-  const cx0 = C.toX(LY.COUNTER.x0), cx1 = C.toX(LY.COUNTER.x1), cz1 = C.ZC + 0.06, cz0 = cz1 - 0.58;
+  const cx0 = C.toX(LY.COUNTER.x0), cx1 = C.toX(LY.COUNTER.x1), cz1 = C.ZC + 0.08, cz0 = 1.54;   // gångbandet bakom disken är z 1.14–1.5
   const panel = A.pbr('wood_table_001', { repeat: [1.8, 0.5], color: new THREE.Color(theme.counter || '#9e1b22').multiplyScalar(1.6), roughness: 0.5 });
   slab(g, cx0, cx1, 0.08, 0.98, cz0, cz1, panel, { pick: { type: 'counter' } });
   slab(g, cx0, cx1, 0, 0.08, cz0 + 0.05, cz1 - 0.05, paintMat(0x1a1a1c, 0.6), { cast: false });

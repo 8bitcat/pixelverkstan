@@ -19,7 +19,7 @@ import * as WK from '../core/floor-walk.js';
 
 export const QUALITIES = ['hög', 'medel', 'låg'];
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
-const EYE = 1.62, RADIUS = 0.24, SPEED = 2.6, RUN = 4.3, REACH = 3.8;
+const EYE = 1.62, RADIUS = 0.12, SPEED = 2.6, RUN = 4.3, REACH = 3.8;
 const $ = (s) => document.querySelector(s);
 
 export class Shop3D {
@@ -273,23 +273,23 @@ export class Shop3D {
       const want = c.order?.title || c.order?.want || '';
       const mood = c.phase === 'leaving' ? (c.mood === 'angry' ? ' 😠' : c.mood === 'happy' ? ' 😊' : '') : '';
       const label = cl ? (want ? `${c.name}: ${want}` : c.name) : say(c) || (c.phase === 'ready' ? c.name + ' hämtar' : c.phase === 'leaving' && mood ? c.name + mood : '');
-      out.push({ key, x, z, yaw: c.moving ? yaw : C.yawOf(c.dir), moving: c.moving, kid: !!c.look?.kid, color: c.look?.shirt || '#7ea0c8', label, labelColor: cl ? '#f5c542' : c.mood === 'angry' ? '#e23b5a' : '#7ee8fa', mark: cl });
+      out.push({ key, x, z, yaw: c.moving ? yaw : C.yawOf(c.dir), moving: c.moving, kid: !!c.look?.kid, color: c.look?.shirt || '#7ea0c8', look: c.look, label, labelColor: cl ? '#f5c542' : c.mood === 'angry' ? '#e23b5a' : '#7ee8fa', mark: cl });
       seen.add(key);
     }
     for (const pl of fl.players) {
       if (pl.local || pl.away || pl.x === undefined) continue;
       const key = 'p' + pl.id, x = C.toX(pl.x), z = C.toZ(pl.y);
-      out.push({ key, x, z, yaw: pl.moving ? this.yawFor(key, x, z, pl.dir) : C.yawOf(pl.dir), moving: !!pl.moving, kid: !!pl.look?.kid, color: pl.color || '#7ee8fa', label: pl.say && performance.now() < pl.say.until ? pl.say.text : pl.name, labelColor: pl.color || '#7ee8fa', big: !!(pl.say && performance.now() < pl.say.until) });
+      out.push({ key, x, z, yaw: pl.moving ? this.yawFor(key, x, z, pl.dir) : C.yawOf(pl.dir), moving: !!pl.moving, kid: !!pl.look?.kid, color: pl.color || '#7ee8fa', look: pl.look, label: pl.say && performance.now() < pl.say.until ? pl.say.text : pl.name, labelColor: pl.color || '#7ee8fa', big: !!(pl.say && performance.now() < pl.say.until) });
     }
     for (const s of g.staff || []) {
       if (s.course) continue;
       const p = fl.staffPos(s), key = 's' + s.id;
-      out.push({ key, x: C.toX(p.x), z: C.toZ(p.y), yaw: C.yawOf(p.dir), moving: !!s.job, kid: false, color: s.role === 'tekniker' ? '#f5a142' : '#8be36b', label: `${s.name.split(' ')[0]} · ${s.role}${s.job ? ' ' + Math.round((s.progress || 0) * 100) + ' %' : ''}`, labelColor: s.role === 'tekniker' ? '#f5a142' : '#8be36b' });
+      out.push({ key, x: C.toX(p.x), z: C.toZ(p.y), yaw: C.yawOf(p.dir), moving: !!s.job, kid: false, color: s.role === 'tekniker' ? '#f5a142' : '#8be36b', look: s.look, label: `${s.name.split(' ')[0]} · ${s.role}${s.job ? ' ' + Math.round((s.progress || 0) * 100) + ' %' : ''}`, labelColor: s.role === 'tekniker' ? '#f5a142' : '#8be36b' });
     }
     for (const w of fl.walkers || []) {
       let id = this.walkerIds.get(w); if (!id) { id = this.nextWalker++; this.walkerIds.set(w, id); }
       const key = 'w' + id, x = C.toX(w.x), z = C.toZ(w.y);
-      out.push({ key, x, z, yaw: this.yawFor(key, x, z, w.dir > 0 ? 'right' : 'left'), moving: true, kid: !!w.look?.kid, color: w.look?.shirt || '#8899aa' });
+      out.push({ key, x, z, yaw: this.yawFor(key, x, z, w.dir > 0 ? 'right' : 'left'), moving: true, kid: !!w.look?.kid, color: w.look?.shirt || '#8899aa', look: w.look });
     }
     return out;
   }

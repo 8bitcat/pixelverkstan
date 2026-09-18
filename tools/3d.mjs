@@ -36,6 +36,9 @@ ok(await page.evaluate(() => document.querySelector('#floor').classList.contains
 console.log('enheter', await page.evaluate(() => PV.floor.unitList.map((u) => u.i + ':' + (u.empty ? 'tom' : u.unit || u.cat) + (u.frame && PV.floor.partsFor ? '(' + PV.floor.partsFor(u).length + ')' : '')).join(' ')));
 console.log('modeller', JSON.stringify(info.models));
 ok(info.products > 3, `produktkartonger i montrarna: ${info.products}`);
+const sz = await page.evaluate(async () => { const THREE = await import('three'); const v = PV.view3d; const hs = [...v.people.actors.values()].map((ac) => { const b = new THREE.Box3().setFromObject(ac.root, true); return +(b.max.y - b.min.y).toFixed(2); }); return { hs, height: +v.people.height.toFixed(2), canStand: v.canStand(v.pos.x, v.pos.z), fwd: v.canStand(v.pos.x + 0.3, v.pos.z), back: v.canStand(v.pos.x - 0.3, v.pos.z) }; });
+ok(sz.hs.length && sz.hs.every((h) => h > 1.1 && h < 1.95), `figurerna är människostora: ${sz.hs.join(', ')} m (rigg ${sz.height})`);
+ok(sz.canStand && sz.fwd && sz.back, `spelaren kan röra sig från startplatsen (${JSON.stringify(sz)})`);
 // kameran tittar i riktningen (-sin yaw, -cos yaw)
 const yawTo = (x, z, tx, tz) => Math.atan2(-(tx - x), -(tz - z));
 const shoot = async (name, x, z, tx, tz, pitch = -0.06) => {
@@ -45,6 +48,7 @@ const shoot = async (name, x, z, tx, tz, pitch = -0.06) => {
 };
 // Källarhålan: från disken, från dörren mot montrarna, från bakre gången mot dörren
 await shoot('k1-disk', 1.9, 1.3, 0.5, 6.0);
+{ const c = await page.evaluate(async () => { const C = await import('./js/3d/coords.js'); const c = PV.game.customers[0]; return c && c.y > 100 ? [C.toX(c.x), C.toZ(c.y)] : null; }); if (c) await shoot('k1-kund', c[0] + 1.6, c[1] + 1.4, c[0], c[1], -0.05); }
 if (!QUICK) { await shoot('k1-dorr', -0.9, 0.9, -0.3, 6.5); await shoot('k1-montrar', 2.6, 4.2, -0.9, 5.0); await shoot('k1-bak', 1.5, 8.9, 0.0, 1.5); }
 // Kvartersbutiken (lokal 3): köp och bygg om
 console.log('köper lokal', await page.evaluate(() => { const g = PV.game; const a = g.buyItem('lokal2'), b = g.buyItem('lokal3'); g.emit('change'); return [a, b, g.shop.fit.lokalOf(g.fit)]; }));
