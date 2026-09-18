@@ -64,6 +64,7 @@ const r = await page.evaluate(async () => {
   const g = PV.game, fl = PV.floor, v = PV.view3d;
   const c = g.customers[0];
   c.phase = 'queue'; c.x = 318; c.y = 176; c._path = []; c._tkey = 'q0'; c.moving = false; c.dir = 'up';
+  c.patience = c.patienceMax = 9999;   // testet tar minuter i SwiftShader – kunden får inte tröttna och gå
   // kunden ska vara först i kön
   await new Promise((r) => setTimeout(r, 400));
   const C = await import('./js/3d/coords.js');
@@ -73,9 +74,12 @@ const r = await page.evaluate(async () => {
   await new Promise((r) => { const t = setInterval(() => { if (v.frames >= f0 + 2) { clearInterval(t); r(); } }, 100); });
   v.updateHover();
   const h = v.hover;
+  let called = false; const orig = fl.onCustomerClick; fl.onCustomerClick = (x) => { called = true; return orig(x); };
+  const toasts = []; const ot = v.hooks.toast; v.hooks.toast = (t, k) => { toasts.push(t); return ot(t, k); };
   v.interact();
+  fl.onCustomerClick = orig; v.hooks.toast = ot;
   await new Promise((r) => setTimeout(r, 300));
-  return { hover: h ? h.type : null, name: c.name, clickable: fl.clickable(c), modal: !document.querySelector('#modal').classList.contains('hidden'), title: document.querySelector('#modal h2, #modal .dlg h2, #modal b')?.textContent || '' };
+  return { hover: h ? h.type : null, dist: h ? +h.dist.toFixed(2) : null, called, toasts, name: c.name, clickable: fl.clickable(c), modal: !document.querySelector('#modal').classList.contains('hidden'), title: document.querySelector('#modal h2, #modal .dlg h2, #modal b')?.textContent || '' };
 });
 ok(r.hover === 'customer' && r.modal, `siktet träffar kunden och klicket öppnar beställningen (${JSON.stringify(r)})`);
 await page.screenshot({ path: OUT + '3d-kund.png', timeout: 120000 });

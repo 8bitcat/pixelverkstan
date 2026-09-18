@@ -14,6 +14,7 @@ import * as C from './coords.js';
 import { buildRoom, MODELS_ROOM } from './room.js';
 import { Units, MODELS_UNITS } from './units.js';
 import { People } from './people.js';
+import { Bench3D } from './bench.js';
 import * as LY from '../core/floor-layout.js';
 import * as WK from '../core/floor-walk.js';
 
@@ -35,6 +36,8 @@ export class Shop3D {
     this.raycaster = new THREE.Raycaster();
     this.raycaster.far = REACH + 1;
     this.frames = 0;
+    this.mode = 'walk';          // 'walk' = förstaperson i butiken, 'bench' = bygger vid arbetsbänken
+    this.bench = null; this.benchComposer = null;
   }
   attach(game, floor) {
     this.game = game; this.floor = floor;
@@ -75,6 +78,8 @@ export class Shop3D {
       this.scene.environmentIntensity = 0.45;
     } else this.scene.background = new THREE.Color(0x8fb4d8);
     this.rebuildAll();
+    this.bench = new Bench3D(this);
+    this.bench.place(this.room.bench);
     this.setQuality(this.quality);
     this.bindInput();
     this.ready = true;
@@ -88,6 +93,7 @@ export class Shop3D {
     ctx.room = this.room;
     this.units = new Units(this.scene, ctx);
     this.units.rebuild();
+    this.bench?.place(this.room.bench);
     this.lokal = this.floor.lokal; this.fitSig = this.floor.fitSig; this.sig = this.floor.sig; this.year = this.game.year;
     this.envDirty = true; this.envT = 0;
     if (!this.placed) { this.pos.set(C.toX(WK.SPOTS.home[0]), 0, C.toZ(WK.SPOTS.home[1])); this.yaw = Math.PI; this.pitch = -0.04; this.placed = true; }
@@ -120,24 +126,30 @@ export class Shop3D {
     const dpr = Math.min(window.devicePixelRatio || 1, q === 'låg' ? 1 : 1.5);
     r.setPixelRatio(dpr); r.setSize(w, h, false);
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
-    if (this.composer) { for (const p of this.composer.passes) p.dispose?.(); this.composer.dispose?.(); this.composer = null; this.gtao = null; }
+    this.killComposer('composer'); this.killComposer('benchComposer');
     this.applyShadowQuality();
     if (q === 'låg') return;
-    const comp = this.composer = new EffectComposer(r);
+    this.composer = this.makeComposer(this.camera, w, h, dpr);
+    if (this.mode === 'bench' && this.bench) this.benchComposer = this.makeComposer(this.bench.camera, w, h, dpr);
+  }
+  killComposer(key) { const c = this[key]; if (!c) return; for (const p of c.passes) p.dispose?.(); c.dispose?.(); this[key] = null; }
+  // renderkedja för en kamera: GTAO (hög), bloom, tonemapping, SMAA
+  makeComposer(cam, w, h, dpr) {
+    const comp = new EffectComposer(this.renderer);
     comp.setPixelRatio(dpr); comp.setSize(w, h);
-    comp.addPass(new RenderPass(this.scene, this.camera));
-    if (q === 'hög') {
-      const gtao = this.gtao = new GTAOPass(this.scene, this.camera, w, h);
+    comp.addPass(new RenderPass(this.scene, cam));
+    if (this.quality === 'hög') {
+      const gtao = new GTAOPass(this.scene, cam, w, h);
       gtao.output = GTAOPass.OUTPUT.Default;
-      gtao.updateGtaoMaterial({ radius: 0.3, distanceExponent: 1, thickness: 1, scale: 1.1, samples: 12, distanceFallOff: 1, screenSpaceRadius: false });
+      gtao.updateGtaoMaterial({ radius: cam.isOrthographicCamera ? 0.12 : 0.3, distanceExponent: 1, thickness: 1, scale: 1.1, samples: 12, distanceFallOff: 1, screenSpaceRadius: false });
       gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 4, radiusExponent: 1, rings: 2, samples: 16 });
       gtao.blendIntensity = 0.85;
       comp.addPass(gtao);
     }
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.32, 0.55, 0.92);
-    comp.addPass(this.bloom);
+    comp.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.32, 0.55, 0.92));
     comp.addPass(new OutputPass());
     comp.addPass(new SMAAPass(w * dpr, h * dpr));
+    return comp;
   }
   applyShadowQuality() {
     if (!this.room) return;
@@ -149,6 +161,7 @@ export class Shop3D {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
     this.composer?.setSize(w, h);
+    this.benchComposer?.setSize(w, h);
   }
 
   // ---------- In/ut ----------
@@ -160,6 +173,7 @@ export class Shop3D {
     this.hint();
   }
   leave() {
+    if (this.mode === 'bench') this.leaveBench();
     this.active = false;
     if (this.locked) document.exitPointerLock?.();
     this.canvas.classList.add('hidden'); $('#hud3d')?.classList.add('hidden');
@@ -167,11 +181,55 @@ export class Shop3D {
     this.keys.clear();
   }
 
+  // ---------- Byggläget vid arbetsbänken ----------
+  // Byggvyn (core/build.js) ritar sin scen genom bench.js i stället för pixelrastern; kameran
+  // låses ovanför bänken i samma vinkel som 2D. Pekarlogiken i byggvyn är oförändrad.
+  enterBench(view) {
+    if (!this.ready || !this.bench || !this.room?.bench) return false;
+    if (this.mode !== 'bench') {
+      this.mode = 'bench';
+      if (this.locked) document.exitPointerLock?.();
+      this.keys.clear(); this.hover = null; this.canvas.style.cursor = 'default';
+      $('#hud3d')?.classList.add('hidden');
+      document.body.classList.add('bench3d');
+      const w = Math.max(2, this.canvas.clientWidth), h = Math.max(2, this.canvas.clientHeight), dpr = Math.min(window.devicePixelRatio || 1, this.quality === 'låg' ? 1 : 1.5);
+      if (this.quality !== 'låg') this.benchComposer = this.makeComposer(this.bench.camera, w, h, dpr);
+    }
+    this.bench.attach(view);
+    return true;
+  }
+  leaveBench() {
+    if (this.mode !== 'bench') return;
+    this.mode = 'walk';
+    this.bench.detach();
+    this.killComposer('benchComposer');
+    document.body.classList.remove('bench3d');
+    if (this.active) $('#hud3d')?.classList.remove('hidden');
+    // spelaren står kvar vid bänken och tittar ner på den
+    const b = this.room?.bench;
+    if (b) { this.pos.set(b.stand[0], 0, b.stand[1]); this.yaw = 0; this.pitch = -0.45; this.vel.set(0, 0, 0); this.wasAway = false; }
+    this.hint();
+  }
+  renderBench(dt) {
+    if (!this.ready || this.mode !== 'bench') return;
+    const fl = this.floor;
+    fl.refreshStock();
+    if (fl.lokal !== this.lokal || fl.fitSig !== this.fitSig || this.game.year !== this.year) this.rebuildAll();
+    else if (fl.sig !== this.sig) { this.sig = fl.sig; this.units.rebuild(); }
+    this.room.update(dt, fl);
+    this.units.update(dt);
+    this.people.sync(this.peopleList(), dt);
+    this.bench.update(dt);
+    this.renderer.info.reset();
+    if (this.benchComposer) this.benchComposer.render(); else this.renderer.render(this.scene, this.bench.camera);
+    this.frames++;
+  }
+
   // ---------- Inmatning ----------
   bindInput() {
     const c = this.canvas;
     c.addEventListener('click', () => {
-      if (!this.active || this.hooks.modalOpen()) return;
+      if (!this.active || this.mode !== 'walk' || this.hooks.modalOpen()) return;
       if (!this.locked) { c.requestPointerLock?.(); return; }
       this.interact();
     });
@@ -182,7 +240,7 @@ export class Shop3D {
     });
     const typing = () => /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '');
     window.addEventListener('keydown', (e) => {
-      if (!this.active || this.hooks.modalOpen() || typing()) return;
+      if (!this.active || this.mode !== 'walk' || this.hooks.modalOpen() || typing()) return;
       this.keys.add(e.code);
       if (e.code === 'KeyE' || e.code === 'Space') { e.preventDefault(); this.interact(); }
       if (e.code === 'KeyQ') { const i = QUALITIES.indexOf(this.quality); this.setQuality(QUALITIES[(i + 1) % QUALITIES.length]); this.hooks.toast(`Grafik: ${this.quality}`); }
@@ -210,7 +268,7 @@ export class Shop3D {
   hint(text = null) {
     const el = $('#hint3d'); if (!el) return;
     if (text !== null) { el.textContent = text; el.classList.toggle('hidden', !text); return; }
-    el.textContent = this.locked ? '' : 'Klicka i bilden för att styra · W A S D går · musen tittar · klicka på kunder, montrar och lådor · Esc släpper musen · Q byter grafikkvalitet';
+    el.textContent = this.locked ? '' : 'Klicka i bilden för att styra · W A S D går · musen tittar · klicka på kunder, montrar och lådor · bygg datorer vid arbetsbänken bakom disken · Esc släpper musen · Q byter grafikkvalitet';
     el.classList.toggle('hidden', this.locked);
   }
 
@@ -324,7 +382,8 @@ export class Shop3D {
     const far = h.dist > REACH ? ' (gå närmare)' : '';
     if (h.type === 'customer') return (this.floor.clickable(h.c) ? `${h.c.name} vill beställa – klicka för att ta emot` : `${h.c.name}${h.c.phase === 'waiting' ? ' väntar på sin dator' : h.c.phase === 'ready' ? ' hämtar sin dator' : ''}`) + far;
     if (h.type === 'box') return 'Leverans från grossisten – klicka för att packa upp' + far;
-    if (h.type === 'workshop') return 'Verkstaden – öppna en beställning i listan för att gå in';
+    if (h.type === 'workshop') return 'Verkstaden – datorerna byggs på arbetsbänken bakom disken';
+    if (h.type === 'bench') { const n = (this.game.orders || []).filter((o) => !o.service).length; return (n ? `Arbetsbänken – klicka för att bygga (${n} ${n === 1 ? 'beställning' : 'beställningar'} väntar)` : 'Arbetsbänken – ta emot en beställning vid disken först') + far; }
     if (h.type === 'player') return h.p.name;
     if (h.type === 'staff') return `${h.s.name} (${h.s.role})`;
     if (h.type === 'unit') {
@@ -339,7 +398,7 @@ export class Shop3D {
     return '';
   }
   interact() {
-    if (!this.active || this.hooks.modalOpen()) return;
+    if (!this.active || this.mode !== 'walk' || this.hooks.modalOpen()) return;
     this.updateHover();
     const h = this.hover;
     if (!h) return;
@@ -347,13 +406,14 @@ export class Shop3D {
     if (h.type === 'customer') return this.hooks.onCustomerClick(h.c);
     if (h.type === 'box') return this.hooks.onBoxClick(h.d);
     if (h.type === 'unit') return this.hooks.onShowcaseClick(h.what);
-    if (h.type === 'workshop') return this.hooks.toast('Öppna en beställning i listan till höger så går du in i verkstaden.');
+    if (h.type === 'workshop') return this.hooks.toast('Datorerna byggs på arbetsbänken bakom disken – gå dit och klicka.');
+    if (h.type === 'bench') return this.hooks.onBench?.();
     if (h.type === 'staff') return this.hooks.onStaff?.();
   }
 
   // ---------- Per bildruta ----------
   update(dt) {
-    if (!this.ready || !this.active) return;
+    if (!this.ready || !this.active || this.mode !== 'walk') return;
     const fl = this.floor;
     fl.refreshStock();
     if (fl.lokal !== this.lokal || fl.fitSig !== this.fitSig || this.game.year !== this.year) this.rebuildAll();
@@ -378,12 +438,12 @@ export class Shop3D {
     }
   }
   render() {
-    if (!this.ready || !this.active) return;
+    if (!this.ready || !this.active || this.mode !== 'walk') return;
     this.renderer.info.reset();
     if (this.composer) this.composer.render(); else this.renderer.render(this.scene, this.camera);
     this.frames++;
   }
   // för tester: ställ kameran
   setPose(x, z, yaw = this.yaw, pitch = this.pitch) { this.pos.set(x, 0, z); this.yaw = yaw; this.pitch = pitch; this.vel.set(0, 0, 0); }
-  info() { return { ready: this.ready, quality: this.quality, lokal: this.lokal, people: this.people?.actors.size || 0, pick: this.units?.pickables.length || 0, boxes: this.units?.boxes.size || 0, products: this.units?.boxCount || 0, models: A.stats(), frames: this.frames, avg: this.perf.avg, drawCalls: this.renderer?.info.render.calls, tris: this.renderer?.info.render.triangles }; }
+  info() { return { ready: this.ready, mode: this.mode, bench: this.bench?.info(), quality: this.quality, lokal: this.lokal, people: this.people?.actors.size || 0, pick: this.units?.pickables.length || 0, boxes: this.units?.boxes.size || 0, products: this.units?.boxCount || 0, models: A.stats(), frames: this.frames, avg: this.perf.avg, drawCalls: this.renderer?.info.render.calls, tris: this.renderer?.info.render.triangles }; }
 }

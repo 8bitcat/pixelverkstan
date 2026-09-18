@@ -542,7 +542,10 @@ body[data-screen="build"] #chatlog { bottom: 150px; left: 280px; }
 .opt.on { background: #cfeec9; box-shadow: 2px 2px 0 var(--ink); } .opt small { color: var(--muted); }
 
 /* ---------- 3D-läget ---------- */
-#floor3d { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: auto; }
+#floor3d { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: auto; }
+body.view3d #shop { background: transparent; }
+/* byggläget i 3D: bänken syns genom byggytan, #board ritar bara kablar och markeringar */
+body.bench3d #build, body.bench3d #build-stage { background: transparent; }
 #hud3d { position: absolute; inset: 0; pointer-events: none; }
 #cross3d { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid rgba(255,255,255,.85); box-shadow: 0 0 0 1px rgba(0,0,0,.6), inset 0 0 0 1px rgba(0,0,0,.6); }
 #cross3d::after { content: ""; position: absolute; left: 4px; top: 4px; width: 2px; height: 2px; background: #fff; }

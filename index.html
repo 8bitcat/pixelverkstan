@@ -15,10 +15,11 @@
 </head>
 <body>
   <div id="app">
+    <!-- 3D-läget ritar under skärmarna: butiken (förstaperson) och byggvyn (arbetsbänken) -->
+    <canvas id="floor3d" class="hidden"></canvas>
     <!-- Butiksgolvet -->
     <section id="shop" class="screen hidden">
       <canvas id="floor"></canvas>
-      <canvas id="floor3d" class="hidden"></canvas>
       <div id="hud3d" class="hidden">
         <div id="cross3d"></div>
         <div id="hint3d"></div>

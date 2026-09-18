@@ -199,6 +199,17 @@ valet sparas (`pixelverkstan_3d`). 2D-läget finns kvar orört.
 - **Människor:** `people.js` – riggade figurer (three.js-mannekängen Xbot som platshållare,
   färgad efter kläder) med gå/stå-animation, namnlapp och `!`-markör på kunden som står först.
   Kunder, personal, kompisar i co-op och folk på trottoaren följer simuleringens positioner.
+- **Byggläget i 3D (`js/3d/bench.js`):** datorn byggs på **arbetsbänken bakom disken** (under
+  högra fönstret: bänk, antistatmatta, verktygstavla, bänklampa med spot). Klicka på bänken
+  (eller 🔧 Bygg i listan) så låses kameran ovanför bänken i **exakt samma vinkel som
+  2D-byggvyn**: en ortografisk kamera i 30° som matchar `P.proj` pixel för pixel (höjderna
+  trycks ihop med `hz/k ÷ 1,2247`), så byggvyns hela pekarlogik – platser, handgrepp, uttag,
+  kablar, zoom/panorering, kompisars pekare – fungerar oförändrad. Scenen ritas av samma kod
+  som i 2D (`rig.drawScene`) men varje låda blir en riktig 3D-låda med pixelgrafiken som
+  textur på de tre synliga sidorna, packad i en texturatlas (två draw calls), belyst av rummet,
+  lampan och skuggor. `#board` ritar bara kablar och markeringar ovanpå; klick i scenen
+  raycastas mot lådorna (genomskinliga pixlar räknas inte). Finalen (ställ upp datorn) är
+  kvar i 2D. Efter bygget står du kvar vid bänken.
 - **Tillgångar:** `assets/3d/` (modeller, texturer, HDRI, Xbot), hämtade med
   `python tools/ph-fetch.py`; licenser i `assets/3d/LICENSES.md`.
 
@@ -206,7 +217,7 @@ valet sparas (`pixelverkstan_3d`). 2D-läget finns kvar orört.
 
 ```
 js/3d/          3D-läget: shop3d.js (renderare, kamera, styrning, sikte), room.js, units.js,
-                people.js, textures.js, assets.js, coords.js
+                people.js, textures.js, assets.js, coords.js, bench.js (byggläget vid arbetsbänken)
 js/core/        generisk motor – vet inget om datorer
   game.js       pengar, lager, årtal/XP, kunder, beställningar, sparning
   floor*.js     butiksgolvet med museimontrar + stjärnobjekt (årets finaste grafikkort)
@@ -295,6 +306,7 @@ node tools/spelvarianter.mjs             # Node: alla 179 titlar kör 600 steg i
 node tools/spel2.mjs                     # nio titlar spelas i webbläsaren – olika motorer och era-look, skärmdumpar titel-*.png
 node tools/lokaler.mjs                   # sex lokaler: egen planlösning, fler platser, alla väntplatser nåbara, inredningen följer med
 node tools/3d.mjs [--snabb]              # 3D-läget: laddar, bygger Källarhålan + Kvartersbutiken, skärmdumpar 3d-*.png, sikte + klick på kund
+node tools/bygg3d.mjs                    # byggläget i 3D: bänken, kameran matchar 2D-projektionen, delar i, klicktest, zoom, ut igen
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner
 ```
 

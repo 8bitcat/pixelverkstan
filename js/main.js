@@ -23,6 +23,7 @@ const hooks3d = {
   onShowcaseClick: (w) => floor?.onShowcaseClick?.(w),
   onBoxClick: (d) => floor?.onBoxClick?.(d),
   onStaff: () => UI.openStaff(game),
+  onBench: () => benchMenu(),
   modalOpen: () => UI.modalOpen(),
   toast: (t, k = '') => UI.toast(t, k),
 };
@@ -339,6 +340,7 @@ function openBuild(order) {
     const me = floor.localPlayer();
     if (me) { me.path = []; me.act = null; me.x = WALK_SPOTS.workshop[0]; me.y = WALK_SPOTS.workshop[1]; me.away = 'workshop'; me.orderId = o.id; }
     act('touchOrder', { orderId: o.id });   // teknikern släpper bygget till spelaren
+    if (is3d()) view3d.enterBench(build);    // i 3D byggs datorn på arbetsbänken bakom disken
     show('build');
     build.open(o);
   };
@@ -348,6 +350,17 @@ function openBuild(order) {
 function leaveWorkshop() {
   const me = floor?.localPlayer();
   if (me && me.away) { me.away = null; me.orderId = null; me.x = WALK_SPOTS.workshop[0]; me.y = WALK_SPOTS.workshop[1]; me.dir = 'left'; }
+  view3d?.leaveBench();
+}
+// 3D: klick på arbetsbänken – bygg den enda beställningen, eller välj bland flera
+function benchMenu() {
+  if (!game || UI.modalOpen()) return;
+  const list = game.orders.filter((o) => !o.service);
+  if (!list.length) return UI.toast('Inga datorer att bygga just nu – ta emot en kund vid disken först.', '');
+  if (list.length === 1) return openBuild(list[0]);
+  const body = `<p style="font-size:19px;margin-top:0">Vilken dator vill du bygga?</p><div class="plist">${list.map((o) => `<button class="shop-opt" data-order="${o.id}"><b>${o.repair ? '🔧 ' : ''}${esc(o.title)}</b><small>åt ${esc(o.name)}${o.repair ? ' · reparation' : ''}</small></button>`).join('')}</div>`;
+  const dlg = UI.openModal('🔧 Arbetsbänken', body, [{ label: 'Stäng', onClick: UI.closeModal }]);
+  dlg.querySelectorAll('[data-order]').forEach((b) => (b.onclick = () => { UI.closeModal(); const o = game.orders.find((x) => String(x.id) === b.dataset.order); if (o) openBuild(o); }));
 }
 
 const hudHandlers = {
@@ -564,7 +577,7 @@ function loop(now) {
       if (hudDirty) { UI.renderHud(game, hudHandlers, coop ? { code: net.code, count: (coop instanceof CoopHost ? coop.players.size + 1 : coop.list.length) } : null); hudDirty = false; }
       if (ordersTimer <= 0) { UI.renderOrders(game, openBuild, floor.players); ordersTimer = 0.5; }
     }
-    if (screen === 'build') build.frame(dt);
+    if (screen === 'build') { build.frame(dt); if (is3d() && view3d.mode === 'bench' && build.order && build.phase !== 'desk') view3d.renderBench(dt); }
     if (screen === 'play') { try { play.frame(dt); } catch (e) { console.error(e); } }
     if (screen === 'arcade' && arcade) { arcade.update(dt); arcade.draw(); }
     friendsTimer -= dt;

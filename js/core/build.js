@@ -26,6 +26,7 @@ export class BuildView {
     this.ptrs = new Map();
     this.cursors = new Map();   // kompisarnas muspekare: id → { order, s, x, y, drag, name, color, t }
     this.cursorIcons = new Map();
+    this.gl = null;   // 3D-läget (js/3d/bench.js): ritar scenen i 3D-canvasen i stället för pixelrastern
     this.zoomUI();
     this.t = 0; this.spin = 0; this.order = null;
     this.finale = this.shop.Finale ? new this.shop.Finale(this) : null;
@@ -392,8 +393,9 @@ export class BuildView {
         return this.say(`<b>${esc(this.L.CABLE[id].name)}</b> sitter i ${esc(this.L.portLabel(key))}. <button class="btn btn-small" data-act="unplug">Dra ur</button>`, 'info');
       }
     }
-    if (this.renderDue) this.render();
-    const id = this.R.idAt(pt[0] / this.buf.px, pt[1] / this.buf.px, 1);
+    let id;
+    if (this.gl) id = this.gl.idAt(pt[0], pt[1]);
+    else { if (this.renderDue) this.render(); id = this.R.idAt(pt[0] / this.buf.px, pt[1] / this.buf.px, 1); }
     const slot = this.L.SLOTS.find((s) => s.n === id);
     if (slot && this.b.placed[slot.id]) {
       const p = this.b.placed[slot.id];
@@ -465,7 +467,7 @@ export class BuildView {
     this.fit = { zoom: V.k * s, x: ox + V.ox * s, y: oy + V.oy * s };
     if (!this.userCam || !this.cam) this.cam = { ...this.fit };
     this.applyCam();
-    this.dirty = true;
+    if (!this.gl) this.dirty = true;
     this.finale?.resize(cw, ch, narrow);
   }
 
@@ -483,8 +485,8 @@ export class BuildView {
     if (this.toolAnim) { this.toolAnim.t += dt; if (this.toolAnim.t > 0.45) this.toolAnim = null; }
     if (this.plugAnim) { this.plugAnim.t += dt * 3; this.cablesDirty = true; if (this.plugAnim.t >= 1) { this.plugAnim = null; } }
     if (!this.cam) this.resize();
-    if (this.dirty || (this.renderDue && this.t >= this.renderDue)) this.render();
-    if (this.cablesDirty) { this.L.drawCables(this.cableCtx, this.R, this.b, { plug: this.plugAnim }); this.cablesDirty = false; }
+    if (this.dirty || (!this.gl && this.renderDue && this.t >= this.renderDue)) this.render();
+    if (this.cablesDirty) { if (this.gl) this.gl.cables(this); else this.L.drawCables(this.cableCtx, this.R, this.b, { plug: this.plugAnim }); this.cablesDirty = false; }
     this.draw(ctx);
   }
 
@@ -512,6 +514,7 @@ export class BuildView {
     if (my < 0) this.cam.y -= my; if (my > this.ch) this.cam.y -= my - this.ch;
   }
   render() {
+    if (this.gl) { this.gl.render(this.L, this.b, { spin: this.spin, t: this.t }); this.dirty = false; this.renderDue = null; this.cablesDirty = true; return; }
     const c = this.cam, V = this.L.VIEW;
     // rita i skärmens upplösning (upp till 2× på retina), men håll bufferten under ~1,4 Mpx
     const q = Math.min(this.dpr || 1, 2);
@@ -664,15 +667,22 @@ export class BuildView {
 
   draw(ctx) {
     const V = this.L.VIEW;
-    ctx.fillStyle = '#efe9df'; ctx.fillRect(0, 0, this.cw, this.ch);
     const sx = this.shake > 0 ? Math.round(Math.sin(this.t * 80) * 5) : 0;
-    ctx.save(); ctx.translate(sx, 0);
-    // skarpa pixlar när bilden förstoras; mjuk nedskalning på små skärmar
-    const bc = this.buf, sc = this.cam.zoom / bc.zoom;
-    const dx = this.cam.x - bc.x * sc, dy = this.cam.y - bc.y * sc, dw = this.R.w * bc.px * sc, dh = this.R.h * bc.px * sc;
-    ctx.imageSmoothingEnabled = bc.px * sc < 1;
-    ctx.drawImage(this.R.canvas, dx, dy, dw, dh);
-    ctx.drawImage(this.cableCanvas, dx, dy, dw, dh);
+    if (this.gl) {
+      // 3D-läget: själva scenen ligger i 3D-canvasen under – här bara kablar och markeringar
+      ctx.clearRect(0, 0, this.cw, this.ch);
+      ctx.save(); ctx.translate(sx, 0);
+      ctx.drawImage(this.cableCanvas, 0, 0, this.cw, this.ch);
+    } else {
+      ctx.fillStyle = '#efe9df'; ctx.fillRect(0, 0, this.cw, this.ch);
+      ctx.save(); ctx.translate(sx, 0);
+      // skarpa pixlar när bilden förstoras; mjuk nedskalning på små skärmar
+      const bc = this.buf, sc = this.cam.zoom / bc.zoom;
+      const dx = this.cam.x - bc.x * sc, dy = this.cam.y - bc.y * sc, dw = this.R.w * bc.px * sc, dh = this.R.h * bc.px * sc;
+      ctx.imageSmoothingEnabled = bc.px * sc < 1;
+      ctx.drawImage(this.R.canvas, dx, dy, dw, dh);
+      ctx.drawImage(this.cableCanvas, dx, dy, dw, dh);
+    }
 
     const entry = this.selected && this.trayEntries().find((x) => x.key === this.selected);
     const next = this.help ? this.nextStep() : null;
