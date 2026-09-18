@@ -116,6 +116,7 @@ export function renderHud(game, h, room = null) {
     ${game.shop.staff ? `<button class="btn" data-h="staff" title="Personal – tekniker och säljare">👥 Personal${game.staff?.length ? ` ${game.staff.length}` : ''}</button>` : ''}
     <button class="btn" data-h="stock" title="Förråd och skyltning">📦 Lager</button>
     <button class="btn" data-h="shop">🛒 Grossist</button>
+    ${game.shop.fit ? `<button class="btn" data-h="view3d" title="${h.is3d ? 'Tillbaka till 2D-vyn' : 'Gå in i butiken i 3D'}">${h.is3d ? '🗺️ 2D' : '🧊 3D'}</button>` : ''}
     <button class="btn" data-h="menu" title="Meny – byt startår eller butik">☰</button>`;
   $('#hud').querySelectorAll('[data-h]').forEach((b) => (b.onclick = () => h[b.dataset.h]()));
 }

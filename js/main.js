@@ -15,6 +15,50 @@ import { ArcadeRoom } from './core/arcade-room.js';
 const $ = (s) => document.querySelector(s);
 const esc = UI.esc;
 let game = null, floor = null, build = null, arcade = null, screen = 'menu', hudDirty = true;
+// 3D-läget (js/3d/shop3d.js) laddas först när man slår på det
+let view3d = null, want3d = false;
+try { want3d = localStorage.getItem('pixelverkstan_3d') === '1'; } catch {}
+const hooks3d = {
+  onCustomerClick: (c) => floor?.onCustomerClick?.(c),
+  onShowcaseClick: (w) => floor?.onShowcaseClick?.(w),
+  onBoxClick: (d) => floor?.onBoxClick?.(d),
+  onStaff: () => UI.openStaff(game),
+  modalOpen: () => UI.modalOpen(),
+  toast: (t, k = '') => UI.toast(t, k),
+};
+async function enable3D() {
+  if (!game || !floor) return;
+  const load = $('#load3d');
+  try {
+    if (!view3d) {
+      load.classList.remove('hidden'); load.textContent = 'Laddar 3D-butiken …';
+      $('#hud3d').classList.remove('hidden');
+      const mod = await import('./3d/shop3d.js');
+      view3d = new mod.Shop3D($('#floor3d'), hooks3d);
+      view3d.attach(game, floor);
+      $('#floor3d').classList.remove('hidden');
+      await view3d.init((f) => { load.textContent = `Laddar 3D-butiken … ${Math.round(f * 100)} %`; });
+      load.classList.add('hidden');
+    } else if (view3d.game !== game || view3d.floor !== floor) view3d.attach(game, floor);
+    view3d.enter();
+    $('#floor').classList.add('hidden');
+    want3d = true; try { localStorage.setItem('pixelverkstan_3d', '1'); } catch {}
+    hudDirty = true;
+  } catch (e) {
+    console.error(e);
+    load.classList.add('hidden'); $('#hud3d').classList.add('hidden'); $('#floor3d').classList.add('hidden');
+    UI.toast('3D-läget kunde inte startas: ' + e.message, 'bad');
+    want3d = false; try { localStorage.setItem('pixelverkstan_3d', '0'); } catch {}
+  }
+}
+function disable3D() {
+  view3d?.leave();
+  $('#floor').classList.remove('hidden');
+  floor?.resize();
+  want3d = false; try { localStorage.setItem('pixelverkstan_3d', '0'); } catch {}
+  hudDirty = true;
+}
+const is3d = () => !!(view3d && view3d.active);
 let playFrom = 'shop';   // vart man kommer tillbaka efter ett spel
 let net = null, coop = null, lobbyPlayers = [];
 // minispelen (arkadmaskiner och speldatorn)
@@ -70,7 +114,7 @@ function show(name) {
   screen = name;
   document.body.dataset.screen = name;
   for (const id of ['menu', 'shop', 'build', 'lobby', 'play', 'arcade']) $('#' + id)?.classList.toggle('hidden', id !== name);
-  if (name === 'shop') { floor.resize(); hudDirty = true; }
+  if (name === 'shop') { floor.resize(); if (is3d()) view3d.resize(); hudDirty = true; }
   if (name === 'play') requestAnimationFrame(() => play.resize());
   if (name === 'arcade') requestAnimationFrame(() => arcade?.resize());
   if (name === 'build') requestAnimationFrame(() => build.resize());
@@ -185,6 +229,7 @@ function setupGame(shopModule, opts) {
   floor = new Floor($('#floor'), game);
   const av = myAvatar();
   floor.players = [{ id: 'me', local: true, name: av.name, look: av.look, color: av.color, x: WALK_SPOTS.home[0], y: WALK_SPOTS.home[1], dir: 'down', seed: Math.random() * 6 }];
+  if (view3d) view3d.attach(game, floor);
   build = new BuildView(game, {
     act,
     onOp: (order, op) => { if (coop instanceof CoopHost) coop.localOp(order, op); else if (coop) coop.op(order, op); },
@@ -257,6 +302,7 @@ async function start(shopModule, opts = {}) {
   show('shop');
   if (coop instanceof CoopHost) coop.started();
   addBuildChatButton();
+  if (want3d) enable3D();
 }
 
 // klient i co-op: spelet speglar värdens
@@ -280,6 +326,7 @@ async function startMirrorInner(m) {
   UI.closeModal();
   show('shop');
   addBuildChatButton();
+  if (want3d) enable3D();
   UI.toast(`👥 Du är med i butiken (rum ${net.code})! Tryck Enter eller 💬 för att chatta.`, 'good');
 }
 
@@ -304,6 +351,8 @@ function leaveWorkshop() {
 }
 
 const hudHandlers = {
+  view3d: () => (is3d() ? disable3D() : enable3D()),
+  get is3d() { return is3d(); },
   shop: () => UI.openShop(game),
   fit: () => UI.openFittings(game),
   arcade: () => openArcade(),
@@ -321,7 +370,7 @@ const hudHandlers = {
       ]);
       return;
     }
-    game.save(); build.order = null; arcade = null; renderMenu(); show('menu');
+    game.save(); build.order = null; arcade = null; if (view3d) view3d.leave(); renderMenu(); show('menu');
   },
 };
 
@@ -490,6 +539,7 @@ function endCoop() {
   if (build) build.order = null;
   if (floor) floor.players = floor.players.filter((p) => p.local);
   game = null; floor = null; build = null; arcade = null;
+  if (view3d) view3d.leave();
   UI.closeModal(); UI.closeChatBar();
   $('#friendbuilds').innerHTML = ''; $('#friendbuilds').dataset.key = '';
   friendAt.clear();
@@ -509,7 +559,7 @@ function loop(now) {
     // beställningen försvann (kunden gav upp eller en kompis levererade)
     if (screen === 'build' && build.order && !game.orders.includes(build.order)) { build.order = null; leaveWorkshop(); show('shop'); }
     if (screen === 'shop') {
-      floor.draw();
+      if (is3d()) { view3d.update(dt); view3d.render(); } else floor.draw();
       ordersTimer -= dt;
       if (hudDirty) { UI.renderHud(game, hudHandlers, coop ? { code: net.code, count: (coop instanceof CoopHost ? coop.players.size + 1 : coop.list.length) } : null); hudDirty = false; }
       if (ordersTimer <= 0) { UI.renderOrders(game, openBuild, floor.players); ordersTimer = 0.5; }
@@ -523,7 +573,7 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-window.addEventListener('resize', () => { if (floor) floor.resize(); if (build && screen === 'build') build.resize(); if (screen === 'play') play.resize(); if (screen === 'arcade') arcade?.resize(); });
+window.addEventListener('resize', () => { if (floor) floor.resize(); if (is3d()) view3d.resize(); if (build && screen === 'build') build.resize(); if (screen === 'play') play.resize(); if (screen === 'arcade') arcade?.resize(); });
 window.addEventListener('beforeunload', () => {
   if (!(coop instanceof CoopClient)) game?.save();
   if (coop instanceof CoopClient) net?.send({ t: 'bye' });
@@ -539,4 +589,4 @@ renderMenu().then(() => {
 requestAnimationFrame(loop);
 
 // för test/felsökning
-window.PV = { get game() { return game; }, get build() { return build; }, get floor() { return floor; }, get net() { return net; }, get coop() { return coop; }, get play() { return play; }, openBuild, startPlay, fmt };
+window.PV = { get game() { return game; }, get build() { return build; }, get floor() { return floor; }, get view3d() { return view3d; }, enable3D, disable3D, get net() { return net; }, get coop() { return coop; }, get play() { return play; }, openBuild, startPlay, fmt };

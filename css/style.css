@@ -540,3 +540,19 @@ body[data-screen="build"] #chatlog { bottom: 150px; left: 280px; }
 .optbar b { font: 18px var(--head); margin-right: 4px; }
 .opt { font: inherit; font-size: 16px; border: 2px solid var(--ink); background: #fff; padding: 2px 8px; cursor: pointer; color: inherit; }
 .opt.on { background: #cfeec9; box-shadow: 2px 2px 0 var(--ink); } .opt small { color: var(--muted); }
+
+/* ---------- 3D-läget ---------- */
+#floor3d { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: auto; }
+#hud3d { position: absolute; inset: 0; pointer-events: none; }
+#cross3d { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid rgba(255,255,255,.85); box-shadow: 0 0 0 1px rgba(0,0,0,.6), inset 0 0 0 1px rgba(0,0,0,.6); }
+#cross3d::after { content: ""; position: absolute; left: 4px; top: 4px; width: 2px; height: 2px; background: #fff; }
+#hint3d { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); max-width: min(92vw, 760px); padding: 8px 16px; font: 21px var(--head); color: #fff; background: rgba(23,21,26,.82); border: 2px solid rgba(255,255,255,.25); text-align: center; }
+#load3d { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 34px var(--head); color: #fff; background: rgba(23,21,26,.9); text-align: center; padding: 20px; }
+#pad3d { display: none; position: absolute; left: 14px; right: 14px; bottom: 16px; pointer-events: none; }
+#pad3d .dpad { position: absolute; left: 0; bottom: 0; width: 150px; height: 150px; pointer-events: auto; }
+#pad3d .dpad button { position: absolute; width: 50px; height: 50px; font-size: 22px; background: rgba(241,235,224,.85); border: 3px solid var(--ink); }
+#pad3d .dpad [data-k="up"] { left: 50px; top: 0; } #pad3d .dpad [data-k="left"] { left: 0; top: 50px; } #pad3d .dpad [data-k="right"] { left: 100px; top: 50px; } #pad3d .dpad [data-k="down"] { left: 50px; top: 100px; }
+#pad3d .use { position: absolute; right: 0; bottom: 30px; width: 110px; height: 70px; font: 24px var(--head); background: var(--green2); color: #fff; border: 3px solid var(--ink); pointer-events: auto; }
+@media (pointer: coarse) { #pad3d { display: block; } }
+body.view3d #orders { background: rgba(241,235,224,.9); }
+body.view3d #hud .btn, body.view3d #hud .chip { opacity: .95; }

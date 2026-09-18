@@ -9,12 +9,22 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=VT323&family=Jersey+10&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+  </script>
 </head>
 <body>
   <div id="app">
     <!-- Butiksgolvet -->
     <section id="shop" class="screen hidden">
       <canvas id="floor"></canvas>
+      <canvas id="floor3d" class="hidden"></canvas>
+      <div id="hud3d" class="hidden">
+        <div id="cross3d"></div>
+        <div id="hint3d"></div>
+        <div id="pad3d"><div class="dpad"><button data-k="up">▲</button><button data-k="left">◀</button><button data-k="right">▶</button><button data-k="down">▼</button></div><button class="use" data-k="use">Använd</button></div>
+        <div id="load3d" class="hidden"></div>
+      </div>
       <header id="hud"></header>
       <aside id="orders"></aside>
     </section>

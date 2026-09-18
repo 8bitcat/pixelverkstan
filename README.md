@@ -176,9 +176,37 @@ De tre första kunderna är guidade.
   och vad kompisen håller i. Nätverket är WebRTC via PeerJS; värden kör spelet och
   sparar det.
 
+## 3D-läget (🧊 3D i HUD:en)
+
+Butiken går att gå runt i som ett riktigt 3D-rum – samma simulering (kunder, kö, personal,
+lådor, montrar) som 2D-golvet, bara renderat på nytt sätt. Knappen **🧊 3D** i HUD:en växlar;
+valet sparas (`pixelverkstan_3d`). 2D-läget finns kvar orört.
+
+- **Rendering:** three.js 0.170 (import map → jsdelivr) med PBR-material och normal-/ARM-kartor
+  från Poly Haven (CC0), HDRI-himmel utanför fönstren, sol med mjuka skuggor, takarmaturer
+  (RectAreaLight), spotar, rummets egna reflektioner (kubkamera → miljökarta), GTAO, bloom,
+  ACES-tonemapping och SMAA. Neon, LED-lister i montrarna och skärmar glöder.
+- **Rummet** byggs ur samma planlösning som 2D (`floor-plans.js`/`floor-layout.js`):
+  `js/3d/coords.js` mappar golvpixlar → meter (2 cm/px, zonen kring disken sträcks till 3 cm/px,
+  rummet är en meter djupare med en gång längs bakväggen). Montrar/torn/TV-hörna/spelhylla/
+  spelbord/arkadskåp/automater/lediga platser byggs i `units.js`, väggar/fönster/skjutdörr/
+  disk/kassa/skåp/ljus/gata i `room.js`. Produkter är tryckta kartonger (`textures.js`:
+  canvas-tryck med märke, namn, pixelikon, streckkod; spel/konsoler får sina pixelomslag).
+- **Styrning:** klicka i bilden → muslås; W A S D går, musen tittar, klick/E använder det i
+  siktet (kund, monter, låda, stjärnobjekt), Esc släpper musen, Q byter grafikkvalitet
+  (hög/medel/låg; sänks automatiskt om bilden hackar). Pekskärm: dra för att titta, knappar
+  för att gå. Kollision via 2D-gångnätet (`floor-walk.walkable`).
+- **Människor:** `people.js` – riggade figurer (three.js-mannekängen Xbot som platshållare,
+  färgad efter kläder) med gå/stå-animation, namnlapp och `!`-markör på kunden som står först.
+  Kunder, personal, kompisar i co-op och folk på trottoaren följer simuleringens positioner.
+- **Tillgångar:** `assets/3d/` (modeller, texturer, HDRI, Xbot), hämtade med
+  `python tools/ph-fetch.py`; licenser i `assets/3d/LICENSES.md`.
+
 ## Struktur
 
 ```
+js/3d/          3D-läget: shop3d.js (renderare, kamera, styrning, sikte), room.js, units.js,
+                people.js, textures.js, assets.js, coords.js
 js/core/        generisk motor – vet inget om datorer
   game.js       pengar, lager, årtal/XP, kunder, beställningar, sparning
   floor*.js     butiksgolvet med museimontrar + stjärnobjekt (årets finaste grafikkort)
@@ -266,6 +294,7 @@ node tools/tjanster.mjs                  # tjänster (låst utan pryl, utför fr
 node tools/spelvarianter.mjs             # Node: alla 179 titlar kör 600 steg i sin motor, varianter skiljer sig, eran följer konsolen
 node tools/spel2.mjs                     # nio titlar spelas i webbläsaren – olika motorer och era-look, skärmdumpar titel-*.png
 node tools/lokaler.mjs                   # sex lokaler: egen planlösning, fler platser, alla väntplatser nåbara, inredningen följer med
+node tools/3d.mjs [--snabb]              # 3D-läget: laddar, bygger Källarhålan + Kvartersbutiken, skärmdumpar 3d-*.png, sikte + klick på kund
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner
 ```
 
