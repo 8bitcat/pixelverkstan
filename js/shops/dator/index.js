@@ -5,6 +5,7 @@ import * as layout from './layout.js';
 import * as orders from './orders.js';
 import * as upgrades from './upgrades.js';
 import * as products from './products.js';
+import * as compat from './compat.js';
 import { iconCanvas } from './art.js';
 import { Desk } from './desk.js';
 import { DB, loadParts, onSale } from './parts/index.js';
@@ -31,6 +32,7 @@ export default {
   isProduct: products.isProduct,
   hypeAt: products.hypeAt,
   productCats: catalog.PRODUCT_CATS,
+  compat,
   // Stjärnobjektet: årets finaste grafikkort (RTX 5080 Astral när det finns)
   heroFor(game) {
     const list = onSale(game.year).filter((p) => p.cat === 'gpu');

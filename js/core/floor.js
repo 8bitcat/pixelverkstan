@@ -403,7 +403,13 @@ export class Floor {
     const [x, y] = this.toLocal(e);
     for (const u of this.units || []) {
       const sl = u.slot;
-      if (u.frame) {
+      if (u.unit && u.frame) {
+        // TV-hörna, spelhylla, spelbord
+        const y0 = sl.base - u.frame.H + 1;
+        if (x >= u.x && x < u.x + u.frame.W && y >= y0 && y <= sl.base + 2) return { slot: u.i, unit: u.unit, title: this.shop.fit?.slotTitle(u.def) };
+      } else if (u.unit === 'arkad') {
+        if (x >= u.x && x < u.x + CAB_BOX.w && y >= u.y && y <= sl.base + 2) return { slot: u.i, unit: 'arkad', title: this.shop.fit?.slotTitle(u.def) };
+      } else if (u.frame) {
         const y0 = sl.base - u.frame.H + 1;
         if (x >= u.x && x < u.x + u.frame.W && y >= y0 && y <= sl.base + 2) return { slot: u.i, cat: u.cat, brand: u.def.brand || null, title: this.shop.fit?.slotTitle(u.def) };
       } else if (u.def) {
@@ -642,7 +648,20 @@ export class Floor {
     return c;
   }
   renderDesk(u) {
-    const [c] = this.unitCanvas(u);
+    const [c, x] = this.unitCanvas(u), f = u.frame, g = this.game, parts = g.deskParts?.() || {};
+    if (parts.case) {
+      // datorlådan i chassits färg ovanpå bordet, till vänster om skärmen
+      const col = parts.case.look?.color || '#d8d0b8', W = f.W;
+      const bx = Math.round(W * 0.62) - 42, by = 38 - 22;
+      x.fillStyle = '#17151a'; x.fillRect(bx - 1, by - 1, 14, 23);
+      x.fillStyle = col; x.fillRect(bx, by, 12, 21);
+      x.fillStyle = 'rgba(255,255,255,.25)'; x.fillRect(bx, by, 12, 1); x.fillRect(bx, by, 1, 21);
+      x.fillStyle = '#2a2d33'; x.fillRect(bx + 2, by + 3, 8, 2); x.fillRect(bx + 2, by + 7, 8, 1);
+      x.fillStyle = Math.floor(this.t * 2) % 2 ? '#45e06a' : '#2f8f46'; x.fillRect(bx + 9, by + 16, 1, 1);
+      if (parts.gpu?.rgb || parts.case.rgb) { x.fillStyle = css(hsl(this.t * 90, 0.9, 0.6)); x.fillRect(bx + 1, by + 11, 10, 1); }
+      const label = 'SPELDATOR', tw = textW(SMALL, label) + 4;
+      x.fillStyle = '#f4efe2'; x.fillRect(bx - 4, by + 22, tw, 7); ctxText(x, SMALL, label, bx - 2, by + 23, '#17151a');
+    }
     return c;
   }
 
@@ -738,7 +757,14 @@ export class Floor {
       return;
     }
     if (u.unit === 'spelbord') {
-      const s = f.screen, msg = 'BYGG DIN DATOR  ', tw = textW(SMALL, msg), off = Math.round((t * 14) % tw);
+      const s = f.screen;
+      if (this.game.deskPc) {
+        const parts = this.game.deskParts?.() || {}, y = this.game.year;
+        const g = shop.parts.filter((p) => p.cat === 'spel' && p.platform === 'pc' && p.year <= y).sort((a, b) => b.year - a.year)[0];
+        screenAt(s.x, s.y, s.w, s.h, g ? (ATTRACT_FOR_ENGINE[g.engine] || 'default') : 'default');
+        return;
+      }
+      const msg = 'BYGG DIN DATOR  ', tw = textW(SMALL, msg), off = Math.round((t * 14) % tw);
       ctx.fillStyle = '#0b0c10'; ctx.fillRect(u.x + s.x, u.y + s.y, s.w, s.h);
       ctx.save(); ctx.beginPath(); ctx.rect(u.x + s.x, u.y + s.y, s.w, s.h); ctx.clip();
       ctxText(ctx, SMALL, msg + msg, u.x + s.x + 2 - off, u.y + s.y + Math.round(s.h / 2) - 2, Math.floor(t * 2) % 2 ? '#3fb04a' : '#8fd49a');

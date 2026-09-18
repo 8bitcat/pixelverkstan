@@ -9,11 +9,19 @@ import { SPOTS as WALK_SPOTS } from './core/floor-walk.js';
 import { SHOPKEEPER, portrait } from './core/people.js';
 import { Net, cleanCode } from './core/net.js';
 import { CoopHost, CoopClient, applyEcon } from './core/coop.js';
+import { Play } from './games/runtime.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = UI.esc;
 let game = null, floor = null, build = null, screen = 'menu', hudDirty = true;
 let net = null, coop = null, lobbyPlayers = [];
+// minispelen (arkadmaskiner och speldatorn)
+const play = new Play({
+  onExit: (r) => { if (screen === 'play') show('shop'); if (r.score > 0) UI.toast(`🕹️ ${r.score} poäng!`, 'good'); },
+  onScore: (product, score, record) => { if (record) UI.toast(`🏆 Nytt rekord på ${product.name}: ${score}!`, 'good'); },
+  playerName: () => myAvatar().name,
+});
+function startPlay(opts) { show('play'); play.open(opts); }
 
 // avataren (js/core/avatar.js) laddas om den finns
 let AV = null;
@@ -45,8 +53,9 @@ function queueRefresh() { if (refreshQueued) return; refreshQueued = true; reque
 function show(name) {
   screen = name;
   document.body.dataset.screen = name;
-  for (const id of ['menu', 'shop', 'build', 'lobby']) $('#' + id)?.classList.toggle('hidden', id !== name);
+  for (const id of ['menu', 'shop', 'build', 'lobby', 'play']) $('#' + id)?.classList.toggle('hidden', id !== name);
   if (name === 'shop') { floor.resize(); hudDirty = true; }
+  if (name === 'play') requestAnimationFrame(() => play.resize());
   if (name === 'build') requestAnimationFrame(() => build.resize());
 }
 
@@ -187,8 +196,16 @@ function setupGame(shopModule, opts) {
     if (what.closed) { UI.toast('Den här delen av lokalen är stängd – bygg ut butiken under 🏪 Butiken.', ''); return UI.openFittings(game, 'lager'); }
     if (what.unit === 'tv') return UI.openShowcase(game, { cats: ['konsol'], title: 'TV-hörnan' });
     if (what.unit === 'spelhylla') return UI.openShowcase(game, { cats: ['spel'], title: 'Spelhyllan' });
-    if (what.unit === 'arkad') { UI.toast('🕹️ Arkadmaskinen – snart kan du spela på den!', ''); return; }
-    if (what.unit === 'spelbord') { UI.toast('🖥️ Spelbordet – snart bygger du butikens egen speldator här.', ''); return; }
+    if (what.unit === 'arkad') {
+      const p = game.shop.part[game.fit.slots[what.slot]?.product];
+      if (!p) return;
+      return startPlay({ mode: 'arcade', product: p, engine: p.attract, title: p.name, skin: { title: p.name, dive: p.id === 'a-galaga' } });
+    }
+    if (what.unit === 'spelbord') {
+      const openMenu = () => UI.openPlayMenu(game, (g, m, ev) => startPlay({ mode: 'pc', product: g, engine: g.engine, title: g.name, skin: { title: g.name }, machine: { ...m, ...ev, year: g.year } }), () => UI.openDeskBuild(game, openMenu));
+      if (!game.deskPc) return UI.openDeskBuild(game, openMenu);
+      return openMenu();
+    }
     if (what.unit) { UI.toast(what.unit === 'kaffe' ? '☕ Mmm, en kopp kaffe.' : '🍬 Nom nom.', 'good'); return; }
     UI.openShowcase(game, what);
   };
@@ -307,7 +324,7 @@ function showChat(from, text) {
   UI.chatLog(name, color, text);
 }
 document.addEventListener('keydown', (e) => {
-  if (!coop || e.key !== 'Enter' || UI.modalOpen() || UI.chatBarOpen()) return;
+  if (!coop || e.key !== 'Enter' || UI.modalOpen() || UI.chatBarOpen() || screen === 'play') return;
   if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return;
   e.preventDefault();
   openChat();
@@ -469,13 +486,14 @@ function loop(now) {
       if (ordersTimer <= 0) { UI.renderOrders(game, openBuild, floor.players); ordersTimer = 0.5; }
     }
     if (screen === 'build') build.frame(dt);
+    if (screen === 'play') { try { play.frame(dt); } catch (e) { console.error(e); } }
     friendsTimer -= dt;
     if (friendsTimer <= 0) { updateFriendBuilds(); friendsTimer = 0.4; }
   }
   requestAnimationFrame(loop);
 }
 
-window.addEventListener('resize', () => { if (floor) floor.resize(); if (build && screen === 'build') build.resize(); });
+window.addEventListener('resize', () => { if (floor) floor.resize(); if (build && screen === 'build') build.resize(); if (screen === 'play') play.resize(); });
 window.addEventListener('beforeunload', () => {
   if (!(coop instanceof CoopClient)) game?.save();
   if (coop instanceof CoopClient) net?.send({ t: 'bye' });
@@ -491,4 +509,4 @@ renderMenu().then(() => {
 requestAnimationFrame(loop);
 
 // för test/felsökning
-window.PV = { get game() { return game; }, get build() { return build; }, get floor() { return floor; }, get net() { return net; }, get coop() { return coop; }, openBuild, fmt };
+window.PV = { get game() { return game; }, get build() { return build; }, get floor() { return floor; }, get net() { return net; }, get coop() { return coop; }, get play() { return play; }, openBuild, startPlay, fmt };

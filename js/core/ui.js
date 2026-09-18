@@ -5,6 +5,7 @@ import * as PR from './floor-props.js';
 import { SLOTS, SLOT_DEPTH } from './floor-layout.js';
 import { hex, mix, mul } from './floor-pix.js';
 import { cabinetSprite } from '../shops/dator/art-products.js';
+import { machineOf, evaluate, fmtMb } from '../games/specs.js';
 
 const $ = (s) => document.querySelector(s);
 export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -502,4 +503,56 @@ export function openFittings(game, tab = null, slot = null) {
     live(render);
   };
   render();
+}
+
+
+// ---------- Speldatorn: sätt ihop av delar i lagret ----------
+const DESK_CATS = ['case', 'mb', 'cpu', 'cooler', 'ram', 'gpu', 'storage', 'sound', 'psu'];
+export function openDeskBuild(game, onDone) {
+  const shop = game.shop;
+  const pick = { ...(game.deskPc?.parts || {}) };
+  const render = () => {
+    const owned = (cat) => Object.keys(game.stock).filter((id) => game.stockFree(id) > 0 && shop.part[id]?.cat === cat).map((id) => shop.part[id]).sort((a, b) => b.cost - a.cost);
+    const rows = DESK_CATS.map((cat) => {
+      const list = owned(cat), cur = pick[cat] || '';
+      const opts = ['<option value="">– ingen –</option>', ...list.map((p) => `<option value="${p.id}" ${p.id === cur ? 'selected' : ''}>${esc(p.name)} (${game.stockFree(p.id)} st)</option>`)].join('');
+      const need = ['case', 'mb', 'cpu', 'ram', 'storage', 'psu'].includes(cat);
+      return `<div class="deskrow"><b>${shop.cats[cat].icon} ${esc(shop.cats[cat].name)}</b><select data-cat="${cat}">${opts}</select><span class="st ${cur ? 'ok' : need ? 'bad' : ''}">${cur ? '✓' : need ? 'krävs' : 'valfri'}</span></div>`;
+    }).join('');
+    const problems = game.deskProblems(pick);
+    const parts = {}; for (const [cat, id] of Object.entries(pick)) if (id) parts[cat] = shop.part[id];
+    const m = machineOf(parts, game.year);
+    const status = problems.length ? `<div class="speech" style="background:#ffe3e3">✗ ${esc(problems[0])}</div>` : `<div class="speech" style="background:#effbef">✓ Datorn går ihop: <b>${esc(m.name)}</b> · ${fmtMb(m.ram)} minne · ${m.gfx}${m.vram ? ' ' + fmtMb(m.vram) : ''}${m.sound ? ' · ljudkort' : ' · bara pipljud'}</div>`;
+    const body = `<p style="font-size:18px;margin:0 0 8px">Välj delar ur lagret till butikens egen dator. Den står på spelbordet – och du kan gå dit och spela på den. Bättre delar = fler bildrutor per sekund.</p>
+      <div class="plist">${rows}</div>${status}`;
+    const dlg = openModal('🖥️ Sätt ihop speldatorn', body, [
+      { label: 'Avbryt', onClick: closeModal },
+      { label: '🔩 Plocka isär', cls: 'btn-red', hidden: !game.deskPc, onClick: () => { act('deskUnbuild'); closeModal(); } },
+      { label: '✓ Sätt ihop', cls: 'btn-go', disabled: problems.length > 0, onClick: () => { act('deskBuild', { parts: pick }); closeModal(); onDone?.(); } },
+    ]);
+    dlg.classList.add('dlg-wide');
+    dlg.querySelectorAll('[data-cat]').forEach((sel) => (sel.onchange = () => { if (sel.value) pick[sel.dataset.cat] = sel.value; else delete pick[sel.dataset.cat]; render(); }));
+  };
+  render();
+}
+
+// ---------- Spelmenyn på speldatorn: vilka spel går, och hur bra? ----------
+export function openPlayMenu(game, onPlay, onRebuild) {
+  const shop = game.shop, y = game.year;
+  const m = machineOf(game.deskParts(), y);
+  const games = shop.parts.filter((p) => p.cat === 'spel' && p.platform === 'pc' && p.year <= y).sort((a, b) => b.year - a.year);
+  const rows = games.map((p) => {
+    const ev = evaluate(p.id, m);
+    const badge = ev.error ? `<span class="fpsbadge err" title="${esc(ev.hint || '')}">✗ ${esc(ev.error.length > 22 ? ev.error.slice(0, 20) + '…' : ev.error)}</span>` : `<span class="fpsbadge ${ev.fps >= 50 ? 'good' : ev.fps >= 25 ? 'mid' : 'bad'}">${ev.fps} FPS</span>`;
+    return `<div class="prow gamerow"><span data-icon="${p.id}"></span><div><div class="nm">${esc(p.name)} <small style="color:var(--muted)">${p.year}</small></div><div class="sp">${ev.error ? esc(ev.hint || '') : esc(ev.smooth) + (ev.software ? ' · mjukvaruläge (inget 3D-kort)' : '')}</div></div>
+      <div style="display:flex;gap:6px;align-items:center">${badge}<button class="btn btn-small ${ev.error ? '' : 'btn-go'}" data-play="${p.id}">▶ ${ev.error ? 'Prova' : 'Spela'}</button></div></div>`;
+  }).join('');
+  const body = `<div class="fit-head"><div><b>🖥️ ${esc(m.name)}</b><small>${fmtMb(m.ram)} minne · ${m.gfx}${m.vram ? ' · ' + fmtMb(m.vram) + ' videominne' : ''}${m.sound ? ' · ljudkort' : ' · PC-högtalare'}</small></div><button class="btn btn-small" data-rebuild>🔩 Byt delar</button></div>
+    <p style="font-size:18px;margin:0 0 8px">Tidstypiska spel. FPS-räknaren visar hur datorn orkar – för lite minne eller fel grafikkort ger felmeddelande, precis som förr.</p>
+    <div class="plist">${rows || '<p>Inga PC-spel än det här året.</p>'}</div>`;
+  const dlg = openModal('🎮 Spela på speldatorn', body, [{ label: 'Stäng', onClick: closeModal }]);
+  dlg.classList.add('dlg-wide');
+  dlg.querySelectorAll('[data-icon]').forEach((el) => el.replaceWith(shop.icon(shop.part[el.dataset.icon], 44, 38)));
+  dlg.querySelectorAll('[data-play]').forEach((b) => (b.onclick = () => { closeModal(); onPlay(shop.part[b.dataset.play], m, evaluate(b.dataset.play, m)); }));
+  dlg.querySelector('[data-rebuild]').onclick = () => { closeModal(); onRebuild?.(); };
 }

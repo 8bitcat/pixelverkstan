@@ -36,7 +36,8 @@ export class Game {
     this.shown = {};        // delar som står framme i butiken (resten ligger i förrådet)
     this.actor = null;      // spelaren som utför ett kommando (för meddelanden i co-op)
     this.fit = this.emptyFit();   // butikens inredning: platser med montrar/bås och köpta prylar
-    this.demand = {};       // vad kunder frågat efter som butiken inte kunnat sälja: { text: antal }
+    this.demand = {};
+    this.deskPc = null;     // butikens egen speldator på spelbordet: { parts: { cat: partId } }       // vad kunder frågat efter som butiken inte kunnat sälja: { text: antal }
     // mirror = klient i co-op: läget kommer från värden, ingen egen simulering eller sparning
     this.mirror = !!opts.mirror;
     if (this.mirror) { this.startYear = opts.startYear ?? 2021; this.xp = 0; this.money = 0; this.stock = {}; this.stats = { served: 0, declined: 0, lost: 0, earned: 0, stars: 0 }; this.tutorialStep = 99; }
@@ -61,7 +62,7 @@ export class Game {
     this.stats = { served: 0, declined: 0, lost: 0, earned: 0, stars: 0 };
     this.tutorialStep = 0;
     this.customers = []; this.orders = [];
-    this.fit = this.emptyFit(); this.demand = {};
+    this.fit = this.emptyFit(); this.demand = {}; this.deskPc = null;
     this.save();
   }
   save() {
@@ -77,7 +78,7 @@ export class Game {
     const start = this.startInfo ? { template: this.startInfo.template, builds: (this.startInfo.builds || []).map((b) => (b || []).map((p) => p.id)) } : null;
     // lådor som är på väg sparas som framme
     const deliveries = this.deliveries.map((d) => ({ id: d.id, items: d.items, state: 'arrived' }));
-    const data = { v: 4, money, xp, stock, shown: this.shown, deliveries, stats: this.stats, tutorialStep, startYear: this.startYear, start, nextId: this.nextId, fit: this.fit, demand: this.demand };
+    const data = { v: 4, money, xp, stock, shown: this.shown, deliveries, stats: this.stats, tutorialStep, startYear: this.startYear, start, nextId: this.nextId, fit: this.fit, demand: this.demand, deskPc: this.deskPc };
     try { localStorage.setItem(this.saveKey, JSON.stringify(data)); } catch { /* privat läge */ }
   }
   load() {
@@ -89,6 +90,7 @@ export class Game {
       // äldre sparningar hade ingen inredning: de tre kategorihyllorna som förr
       this.fit = this.cleanFit(d.fit);
       this.demand = d.demand && typeof d.demand === 'object' ? d.demand : {};
+      this.deskPc = d.deskPc && d.deskPc.parts ? { parts: Object.fromEntries(Object.entries(d.deskPc.parts).filter(([, id]) => this.shop.part[id])) } : null;
       // äldre sparningar hade inget förråd: allt står framme
       this.shown = d.shown ? Object.fromEntries(Object.entries(d.shown).filter(([id]) => this.shop.part[id])) : { ...stock };
       this.deliveries = (d.deliveries || []).map((x) => ({ ...x, items: Object.fromEntries(Object.entries(x.items || {}).filter(([id]) => this.shop.part[id])), state: 'arrived' })).filter((x) => Object.keys(x.items).length);
@@ -170,6 +172,45 @@ export class Game {
     this.emit('toast', { text: `Platsen är tom igen – du fick tillbaka ${fmt(back)} kr.`, kind: '' });
     this.emit('fit');
     this.save(); this.emit('change');
+    return true;
+  }
+  // ---------- Speldatorn på spelbordet ----------
+  deskParts() { const out = {}; for (const [cat, id] of Object.entries(this.deskPc?.parts || {})) if (this.shop.part[id]) out[cat] = this.shop.part[id]; return out; }
+  // vad datorn får ihop: fel-lista (tom = ok)
+  deskProblems(parts) {
+    const C = this.shop.compat, P = {};
+    for (const [cat, id] of Object.entries(parts || {})) if (id && this.shop.part[id]) P[cat] = this.shop.part[id];
+    const out = [];
+    for (const cat of ['case', 'mb', 'cpu', 'ram', 'storage', 'psu']) if (!P[cat]) out.push(`saknar ${this.shop.cats[cat]?.name?.toLowerCase() || cat}`);
+    if (!C || out.length) return out;
+    if (!C.cpuFitsMb(P.cpu, P.mb)) out.push('processorn passar inte moderkortets sockel');
+    if (!C.ramFitsMb(P.ram, P.mb)) out.push('minnet är fel typ för moderkortet');
+    if (!C.caseFitsMb(P.case, P.mb)) out.push('moderkortet får inte plats i chassit');
+    if (!C.storageFitsMb(P.storage, P.mb)) out.push('lagringen passar inte moderkortet');
+    if (C.needsGpu(P.mb, P.cpu) && !P.gpu) out.push('behöver ett grafikkort (ingen inbyggd grafik)');
+    if (P.gpu && !C.cardsFit([P.gpu.bus], P.mb)) out.push('grafikkortet passar inte moderkortets kortplatser');
+    if (P.cpu.needs && P.cpu.needs !== 'none' && !P.cooler) out.push('processorn behöver en kylare');
+    if (P.cooler && !C.coolerFitsCpu(P.cooler, P.cpu)) out.push('kylaren passar inte processorn');
+    if (!C.psuFits(P.psu, P.mb, P.cpu, P.gpu).ok) out.push('nätaggregatet har fel kontakter');
+    else if (P.psu.watt < C.wattNeed(P.cpu, P.gpu, 0, this.year)) out.push('nätaggregatet är för svagt');
+    return out;
+  }
+  deskBuild(parts) {
+    const clean = {};
+    for (const [cat, id] of Object.entries(parts || {})) if (id && this.shop.part[id]?.cat === cat && this.stockFree(id) > 0) clean[cat] = id;
+    if (this.deskProblems(clean).length) return false;
+    if (this.deskPc) this.deskUnbuild();
+    for (const id of Object.values(clean)) this.takeStock(id);
+    this.deskPc = { parts: clean };
+    this.emit('toast', { text: '🖥️ Speldatorn står på bordet – gå dit och spela!', kind: 'good' });
+    this.emit('fit'); this.save(); this.emit('change');
+    return true;
+  }
+  deskUnbuild() {
+    if (!this.deskPc) return false;
+    for (const id of Object.values(this.deskPc.parts)) this.returnStock(id);
+    this.deskPc = null;
+    this.emit('fit'); this.save(); this.emit('change');
     return true;
   }
   buyItem(id) {

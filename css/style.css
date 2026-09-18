@@ -445,3 +445,28 @@ body[data-screen="build"] #chatlog { bottom: 150px; left: 280px; }
 .owned-row { background: #f3fbef; }
 .shoprow.locked { background: #f3f1ee; }
 .lock-need { color: #8a6a2a; }
+
+/* ---------- Spela (arkad / speldator) ---------- */
+#play { background: #08060c; display: flex; flex-direction: column; }
+#play.pc { background: #1c1a22; }
+.play-top { display: flex; gap: 12px; align-items: center; padding: 6px 12px; background: var(--paper2); border-bottom: 4px solid var(--ink); }
+.play-top b { display: block; font: 24px var(--head); line-height: 1; }
+.play-top small { color: var(--muted); font-size: 16px; }
+#play-canvas { flex: 1; width: 100%; min-height: 0; touch-action: none; cursor: crosshair; }
+.play-pad { display: none; justify-content: space-between; padding: 8px 12px 14px; gap: 12px; }
+.play-pad button { width: 46px; height: 46px; font: 22px var(--head); color: #fff; background: #3a3a48; border: 3px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); touch-action: none; user-select: none; }
+.play-pad button:active { background: #6a6a80; transform: translate(2px, 2px); box-shadow: none; }
+.dpad { display: grid; grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(3, 46px); gap: 4px; }
+.dpad [data-k="up"] { grid-column: 2; grid-row: 1; } .dpad [data-k="left"] { grid-column: 1; grid-row: 2; } .dpad [data-k="right"] { grid-column: 3; grid-row: 2; } .dpad [data-k="down"] { grid-column: 2; grid-row: 3; }
+.abtn { display: flex; gap: 8px; align-items: flex-end; }
+.abtn [data-k="a"] { background: var(--red2); border-radius: 50%; } .abtn [data-k="b"] { background: var(--blue); border-radius: 50%; }
+.abtn [data-k="start"] { width: auto; height: 30px; font-size: 14px; padding: 0 10px; }
+@media (pointer: coarse) { .play-pad { display: flex; } }
+/* speldatorn: sätt ihop */
+.deskrow { display: grid; grid-template-columns: 120px 1fr auto; gap: 8px; align-items: center; background: #fff; border: 2px solid var(--ink); padding: 4px 8px; }
+.deskrow b { font: 18px var(--head); }
+.deskrow select { font: 17px var(--font); border: 2px solid var(--ink); padding: 3px; background: #fff; max-width: 100%; }
+.deskrow .st { font-size: 16px; white-space: nowrap; }
+.gamerow { grid-template-columns: 44px 1fr auto; }
+.fpsbadge { font: 20px var(--head); padding: 2px 8px; border: 2px solid var(--ink); background: #fff; min-width: 70px; text-align: center; }
+.fpsbadge.good { background: #d8f5df; } .fpsbadge.mid { background: #fff4c7; } .fpsbadge.bad { background: #ffe3e3; } .fpsbadge.err { background: #e8e6e0; color: var(--muted); }
