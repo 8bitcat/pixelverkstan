@@ -2,7 +2,7 @@
 // (golv, väggar, fönster, dörrkarmar, vägghyllor, affisch, klocka, verkstadsdörr).
 // Ritas en gång till offscreen-canvasar.
 import { Pix, hex, mul, mix, hash, bayer, SMALL, textW, text } from './floor-pix.js';
-import { FW, FH, WALL_Y, DOOR, SLOTS, SLOT_DEPTH, HERO, ROPE, SOFA, TABLE, ARMCHAIR, COUNTER, QUEUE, PICKUP } from './floor-layout.js';
+import { FW, FH, WALL_Y, DOOR, SLOTS, SLOT_DEPTH, HERO, ROPE, SOFA, TABLE, ARMCHAIR, COUNTER, QUEUE, PICKUP, BENCH } from './floor-layout.js';
 
 export const WIN = [[12, 18, 87, 71], [96, 18, 171, 71]]; // glas [x0, y0, x1, y1)
 export const TRANSOM = [DOOR.x0, 12, DOOR.x1, 22];
@@ -119,6 +119,7 @@ export function paintRoom(theme, opts = {}) {
   paintStorefront(P, wall, items, opts.sign, lokal);
   paintWallDecor(P, wall, wallDk, theme, items, lokal);
   if (lokal === 1) { paintWorn(P, wall); paintShabby(P); }
+  if (opts.plan?.partition) paintPartition(P, opts.plan);
   if (lokal === 2) paintPlain(P, wall);
   if (lokal === 6) paintLuxury(P);
   return P;
@@ -182,12 +183,13 @@ function paintFloor(P, flA, flB, lokal = 2, items = {}, openSlots = 3) {
   text(P, SMALL, 'VÄLKOMMEN', DOOR.cx - (textW(SMALL, 'VÄLKOMMEN') >> 1), WALL_Y + 6, 0xb9b3a6);
   P.hl(DOOR.x0, WALL_Y, DOOR.x1 - DOOR.x0, 0xa9aeb8);
   // museimatta under stjärnobjektet
-  paintRug(P, ROPE.x0 - 10, ROPE.back - 12, ROPE.x1 + 10, ROPE.front + 12, 0x5e1622, 0xd8b24a, 'museum');
+  if (ROPE) paintRug(P, ROPE.x0 - 10, ROPE.back - 12, ROPE.x1 + 10, ROPE.front + 12, 0x5e1622, 0xd8b24a, 'museum');
   // väntrumsmatta (finare med prylen "ny matta")
-  if (items.matta || lokal >= 4) paintRug(P, SOFA.x0 - 14, SOFA.base - 36, ARMCHAIR.x1 + 10, TABLE.base + 26, lokal >= 6 ? 0x2a2a4a : 0x7a2a3e, lokal >= 6 ? 0xd8b24a : 0xe8c26a, 'museum');
-  else paintRug(P, SOFA.x0 - 10, SOFA.base - 32, ARMCHAIR.x1 + 8, TABLE.base + 22, lokal <= 2 ? 0x5a5a52 : 0x3f5667, lokal <= 2 ? 0x8a8478 : 0xd9d2c3, 'stripe');
+  if (SOFA && (items.matta || lokal >= 4)) paintRug(P, SOFA.x0 - 14, SOFA.base - 36, ARMCHAIR.x1 + 10, TABLE.base + 26, lokal >= 6 ? 0x2a2a4a : 0x7a2a3e, lokal >= 6 ? 0xd8b24a : 0xe8c26a, 'museum');
+  else if (SOFA) paintRug(P, SOFA.x0 - 10, SOFA.base - 32, ARMCHAIR.x1 + 8, TABLE.base + 22, 0x3f5667, 0xd9d2c3, 'stripe');
+  else if (BENCH) paintRug(P, BENCH.x0 - 10, BENCH.base - 26, BENCH.x1 + 10, BENCH.base + 14, 0x5a5a52, 0x8a8478, 'stripe');
   // ljuskäglor på golvet
-  P.ell(HERO.cx, HERO.base - 22, 88, 42, 0xfff3d0, 0.22, 6);
+  if (HERO) P.ell(HERO.cx, HERO.base - 22, 88, 42, 0xfff3d0, 0.22, 6);
   SLOTS.forEach((v, i) => { if (i < openSlots) P.ell((v.x0 + v.x1) / 2, v.base - 8, (v.x1 - v.x0) * 0.62, 26, 0xfff3d0, 0.14); });
   P.ell(QUEUE[0][0], QUEUE[0][1] + 16, 46, 36, 0xfff3d0, 0.09);
   P.ell(PICKUP[0][0], PICKUP[0][1] + 16, 46, 36, 0xfff3d0, 0.09);
@@ -199,10 +201,11 @@ function paintFloor(P, flA, flB, lokal = 2, items = {}, openSlots = 3) {
   // kontaktskuggor under möbler
   for (const v of SLOTS) shadowRect(P, v.x0 + 1, v.base, v.x1 - v.x0 - 2, 4);
   shadowRect(P, COUNTER.x0, COUNTER.base, COUNTER.x1 - COUNTER.x0, 4);
-  shadowRect(P, SOFA.x0 + 2, SOFA.base, SOFA.x1 - SOFA.x0 - 4, 3);
-  shadowRect(P, ARMCHAIR.x0 + 2, ARMCHAIR.base, ARMCHAIR.x1 - ARMCHAIR.x0 - 4, 3);
-  shadowRect(P, TABLE.x0 + 2, TABLE.base, TABLE.x1 - TABLE.x0 - 4, 3);
-  P.ell(HERO.cx, HERO.base + 1, 54, 5, 0x140c1c, 0.35, 3);
+  if (SOFA) shadowRect(P, SOFA.x0 + 2, SOFA.base, SOFA.x1 - SOFA.x0 - 4, 3);
+  if (ARMCHAIR) shadowRect(P, ARMCHAIR.x0 + 2, ARMCHAIR.base, ARMCHAIR.x1 - ARMCHAIR.x0 - 4, 3);
+  if (TABLE) shadowRect(P, TABLE.x0 + 2, TABLE.base, TABLE.x1 - TABLE.x0 - 4, 3);
+  if (BENCH) shadowRect(P, BENCH.x0 + 2, BENCH.base, BENCH.x1 - BENCH.x0 - 4, 3);
+  if (HERO) P.ell(HERO.cx, HERO.base + 1, 54, 5, 0x140c1c, 0.35, 3);
   // mörkare golv längs väggen (ambient occlusion)
   for (let y = WALL_Y; y < WALL_Y + 7; y++) for (let x = 0; x < FW; x++) {
     if (x >= DOOR.x0 && x < DOOR.x1) continue;
@@ -411,8 +414,8 @@ function paintWallDecor(P, wall, wallDk, theme, items = {}, lokal = 2) {
 // Sliten lokal, del två: plywood för ett fönster, spindelväv i hörnen, flagnande tapet och
 // smutsigare ljus – det ska synas på tre meters håll att butiken behöver renoveras
 function paintShabby(P) {
-  // plywoodskivor spikade över högra fönstret
-  const [x0, y0, x1, y1] = WIN[1];
+  // plywoodskivor spikade över båda fönstren
+  for (const [x0, y0, x1, y1] of [WIN[0], WIN[1]]) {
   for (let y = y0 - 1; y < y1 + 1; y++) for (let x = x0 - 2; x < x1 + 2; x++) {
     const board = Math.floor((y - y0) / 12), edge = (y - y0) % 12 === 0 || (y - y0) % 12 === 11;
     let c = mix(0xb08a58, 0xc9a36b, hash(x >> 2, board, 61) * 0.6 + (bayer(x, y) - 0.5) * 0.1);
@@ -421,7 +424,8 @@ function paintShabby(P) {
     P.px(x, y, c);
   }
   for (let by = y0 + 3; by < y1; by += 12) { P.px(x0, by, 0x3a3a44); P.px(x1 - 2, by, 0x3a3a44); }
-  P.rect(x0 + 8, y0 + 20, 26, 12, 0xf4efe2); P.box(x0 + 8, y0 + 20, 26, 12, 0x17151a); text(P, SMALL, 'TRASIG', x0 + 10, y0 + 23, 0xc9323a);
+  if (x0 === WIN[1][0]) { P.rect(x0 + 8, y0 + 20, 26, 12, 0xf4efe2); P.box(x0 + 8, y0 + 20, 26, 12, 0x17151a); text(P, SMALL, 'TRASIG', x0 + 10, y0 + 23, 0xc9323a); }
+  }
   // spindelväv i övre hörnen
   const web = (cx, cy, dir) => { for (let i = 0; i < 14; i++) { P.px(cx + dir * i, cy + Math.round(i * 0.55), 0x9a9a90, 0.5); P.px(cx + dir * Math.round(i * 0.5), cy + i, 0x9a9a90, 0.5); P.px(cx + dir * i, cy + Math.round(i * 0.2), 0x9a9a90, 0.35); } for (let i = 3; i < 13; i += 4) for (let j = 0; j <= i; j++) P.px(cx + dir * (i - Math.round(j * 0.55)), cy + Math.round(j * (i / 13) + i * 0.3), 0xb8b8b0, 0.35); };
   web(7, 8, 1); web(505, 8, -1); web(238, 8, 1);
@@ -457,4 +461,24 @@ function paintWorn(P, wall) {
   P.hl(bx - 4, by - 8, 8, 0x3a78d8); P.hl(bx - 6, by - 12, 12, 0x2a2d36); P.px(bx - 6, by - 11, 0x2a2d36); P.px(bx + 5, by - 11, 0x2a2d36);
   // tejpad lapp på väggen
   P.rect(226, 60, 10, 8, 0xf4efe2); P.hl(226, 60, 10, 0xffd23a); P.hl(228, 63, 6, 0x8a8f9c); P.hl(228, 65, 5, 0x8a8f9c);
+}
+
+// Källarhålan: förrådet till vänster bakom en plywoodvägg – kartonger, lastpall, rör och en lapp
+function paintPartition(P, plan) {
+  const px = plan.partition;
+  P.darken(6, WALL_Y, px - 8, FH - 7, 0.5);
+  const box = (x, y, w, h, c) => { P.rect(x, y, w, h, c); P.hl(x, y, w, mix(c, 0xffffff, 0.3)); P.vl(x + w - 1, y, h, mul(c, 0.75)); P.hl(x + 2, y + (h >> 1), w - 4, mul(c, 0.7)); P.rect(x + (w >> 1) - 2, y, 4, 3, mix(c, 0xffffff, 0.15)); };
+  box(30, 150, 42, 30, 0x9a7a4a); box(78, 138, 36, 42, 0x8a6a3a); box(40, 118, 30, 32, 0xb08a58);
+  box(22, 296, 52, 38, 0x8a6a3a); box(82, 306, 38, 28, 0x9a7a4a); box(28, 268, 34, 28, 0xa07a48);
+  for (let i = 0; i < 5; i++) P.rect(20 + i * 20, 398, 14, 5, 0x8a6a3a);
+  P.rect(18, 403, 100, 3, 0x6a4a2a); P.rect(18, 392, 100, 3, 0x6a4a2a);
+  box(30, 362, 40, 30, 0xb58f5a); box(74, 370, 30, 22, 0xc9a36b);
+  P.rect(9, 92, 4, FH - 104, 0x5a5f6a); P.rect(8, 200, 6, 6, 0x8a8f9c); P.rect(8, 330, 6, 6, 0x8a8f9c); P.vl(11, 92, FH - 104, 0x8a8f9c, 0.4);
+  // själva väggen, sedd från sidan: en smal remsa plywood från tak till golv, skugga på butikssidan
+  for (let y = 7; y < FH - 6; y++) for (let x = px - 8; x < px; x++) { const board = Math.floor((y - 7) / 40); P.px(x, y, mix(0xa88250, 0xc9a36b, hash(board, x, 71) * 0.5 + (bayer(x, y) - 0.5) * 0.1)); }
+  P.vl(px - 8, 7, FH - 13, 0x5a3d2b); P.vl(px - 1, 7, FH - 13, 0x3a2a1a);
+  for (let y = 20; y < FH - 10; y += 40) { P.px(px - 6, y, 0x3a3a44); P.px(px - 3, y, 0x3a3a44); P.hl(px - 8, y - 1, 8, 0x8a6a3a, 0.6); }
+  for (let x = px; x < px + 12; x++) for (let y = WALL_Y; y < FH - 6; y++) P.px(x, y, 0x000000, 0.28 * (1 - (x - px) / 12));
+  // lapp på väggen: FÖRRÅD
+  P.rect(px - 7, 40, 6, 22, 0xf4efe2); P.vl(px - 5, 43, 16, 0x8a8f9c); P.vl(px - 4, 43, 16, 0x8a8f9c);
 }

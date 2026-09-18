@@ -17,7 +17,7 @@ await page.evaluate(() => localStorage.clear()); await page.reload(); await page
 await page.click('[data-shop="dator"]'); await page.click(`[data-year="${YEAR}"]`);
 await page.waitForFunction(() => window.PV?.game, null, { timeout: 30000 }); await page.waitForTimeout(1200);
 // 1) startlokalen ska vara sunkig
-ok(await page.evaluate(() => PV.floor.lokal === 1 && PV.floor.openSlots === 3), 'startar i Källarhålan (3 platser)');
+ok(await page.evaluate(() => PV.floor.lokal === 1 && PV.floor.openSlots === 5), 'startar i Källarhålan (5 platser, 3 hyllor)');
 await page.screenshot({ path: OUT + "lokal1-kallarhalan.png" });
 // startpaketet ska innehålla ett grafikkort, eller tredje guidade kunden vill ha ett
 const gpuStart = await page.evaluate(() => { const g = PV.game; const kit = g.startInfo.builds.some((b) => b.some((p) => p.cat === 'gpu')); g.money = 100000; const o = g.shop.tutorialOrder(2, g); return { kit, third: o?.items.some((it) => it.cat === 'gpu'), msg: o?.msg }; });

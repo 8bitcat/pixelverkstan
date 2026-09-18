@@ -18,7 +18,7 @@ await page.waitForFunction(() => window.PV?.game, null, { timeout: 30000 }); awa
 // rikedom för testet
 await page.evaluate(() => { PV.game.money = 200000; PV.game.emit('change'); });
 const f0 = await page.evaluate(() => ({ lokal: PV.floor.lokal, open: PV.floor.openSlots, units: PV.floor.units.map((u) => u.closed ? 'closed' : u.empty ? 'empty' : u.frame ? 'booth' : 'unit'), fh: PV.floor.buf.height / PV.floor.RES }));
-ok(f0.lokal === 1 && f0.open === 3 && f0.units.filter((u) => u === 'booth').length === 3 && f0.units.filter((u) => u === 'closed').length === 5, `sliten lokal med 3 hyllor och 5 stängda platser (${JSON.stringify(f0)})`);
+ok(f0.lokal === 1 && f0.open === 5 && f0.units.filter((u) => u === 'booth').length === 3 && f0.units.filter((u) => u === 'empty').length === 2, `sliten lokal med 3 hyllor och 2 lediga platser (${JSON.stringify(f0)})`);
 ok(f0.fh === 480, `golvet är 480 px högt (${f0.fh})`);
 await page.screenshot({ path: OUT + "fit0-sliten.png" });
 // grossisten: hänglås på tier 3+
@@ -82,7 +82,7 @@ const opt2 = await page.evaluate(() => { const b = [...document.querySelectorAll
 if (opt2) { await page.click(`[data-opt="${opt2}"]`); await page.waitForTimeout(200); }
 await page.click('[data-close]'); await page.waitForTimeout(800);
 const f2 = await page.evaluate(() => ({ lokal: PV.floor.lokal, open: PV.floor.openSlots, stats: PV.game.fitStats, units: PV.floor.units.map((u) => u.closed ? 'closed' : u.empty ? 'empty' : u.frame ? 'booth' : u.def?.unit) }));
-ok(f2.lokal === 4 && f2.open === 6 && f2.stats.drag >= 6 && f2.stats.trivsel >= 6, `Hörnbutiken och inrett (${JSON.stringify(f2)})`);
+ok(f2.lokal === 4 && f2.open === 9 && f2.stats.drag >= 6 && f2.stats.trivsel >= 6, `Hörnbutiken och inrett (${JSON.stringify(f2)})`);
 await page.screenshot({ path: OUT + "fit5-renoverad.png" });
 // ställ ut lite delar så montrarna får innehåll
 await page.evaluate(() => { const g = PV.game; const list = g.shop.onSale(g.year).filter((p) => ['gpu', 'cpu', 'ram', 'storage'].includes(p.cat) && g.canSell(p)).sort((a, b) => b.tier - a.tier).slice(0, 40); for (const p of list) { g.stock[p.id] = 2; g.shown[p.id] = 2; } g.emit('change'); });
@@ -93,7 +93,7 @@ await page.evaluate(() => { PV.game.money = 500000; PV.game.emit('change'); });
 await page.click('[data-h="fit"]'); await page.waitForSelector('[data-tab="lager"]'); await page.click('[data-tab="lager"]'); await page.waitForSelector('[data-item="lokal5"]');
 await page.click('[data-item="lokal5"]'); await page.waitForTimeout(300); await page.click('[data-close]'); await page.waitForTimeout(800);
 const f3 = await page.evaluate(() => ({ lokal: PV.floor.lokal, open: PV.floor.openSlots, arcade: PV.game.hasArcadeRoom }));
-ok(f3.lokal === 5 && f3.open === 8 && f3.arcade, `Datorhuset (${JSON.stringify(f3)})`);
+ok(f3.lokal === 5 && f3.open === 10 && f3.arcade, `Datorhuset (${JSON.stringify(f3)})`);
 await page.screenshot({ path: OUT + "fit7-datorhuset.png" });
 await page.click('[data-h="fit"]'); await page.waitForSelector('[data-tab="lager"]'); await page.click('[data-tab="lager"]'); await page.waitForSelector('[data-item="lokal6"]');
 await page.click('[data-item="lokal6"]'); await page.waitForTimeout(300); await page.click('[data-close]'); await page.waitForTimeout(800);

@@ -5,26 +5,28 @@ import * as LY from './floor-layout.js';
 const CELL = 4;
 const GW = Math.ceil(LY.FW / CELL), GH = Math.ceil(LY.FH / CELL);
 const C = LY.COUNTER;
-
-// hinder vid fötterna [x0, y0, x1, y1]
-const BLOCKS = [
-  [C.x0 - 2, LY.WALL_Y - 6, LY.FW, 121],          // bakre skåpet längs väggen
-  [C.x0 - 2, 138, LY.FW, C.base + 1],             // själva disken (framsidan)
-  ...LY.OBSTACLES.slice(1),                        // allt utom kundernas stora diskblock
-];
 const PAD = 3;
 const free = new Uint8Array(GW * GH);
-for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
-  const x = gx * CELL + CELL / 2, y = gy * CELL + CELL / 2;
-  let ok = x > 8 && x < LY.FW - 8 && y > LY.WALL_Y + 6 && y < LY.FH - 4;
-  if (ok) for (const [x0, y0, x1, y1] of BLOCKS) if (x > x0 - PAD && x < x1 + PAD && y > y0 - PAD && y < y1 + PAD) { ok = false; break; }
-  free[gy * GW + gx] = ok ? 1 : 0;
+// hinder vid fötterna [x0, y0, x1, y1] – räknas om när lokalen byts (floor.build → rebuild)
+export function rebuild() {
+  const BLOCKS = [
+    [C.x0 - 2, LY.WALL_Y - 6, LY.FW, 121],          // bakre skåpet längs väggen
+    [C.x0 - 2, 138, LY.FW, C.base + 1],             // själva disken (framsidan)
+    ...LY.OBSTACLES.slice(1),                        // allt utom kundernas stora diskblock
+  ];
+  for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
+    const x = gx * CELL + CELL / 2, y = gy * CELL + CELL / 2;
+    let ok = x > 8 && x < LY.FW - 8 && y > LY.WALL_Y + 6 && y < LY.FH - 4;
+    if (ok) for (const [x0, y0, x1, y1] of BLOCKS) if (x > x0 - PAD && x < x1 + PAD && y > y0 - PAD && y < y1 + PAD) { ok = false; break; }
+    free[gy * GW + gx] = ok ? 1 : 0;
+  }
+  // dörröppningen upp mot trottoaren
+  for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
+    const x = gx * CELL + CELL / 2, y = gy * CELL + CELL / 2;
+    if (x > LY.DOOR.x0 + 8 && x < LY.DOOR.x1 - 8 && y <= LY.WALL_Y + 8 && y > LY.WALL_Y - 2) free[gy * GW + gx] = 1;
+  }
 }
-// dörröppningen upp mot trottoaren
-for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
-  const x = gx * CELL + CELL / 2, y = gy * CELL + CELL / 2;
-  if (x > LY.DOOR.x0 + 8 && x < LY.DOOR.x1 - 8 && y <= LY.WALL_Y + 8 && y > LY.WALL_Y - 2) free[gy * GW + gx] = 1;
-}
+rebuild();
 
 const cellOf = (x, y) => [Math.max(0, Math.min(GW - 1, Math.floor(x / CELL))), Math.max(0, Math.min(GH - 1, Math.floor(y / CELL)))];
 export const walkable = (x, y) => { const [gx, gy] = cellOf(x, y); return !!free[gy * GW + gx]; };

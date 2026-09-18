@@ -12,11 +12,11 @@ export const HEAD_H = [0, 12, 14, 18];
 
 // brand = { name, color }, level 1–3 ger en skylt ovanför huven (märkeshylla, belyst monter,
 // flaggskeppsmonter). Bilderna blir HEAD_H[level] högre; baslinjen ligger fortfarande sist.
-export function makeVitrine(W, title, velvet, brand = null, level = 0) {
+export function makeVitrine(W, title, velvet, brand = null, level = 0, look = {}) {
   const { GH, D, BH, PL } = VIT;
   const HH = brand ? HEAD_H[level] || 0 : 0, H = VIT.H + HH;
   const U0 = new Pix(W, H, 0, -HH), O0 = new Pix(W, H, 0, -HH);
-  paintVitrineBody(U0, O0, W, title, velvet, brand, level);
+  paintVitrineBody(U0, O0, W, title, velvet, brand, level, look);
   if (brand && HH) paintBoothHead(U0, O0, W, HH, brand, level);
   return { under: U0.flush(), over: O0.flush(), W, H, HH, level, brand };
 }
@@ -59,57 +59,68 @@ function paintBoothHead(U, O, W, HH, brand, level) {
   if (lit) O.dith(2, 0, W - 4, 3, c, 0.5, 0.35);
 }
 
-function paintVitrineBody(U, O, W, title, velvet, brand, level) {
+function paintVitrineBody(U, O, W, title, velvet, brand, level, look = {}) {
   const { GH, D, BH, PL } = VIT;
+  const style = look.style || 'glass', wood = style === 'wood', metal = style === 'metal', ledS = style === 'led';
   const bc = brand ? hex(brand.color, 0x76b900) : null;
   const vel = level >= 2 && bc ? mix(velvet, bc, 0.35) : velvet, velDk = mix(mul(vel, 0.45), 0x0a0612, 0.3);
-  // bakre sammetspanel
+  // bakre panel: sammet (glas/LED), grova brädor (trä) eller plåtnät (metall)
   for (let y = 1; y <= GH; y++) for (let x = 1; x < W - 1; x++) {
-    U.px(x, y, mix(velDk, mul(vel, 0.8), (y - 1) / GH + (bayer(x, y) - 0.5) * 0.15));
+    if (wood) U.px(x, y, mix(0x6a4a2a, 0x8a6a3a, hash(x >> 3, y >> 2, 31) * 0.6 + (bayer(x, y) - 0.5) * 0.12) * (y % 5 === 0 ? 0 : 1) + (y % 5 === 0 ? 0x4a3020 : 0));
+    else if (metal) U.px(x, y, (x + y) % 3 === 0 ? 0x2a2f3a : 0x3a3f4a);
+    else U.px(x, y, mix(velDk, mul(vel, 0.8), (y - 1) / GH + (bayer(x, y) - 0.5) * 0.15));
   }
-  U.hl(1, GH, W - 2, mul(velDk, 0.7));
-  // botten (sammet) med ljusfläck
+  U.hl(1, GH, W - 2, wood ? 0x4a3020 : metal ? 0x1a1f2a : mul(velDk, 0.7));
+  // botten (sammet / plankor / plåt) med ljusfläck
   for (let y = GH + 1; y < GH + D; y++) for (let x = 1; x < W - 1; x++) {
     const t = Math.hypot((x - W / 2) / (W * 0.5), (y - GH - D * 0.45) / (D * 0.7));
-    let c = mix(mix(vel, 0xfff0d8, 0.16), mul(vel, 0.7), Math.min(1, t) + (bayer(x, y) - 0.5) * 0.14);
+    let c;
+    if (wood) c = mix(0x9a7a4a, 0x7a5a3a, Math.min(1, t) * 0.6 + (hash(x >> 4, y, 32) - 0.5) * 0.3);
+    else if (metal) c = mix(0x8a8f9c, 0x5a5f6a, Math.min(1, t) + (bayer(x, y) - 0.5) * 0.1);
+    else c = mix(mix(vel, 0xfff0d8, 0.16), mul(vel, 0.7), Math.min(1, t) + (bayer(x, y) - 0.5) * 0.14);
     if (hash(x, y, 21) > 0.9) c = mul(c, 1.08);
     U.px(x, y, c);
   }
-  // led-list inne i taket (i märkets färg på belysta montrar)
-  const led = level >= 2 && bc ? mix(bc, 0xffffff, 0.55) : 0xfff6d8;
-  U.hl(2, 1, W - 4, led); U.hl(2, 2, W - 4, led, 0.35);
-  // underskåp
+  // ljus inne i taket: LED i märkets färg (belysta bås) eller butikens accentfärg (LED-lokal), glödlampa (trä), lysrör (plåt)
+  const led = ledS ? (bc && level >= 2 ? mix(bc, 0xffffff, 0.4) : 0x3fd0e0) : level >= 2 && bc ? mix(bc, 0xffffff, 0.55) : wood ? 0xf0d070 : metal ? 0xf4f2ec : 0xfff6d8;
+  if (wood) { U.rect(Math.round(W / 2) - 2, 1, 4, 3, 0xfff0a0); U.hl(Math.round(W / 2) - 1, 0, 2, 0x3a3a44); }
+  else { U.hl(2, 1, W - 4, led); U.hl(2, 2, W - 4, led, ledS ? 0.6 : 0.35); if (ledS) U.hl(2, 3, W - 4, led, 0.25); }
+  // underskåp: mahogny (glas), grova plankor (trä), plåtlåda med nitar (metall), svart högglans med LED-list (LED)
   const b0 = GH + D;
-  U.hl(0, b0, W, 0x2a2018); U.hl(0, b0 + 1, W, 0xe0c28e); U.hl(0, b0 + 2, W, 0xb8955f);
+  U.hl(0, b0, W, wood ? 0x3a2618 : metal ? 0x2a2f3a : ledS ? 0x0a0a0e : 0x2a2018); U.hl(0, b0 + 1, W, wood ? 0xc9a36b : metal ? 0xa8adb8 : ledS ? 0x3a3a44 : 0xe0c28e); U.hl(0, b0 + 2, W, wood ? 0x9a7a4a : metal ? 0x7a7f8c : ledS ? 0x1a1a22 : 0xb8955f);
   for (let y = b0 + 3; y < b0 + BH; y++) for (let x = 0; x < W; x++) {
-    const grain = Math.sin(x * 0.18 + Math.sin(y * 0.9 + x * 0.05) * 2.2 + y * 0.35);
-    let c = mix(0x5a3a26, 0x7a5236, 0.5 + grain * 0.35 + (hash(x, y, 22) - 0.5) * 0.2);
-    if (x === 0) c = 0x8a6446; if (x === W - 1) c = 0x3a2618;
+    let c;
+    if (wood) { c = mix(0x8a6a3a, 0xa88250, hash(x >> 5, y >> 2, 33) * 0.6 + (bayer(x, y) - 0.5) * 0.15); if ((y - b0) % 6 === 3) c = mul(c, 0.7); if (hash(x, y, 34) > 0.985) c = 0x5a3d2b; }
+    else if (metal) { c = mix(0x5a5f6a, 0x6a6f7c, (bayer(x, y) - 0.5) * 0.3 + 0.5); if ((x % 12 === 6) && (y - b0) % 8 === 5) c = 0xc8ccd6; }
+    else if (ledS) { c = mix(0x14141a, 0x24242c, (y - b0) / BH + (bayer(x, y) - 0.5) * 0.1); }
+    else { const grain = Math.sin(x * 0.18 + Math.sin(y * 0.9 + x * 0.05) * 2.2 + y * 0.35); c = mix(0x5a3a26, 0x7a5236, 0.5 + grain * 0.35 + (hash(x, y, 22) - 0.5) * 0.2); }
+    if (x === 0) c = mix(c, 0xffffff, 0.25); if (x === W - 1) c = mul(c, 0.55);
     U.px(x, y, c);
   }
-  U.hl(0, b0 + 3, W, 0xc8a24a); U.hl(0, b0 + 4, W, 0x7a5a24);
-  U.hl(0, b0 + BH - 2, W, 0xc8a24a); U.hl(0, b0 + BH - 1, W, 0x3a2618);
-  U.bevel(4, b0 + 6, W - 8, BH - 9, 0x3a2618, 0x9a7050);
-  // mässingsskylt
-  const tw = textW(SMALL, title), pw = Math.max(40, tw + 10), px0 = Math.round((W - pw) / 2), py0 = b0 + 7;
-  U.rect(px0, py0, pw, 9, 0xd8b85a); U.box(px0, py0, pw, 9, 0x8a6a2a); U.hl(px0 + 1, py0 + 1, pw - 2, 0xf6e2a0);
-  U.px(px0 + 2, py0 + 4, 0x8a6a2a); U.px(px0 + pw - 3, py0 + 4, 0x8a6a2a);
-  text(U, SMALL, title, Math.round((W - tw) / 2), py0 + 2, 0x3a2a10);
+  if (!wood && !metal && !ledS) { U.hl(0, b0 + 3, W, 0xc8a24a); U.hl(0, b0 + 4, W, 0x7a5a24); U.hl(0, b0 + BH - 2, W, 0xc8a24a); U.hl(0, b0 + BH - 1, W, 0x3a2618); U.bevel(4, b0 + 6, W - 8, BH - 9, 0x3a2618, 0x9a7050); }
+  if (ledS) { const strip = bc && level >= 2 ? bc : 0x3fd0e0; U.hl(1, b0 + BH - 2, W - 2, strip); U.hl(1, b0 + BH - 1, W - 2, mix(strip, 0xffffff, 0.4)); U.dith(0, b0 + BH, W, 2, strip, 0.5, 0.4); }
+  // skylten på underskåpet: kategorifärg, stor text när den får plats
+  const plateCol = look.plate ? hex(look.plate, 0xd8b85a) : 0xd8b85a, F = textW(BIG, title) + 14 <= W - 6 ? BIG : SMALL;
+  const tw = textW(F, title), pw = Math.max(44, tw + 12), ph = F === BIG ? 11 : 9, px0 = Math.round((W - pw) / 2), py0 = b0 + (F === BIG ? 4 : 6);
+  U.rect(px0, py0, pw, ph, plateCol); U.box(px0, py0, pw, ph, mul(plateCol, 0.45)); U.hl(px0 + 1, py0 + 1, pw - 2, mix(plateCol, 0xffffff, 0.4));
+  text(U, F, title, Math.round((W - tw) / 2) + 1, py0 + 3, mul(plateCol, 0.35)); text(U, F, title, Math.round((W - tw) / 2), py0 + 2, 0xffffff);
   // sockel
   U.rect(2, b0 + BH, W - 4, PL, 0x1b1a1f); U.hl(2, b0 + BH, W - 4, 0x0e0d12);
 
-  // glaset (över innehållet)
-  for (let y = 0; y < D + GH; y++) for (let x = 1; x < W - 1; x++) {
-    const front = y >= D;
-    const s = (x + y + 7) % 58;
-    let a = front ? 0.11 : 0.06;
-    if (s < 3) a += front ? 0.2 : 0.16; else if (s === 6 || s === 7) a += 0.1;
-    O.px(x, y, 0xe8f6ff, a);
-  }
-  O.hl(1, D, W - 2, 0xffffff, 0.6); O.hl(1, D + 1, W - 2, 0xffffff, 0.15);
-  O.hl(1, D + GH - 1, W - 2, 0x0e0a14, 0.25);
-  // metallram
-  const fr = 0x3a3228, frHi = 0xd9c088;
+  // glaset (över innehållet) – öppna trä- och plåthyllor har inget glas
+  if (!wood && !metal) {
+    for (let y = 0; y < D + GH; y++) for (let x = 1; x < W - 1; x++) {
+      const front = y >= D;
+      const s = (x + y + 7) % 58;
+      let a = front ? 0.11 : 0.06;
+      if (s < 3) a += front ? 0.2 : 0.16; else if (s === 6 || s === 7) a += 0.1;
+      O.px(x, y, 0xe8f6ff, a);
+    }
+    O.hl(1, D, W - 2, 0xffffff, 0.6); O.hl(1, D + 1, W - 2, 0xffffff, 0.15);
+    O.hl(1, D + GH - 1, W - 2, 0x0e0a14, 0.25);
+  } else { O.hl(1, D, W - 2, wood ? 0xc9a36b : 0xa8adb8, 0.8); O.hl(1, D + 1, W - 2, wood ? 0x5a3d2b : 0x3a3f4a, 0.6); }
+  // ramen: mässing (glas), mörkt trä (trä), stål (plåt), svart (LED)
+  const fr = wood ? 0x5a3a26 : metal ? 0x4a4f5c : ledS ? 0x0a0a0e : 0x3a3228, frHi = wood ? 0xc9a36b : metal ? 0xa8adb8 : ledS ? 0x3fd0e0 : 0xd9c088;
   O.hl(0, 0, W, fr); O.hl(1, 0, W - 2, mix(fr, frHi, 0.5));
   O.vl(0, 0, D + GH, fr); O.vl(W - 1, 0, D + GH, fr);
   O.vl(0, D, GH, frHi); O.vl(1, D, GH, 0xffffff, 0.2); O.vl(W - 2, D, GH, 0x0e0a14, 0.2);
@@ -119,7 +130,7 @@ function paintVitrineBody(U, O, W, title, velvet, brand, level) {
 
 // ---------- Tornmonter (smal, hög glasmonter för de små platserna) ----------
 export const TOWER = { W: 40, H: 96, D: 24, SH: 3 };   // tre hyllplan
-export function makeTower(title, velvet, brand = null, level = 0) {
+export function makeTower(title, velvet, brand = null, level = 0, look = {}) {
   const { W, H, D } = TOWER, HH = brand ? 10 : 0;
   const U = new Pix(W, H, 0, 0), O = new Pix(W, H, 0, 0);
   const bc = brand ? hex(brand.color, 0x76b900) : null;
@@ -139,9 +150,10 @@ export function makeTower(title, velvet, brand = null, level = 0) {
   // sockel med skylt
   const b0 = top + glassH;
   U.rect(0, b0, W, 14, 0x2a2730); U.hl(0, b0, W, 0x55505e); U.hl(0, b0 + 13, W, 0x0e0d12);
-  U.rect(3, b0 + 3, W - 6, 8, 0xd8b85a); U.box(3, b0 + 3, W - 6, 8, 0x8a6a2a);
+  const plateCol = look.plate ? hex(look.plate, 0xd8b85a) : 0xd8b85a;
+  U.rect(3, b0 + 3, W - 6, 8, plateCol); U.box(3, b0 + 3, W - 6, 8, mul(plateCol, 0.45));
   const t = String(title).toUpperCase().slice(0, 7), tw = textW(SMALL, t);
-  text(U, SMALL, t, Math.round((W - tw) / 2), b0 + 5, 0x3a2a10);
+  text(U, SMALL, t, Math.round((W - tw) / 2), b0 + 5, 0xffffff);
   // skylt upptill
   if (brand) {
     const lit = level >= 2, name = String(brand.name).toUpperCase();
@@ -590,4 +602,28 @@ export function makeCar(color, kind = 0) {
   }
   for (const wx of [7, 22]) { P.rect(wx - 2, 10, 5, 4, 0x1b1b1f); P.px(wx, 11, 0x9a9ea6); }
   return P.flush();
+}
+
+// ---------- Möbler och prylar som beror på lokalen (floor-plans.js) ----------
+// träbänk (Gatuplan har ingen soffa)
+export function makeBench(r) {
+  const w = r.x1 - r.x0, H = 24, P = new Pix(w, H);
+  for (let x = 2; x < w - 2; x++) { const g = hash(x >> 3, 0, 41) * 0.5; P.vl(x, 4, 7, mix(0x9a7a4a, 0xc9a36b, g)); P.vl(x, 13, 5, mix(0x9a7a4a, 0xc9a36b, g)); }
+  P.hl(2, 4, w - 4, 0xe0c28e); P.hl(2, 10, w - 4, 0x5a3d2b); P.hl(2, 13, w - 4, 0xe0c28e); P.hl(2, 17, w - 4, 0x5a3d2b);
+  for (const x of [4, w - 8]) { P.rect(x, 12, 4, 12, 0x3a3f4a); P.rect(x, 4, 2, 8, 0x3a3f4a); P.hl(x, 12, 4, 0x6a6f7c); }
+  P.ell(w / 2, H - 1, w / 2 - 2, 3, 0x140c1c, 0.25, 2);
+  return { img: P.flush(), x: r.x0, y: r.base - H, sort: r.base };
+}
+// lådor, tunna, papperskorg, golvskylt, pelare
+export function makeProp(p) {
+  const w = p.x1 - p.x0, d = p.y1 - p.y0;
+  const box = (P, x, y, bw, bh, c) => { P.rect(x, y, bw, bh, c); P.hl(x, y, bw, mix(c, 0xffffff, 0.3)); P.vl(x + bw - 1, y, bh, mul(c, 0.75)); P.hl(x + 2, y + (bh >> 1), bw - 4, mul(c, 0.7)); P.rect(x + (bw >> 1) - 2, y, 4, 3, mix(c, 0xffffff, 0.15)); };
+  let P, H;
+  if (p.kind === 'crates') { H = d + 22; P = new Pix(w, H); box(P, 0, H - 22, w, 22, 0xb58f5a); box(P, 3, H - 40, w - 12, 18, 0xc9a36b); box(P, 8, H - 54, w - 20, 14, 0xa07a48); }
+  else if (p.kind === 'barrel') { H = d + 12; P = new Pix(w, H); for (let y = 2; y < H; y++) for (let x = 1; x < w - 1; x++) P.px(x, y, mix(0x5a5f6a, 0x8a8f9c, Math.sin(x / w * 3.14) * 0.6 + (bayer(x, y) - 0.5) * 0.1)); P.ell(w / 2, 3, w / 2 - 1, 3, 0x6a6f7c, 1, 3); P.hl(1, 8, w - 2, 0x3a3f4a); P.hl(1, H - 8, w - 2, 0x3a3f4a); P.rect(3, 12, w - 6, 8, 0xe23b5a); }
+  else if (p.kind === 'bin') { H = d + 10; P = new Pix(w, H); for (let y = 3; y < H; y++) for (let x = 1; x < w - 1; x++) P.px(x, y, (x % 3 === 0) ? 0x5a5f6a : 0x6a6f7c); P.rect(0, 1, w, 3, 0x3a3f4a); P.hl(0, 1, w, 0x8a8f9c); P.rect(w / 2 - 2, 0, 4, 2, 0x8a8f9c); }
+  else if (p.kind === 'stand') { H = d + 26; P = new Pix(w + 6, H); P.rect(1, 6, w + 4, 18, 0xf4efe2); P.box(1, 6, w + 4, 18, 0x17151a); P.rect(1, 6, w + 4, 6, 0xc9323a); text(P, SMALL, 'REA', 4, 14, 0xc9323a); P.rect(2, 24, 3, H - 24, 0x3a3f4a); P.rect(w + 1, 24, 3, H - 24, 0x3a3f4a); return { img: P.flush(), x: p.x0 - 3, y: p.y1 - H, sort: p.y1 }; }
+  else if (p.kind === 'pillar') { H = p.y1 - 7; P = new Pix(w, H); for (let y = 0; y < H; y++) for (let x = 0; x < w; x++) P.px(x, y, mix(0xd8d0c8, 0xf4efe2, Math.sin(x / w * 3.14) * 0.8 + (hash(x, y >> 2, 42) - 0.5) * 0.1)); P.rect(0, 0, w, 4, 0xc8a24a); P.rect(0, H - 6, w, 6, 0xc8a24a); P.vl(w - 1, 0, H, 0x8a8478); return { img: P.flush(), x: p.x0, y: 7, sort: p.y1 }; }
+  else { H = d + 10; P = new Pix(w, H); box(P, 0, 0, w, H, 0xb58f5a); }
+  return { img: P.flush(), x: p.x0, y: p.y1 - H, sort: p.y1 };
 }

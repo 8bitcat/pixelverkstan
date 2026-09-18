@@ -9,6 +9,7 @@
 // Kategorier utan montrar (chassin, moderkort, nätagg …) styrs av lagerhyllan bakom disken.
 //
 // Ingen DOM här – filen körs även i Node (tools/).
+import { openIndices } from '../../core/floor-plans.js';
 import { ARKAD, hypeAt, isProduct } from './products.js';
 export { ARKAD };
 export const arkadInfo = (id) => ARKAD.find((a) => a.id === id) || null;
@@ -136,10 +137,10 @@ export const itemInfo = (id) => ITEMS.find((i) => i.id === id) || null;
 // → 5 Datorhuset (8 + arkadrum) → 6 Megastore (8 + arkadrum, mer folk)
 export const LOKAL_NAME = ['', 'Källarhålan', 'Gatuplan', 'Kvartersbutiken', 'Hörnbutiken', 'Datorhuset', 'Megastore'];
 export const LOKAL_MAX = 6;
-export const SLOTS_PER_LOKAL = [0, 3, 4, 5, 6, 8, 8];
+export const SLOTS_PER_LOKAL = [0, 5, 7, 8, 9, 10, 11];   // antal platser per lokal (floor-plans.js)
 export const lokalOf = (fit) => { for (let n = LOKAL_MAX; n >= 2; n--) if (fit.items['lokal' + n]) return n; return 1; };
 export const ARCADE_LOKAL = 5;
-export const slotOpen = (fit, i) => i < SLOTS_PER_LOKAL[lokalOf(fit)];
+export const slotOpen = (fit, i) => openIndices(lokalOf(fit)).includes(i);
 
 // ---------- Beräkningar på butikens läge ----------
 // fit = { slots: [{ kind:'cat'|'brand'|'unit', cat, brand, level, unit } | null …], items: { id: 1 } }

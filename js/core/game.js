@@ -1,7 +1,7 @@
 // Spelmotorn: pengar, lager, erfarenhet, kunder och beställningar.
 // Känner inte till datorer – allt specifikt kommer från shop-modulen.
 import { FIRST_NAMES, makeLook } from './people.js';
-import { SLOTS as FLOOR_SLOTS } from './floor-layout.js';
+import { SLOT_SIZES, MAX_SLOTS } from './floor-plans.js';
 import { tickStaff, hire as staffHire, fire as staffFire, train as staffTrain, release as staffRelease } from './staff.js';
 import { initRival, tickRival, stageFor } from './rival.js';
 
@@ -60,7 +60,7 @@ export class Game {
   }
   emptyFit() {
     const f = this.shop.fit ? this.shop.fit.emptyFit(this.shop.showcases || []) : { slots: [], items: {} };
-    while (f.slots.length < FLOOR_SLOTS.length) f.slots.push(null);
+    while (f.slots.length < MAX_SLOTS) f.slots.push(null);
     return f;
   }
 
@@ -150,7 +150,7 @@ export class Game {
       if (!x || typeof x !== 'object' || !['cat', 'brand', 'unit'].includes(x.kind)) return null;
       return { kind: x.kind, cat: x.cat, brand: x.brand, level: Math.max(0, Math.min(3, x.level | 0)), unit: x.unit, ...(x.product ? { product: String(x.product) } : {}) };
     });
-    const nSlots = FLOOR_SLOTS.length;
+    const nSlots = MAX_SLOTS;
     while (slots.length < nSlots) { const x = f.slots?.[slots.length]; slots.push(x && typeof x === 'object' && ['cat', 'brand', 'unit'].includes(x.kind) ? { kind: x.kind, cat: x.cat, brand: x.brand, level: Math.max(0, Math.min(3, x.level | 0)), unit: x.unit, ...(x.product ? { product: String(x.product) } : {}) } : null); }
     const arcade = Array.isArray(f.arcade) ? f.arcade.filter((id) => typeof id === 'string' && this.shop.part[id]?.cat === 'arkad').slice(0, 8) : [];
     return { slots, items: f.items && typeof f.items === 'object' ? { ...f.items } : {}, arcade };
@@ -218,7 +218,7 @@ export class Game {
     const F = this.shop.fit;
     if (!F || slotIndex < 0 || slotIndex >= this.fit.slots.length) return false;
     if (!F.slotOpen(this.fit, slotIndex)) { this.emit('toast', { text: 'Platsen hör till en större lokal – bygg ut butiken först.', kind: 'bad' }); return false; }
-    const size = FLOOR_SLOTS[slotIndex]?.size || 'medium';
+    const size = SLOT_SIZES[slotIndex] || 'medium';
     const o = F.optionsFor(this.fit, slotIndex, size, this.year).find((x) => x.id === optionId);
     if (!o || o.current) return false;
     if (o.pay > this.money) { this.emit('toast', { text: 'Inte tillräckligt med pengar!', kind: 'bad' }); return false; }

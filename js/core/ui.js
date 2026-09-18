@@ -2,7 +2,8 @@
 import { portrait } from './people.js';
 import { fmt } from './game.js';
 import * as PR from './floor-props.js';
-import { SLOTS, SLOT_DEPTH } from './floor-layout.js';
+import { SLOT_DEPTH } from './floor-layout.js';
+import { SLOT_SIZES } from './floor-plans.js';
 import { hex, mix, mul } from './floor-pix.js';
 import { cabinetSprite } from '../shops/dator/art-products.js';
 import { machineOf, evaluate, fmtMb } from '../games/specs.js';
@@ -530,7 +531,7 @@ export function openFittings(game, tab = null, slot = null) {
     let body = '';
     if (st.tab === 'platser' && st.pick !== null) {
       // väljaren för en plats
-      const i = st.pick, sl = SLOTS[i], cur = fit.slots[i];
+      const i = st.pick, sl = { size: SLOT_SIZES[i] }, cur = fit.slots[i];
       const opts = F.optionsFor(fit, i, sl.size, y);
       const groups = [['Hyllor', opts.filter((o) => o.kind === 'cat')], ['Märkesbås', opts.filter((o) => o.kind === 'brand')], ['Annat', opts.filter((o) => o.kind === 'unit')]];
       body = `<p style="font-size:18px;margin:0 0 8px"><b>Plats ${i + 1}</b> (${sl.size === 'small' ? 'liten – torn eller automat' : sl.size === 'wide' ? 'bred monter' : 'monter'}) · nu: <b>${esc(F.slotTitle(cur))}</b>${cur ? ` <button class="btn btn-small btn-red" data-sell="${i}">Riv (+${fmt(Math.round(F.slotValue(cur, y) * 0.4 / 50) * 50)} kr)</button>` : ''}</p>
@@ -540,8 +541,8 @@ export function openFittings(game, tab = null, slot = null) {
         </div>`).join('')}</div>`).join('')}</div>`;
     } else if (st.tab === 'platser') {
       body = `<p style="font-size:18px;margin:0 0 8px">Det du visar är det du får sälja. En <b>kategorihylla</b> tar instegsvaror, ett <b>märkesbås</b> höjer taket för det märket – nivå 1 → tier 3, nivå 2 → tier 4, nivå 3 → tier 5. Tryck på en plats för att köpa eller byta.</p>
-        <div class="slot-grid">${SLOTS.map((sl, i) => {
-          const cur = fit.slots[i], isOpen = i < open;
+        <div class="slot-grid">${SLOT_SIZES.map((size, i) => {
+          const sl = { size }, cur = fit.slots[i], isOpen = F.slotOpen(fit, i);
           const prev = !isOpen ? '<span class="slot-closed">🔒</span>' : cur ? `<span data-slot-prev="${i}"></span>` : '<span class="slot-empty">＋</span>';
           return `<button class="slot-card ${!isOpen ? 'closed' : cur ? '' : 'empty'}" data-slot="${i}" ${!isOpen ? 'disabled' : ''}>
             <div class="slot-prev">${prev}</div><b>Plats ${i + 1}</b><small>${!isOpen ? 'större lokal krävs' : esc(F.slotTitle(cur))}</small></button>`;
@@ -569,16 +570,16 @@ export function openFittings(game, tab = null, slot = null) {
     dlg.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { st.tab = b.dataset.tab; st.pick = null; render(); }));
     dlg.querySelectorAll('[data-slot]').forEach((b) => (b.onclick = () => { st.pick = +b.dataset.slot; render(); }));
     dlg.querySelectorAll('[data-slot-prev]').forEach((el) => {
-      const i = +el.dataset.slotPrev, cur = fit.slots[i], sl = SLOTS[i];
+      const i = +el.dataset.slotPrev, cur = fit.slots[i], sl = { size: SLOT_SIZES[i] };
       const o = cur.kind === 'unit' ? { id: 'unit:' + cur.unit, kind: 'unit', unit: cur.unit } : cur.kind === 'cat' ? { id: 'cat:' + cur.cat, kind: 'cat', cat: cur.cat, level: 0 } : { id: `brand:${cur.cat}:${cur.brand}:${cur.level}`, kind: 'brand', cat: cur.cat, brand: cur.brand, level: cur.level };
       el.replaceWith(fitPreview(F, o, sl.size));
     });
     dlg.querySelectorAll('[data-prev]').forEach((el) => {
-      const o = F.optionsFor(fit, st.pick, SLOTS[st.pick].size, y).find((x) => x.id === el.dataset.prev);
-      if (o) el.replaceWith(fitPreview(F, o, SLOTS[st.pick].size));
+      const o = F.optionsFor(fit, st.pick, SLOT_SIZES[st.pick], y).find((x) => x.id === el.dataset.prev);
+      if (o) el.replaceWith(fitPreview(F, o, SLOT_SIZES[st.pick]));
     });
     dlg.querySelectorAll('[data-opt]').forEach((b) => (b.onclick = () => {
-      const cur = fit.slots[st.pick], o = F.optionsFor(fit, st.pick, SLOTS[st.pick].size, y).find((x) => x.id === b.dataset.opt);
+      const cur = fit.slots[st.pick], o = F.optionsFor(fit, st.pick, SLOT_SIZES[st.pick], y).find((x) => x.id === b.dataset.opt);
       const go = () => { act('buySlot', { slot: st.pick, option: b.dataset.opt }); render(); };
       if (!cur || !o || o.upgrade) return go();
       // platsen är upptagen: fråga innan det gamla rivs (40 % tillbaka är redan avdraget från priset)

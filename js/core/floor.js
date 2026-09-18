@@ -67,7 +67,10 @@ export class Floor {
   build() {
     const shop = this.shop, th = shop.theme || {}, g = this.game, F = shop.fit;
     const fit = g.fit || { slots: [], items: {} }, items = fit.items || {};
-    const lokal = F ? F.lokalOf(fit) : 3, open = F ? F.SLOTS_PER_LOKAL[lokal] : LY.SLOTS.length;
+    const lokal = F ? F.lokalOf(fit) : 3;
+    // lokalens planlösning: platser, möbler, hinder och gångnät
+    LY.setPlan(lokal); WK.rebuild();
+    const open = LY.SLOTS.length;
     this.lokal = lokal; this.openSlots = open;
     this.fitSig = JSON.stringify(fit);
     this.street = SC.paintStreet({ items });
@@ -84,10 +87,10 @@ export class Floor {
     this.heroUnder = hero.under; this.heroOver = hero.over;
     this.heroIcon = this.heroPart ? this.icon(this.heroPart, 78, 52) : null;
     this.heroTitle = title;
-    this.ropeBack = PR.makeRope(LY.ROPE.back, [LY.ROPE.x0, LY.ROPE.x1]);
-    this.ropeFront = PR.makeRope(LY.ROPE.front, [LY.ROPE.x0, LY.HERO.cx, LY.ROPE.x1], true);
+    if (LY.HERO) { this.ropeBack = PR.makeRope(LY.ROPE.back, [LY.ROPE.x0, LY.ROPE.x1]); this.ropeFront = PR.makeRope(LY.ROPE.front, [LY.ROPE.x0, LY.HERO.cx, LY.ROPE.x1], true); }
+    else this.ropeBack = this.ropeFront = null;
     // rummet
-    const room = SC.paintRoom(th, { lokal, items, sign: shop.sign, openSlots: open });
+    const room = SC.paintRoom(th, { lokal, items, sign: shop.sign, openSlots: open, plan: LY.PLAN });
     const neon = hex(th.neon, 0x7ee8fa);
     this.room = room.flush();
     const rc = this.room.getContext('2d');
@@ -100,7 +103,8 @@ export class Floor {
     this.open = neonSign('ÖPPET', 0xff4d6d, 1, 3);
     this.counter = PR.makeCounter(th);
     this.back = PR.makeBackCabinet();
-    this.furniture = [this.back, PR.makeSofa(), PR.makeArmchair(), PR.makeTable(), ...LY.PLANTS.map(([x, y]) => PR.makePlant(x, y)), ...LY.GATES.map((x) => PR.makeGate(x))];
+    this.furniture = [this.back, ...(LY.SOFA ? [PR.makeSofa()] : []), ...(LY.ARMCHAIR ? [PR.makeArmchair()] : []), ...(LY.TABLE ? [PR.makeTable()] : []), ...(LY.BENCH ? [PR.makeBench(LY.BENCH)] : []),
+      ...LY.PLANTS.map(([x, y]) => PR.makePlant(x, y)), ...LY.GATES.map((x) => PR.makeGate(x)), ...(LY.PLAN.props || []).map((pr) => PR.makeProp(pr))];
     if (items.vaxter) this.furniture.push(...LY.EXTRA_PLANTS.map(([x, y]) => PR.makePlant(x, y)));
     if (items.tidningar) this.furniture.push(PR.makeMagRack());
     this.buildUnits();
@@ -113,9 +117,8 @@ export class Floor {
   // Enheterna på platserna: montrar (kategori eller märke), torn, automater – eller tomt/stängt
   buildUnits() {
     const shop = this.shop, g = this.game, F = shop.fit, fit = g.fit || { slots: [], items: {} };
-    this.units = LY.SLOTS.map((slot, i) => {
-      const def = fit.slots[i], W = slot.x1 - slot.x0, D = LY.SLOT_DEPTH[slot.size];
-      if (i >= this.openSlots) return { i, slot, closed: true, img: PR.makeClosedSlot(W, D), x: slot.x0, y: slot.base - D - 34 + 1, sort: slot.base };
+    const list = LY.SLOTS.map((slot) => {
+      const i = slot.i, def = fit.slots[i], W = slot.x1 - slot.x0, D = LY.SLOT_DEPTH[slot.size];
       if (!def) return { i, slot, empty: true, img: PR.makeEmptySlot(W, D, i + 1), x: slot.x0, y: slot.base - D, sort: slot.base - D - 1 };
       if (def.kind === 'unit') {
         if (def.unit === 'tv') { const frame = PR.makeTvCorner(W, g.year); return { i, slot, def, frame, unit: 'tv', img: null, x: slot.x0, y: slot.base - frame.H + 1, sort: slot.base }; }
@@ -127,10 +130,13 @@ export class Floor {
       const cat = shop.cats?.[def.cat], brand = def.kind === 'brand' && F ? F.brandInfo(def.cat, def.brand) : null;
       const velvet = mix(mul(hex(brand?.color || cat?.color, 0x7a2e3e), 0.5), 0x1a1030, 0.35);
       const catName = (F?.CAT_NAME?.[def.cat] || cat?.name || def.cat).toUpperCase();
-      const frame = slot.size === 'small' ? PR.makeTower(catName, velvet, brand, def.level) : PR.makeVitrine(W, catName, velvet, brand, def.level);
+      const look = { style: LY.PLAN.style, plate: cat?.color };
+      const frame = slot.size === 'small' ? PR.makeTower(catName, velvet, brand, def.level, look) : PR.makeVitrine(W, catName, velvet, brand, def.level, look);
       const x = slot.size === 'small' ? Math.round(slot.x0 + (W - frame.W) / 2) : slot.x0;
       return { i, slot, def, frame, brand, cat: def.cat, img: null, x, y: slot.base - frame.H + 1, sort: slot.base };
     });
+    // units[i] = enheten på kanoniskt platsindex i (glest), unitList = alla i ritordning
+    this.units = []; for (const u of list) this.units[u.i] = u; this.unitList = list;
     this.sig = null;
   }
 
@@ -405,7 +411,7 @@ export class Floor {
   // Monter, enhet, plats eller stjärnobjekt under pekaren → { slot, cat, brand, title } | { unit } | { empty } | { closed } | { hero }
   showcaseAt(e) {
     const [x, y] = this.toLocal(e);
-    for (const u of this.units || []) {
+    for (const u of this.unitList || []) {
       const sl = u.slot;
       if (u.unit && u.frame) {
         // TV-hörna, spelhylla, spelbord
@@ -424,7 +430,7 @@ export class Floor {
         if (x >= sl.x0 && x < sl.x1 && y >= u.y && y <= sl.base + 2) return { slot: u.i, closed: true };
       }
     }
-    if (this.heroPart && this.heroUnder) {
+    if (LY.HERO && this.heroPart && this.heroUnder) {
       const B = PR.HERO_BOX, hx = LY.HERO.cx - B.ax, hy = LY.HERO.base - B.ay;
       if (x >= hx && x < hx + this.heroUnder.width && y >= hy && y < hy + this.heroUnder.height) return { hero: this.heroPart.id };
     }
@@ -509,13 +515,15 @@ export class Floor {
       S.push([by, () => this.drawBox(ctx, d, bx, by - Math.round(drop * drop * 60))]);
     });
     S.push([LY.COUNTER.base, () => this.drawCounter(ctx)]);
-    for (const u of this.units || []) {
+    for (const u of this.unitList || []) {
       if (u.frame || u.unit === 'arkad') S.push([u.sort, () => { if (u.img) ctx.drawImage(u.img, u.x, u.y, u.img.width / this.RES, u.img.height / this.RES); this.drawUnitFx(ctx, u); }]);
       else S.push([u.sort, () => ctx.drawImage(u.img, u.x, u.y)]);
     }
-    S.push([LY.ROPE.back, () => ctx.drawImage(this.ropeBack.img, this.ropeBack.x, this.ropeBack.y)]);
-    S.push([LY.HERO.base, () => this.drawHero(ctx)]);
-    S.push([LY.ROPE.front, () => ctx.drawImage(this.ropeFront.img, this.ropeFront.x, this.ropeFront.y)]);
+    if (LY.HERO) {
+      S.push([LY.ROPE.back, () => ctx.drawImage(this.ropeBack.img, this.ropeBack.x, this.ropeBack.y)]);
+      S.push([LY.HERO.base, () => this.drawHero(ctx)]);
+      S.push([LY.ROPE.front, () => ctx.drawImage(this.ropeFront.img, this.ropeFront.x, this.ropeFront.y)]);
+    }
     for (const c of g.customers) {
       if (c.y < LY.WALL_Y) continue;
       const frame = c.moving ? WALK_SEQ[Math.floor(c.walk) % 4] : c._sit ? 5 : (Math.sin(t * 1.9 + c.id * 1.7) > 0.72 ? 4 : 0);
@@ -600,7 +608,7 @@ export class Floor {
     const sig = Object.keys(g.shown).map((id) => id + ':' + g.shownFree(id)).join(',');
     if (sig === this.sig) return;
     this.sig = sig;
-    for (const u of this.units) {
+    for (const u of this.unitList) {
       if (u.unit === 'tv') u.img = this.renderTv(u);
       else if (u.unit === 'spelhylla') u.img = this.renderGameShelf(u);
       else if (u.unit === 'spelbord') u.img = this.renderDesk(u);
@@ -1210,6 +1218,6 @@ function makeBeams() {
       }
     }
   };
-  beam(LY.HERO.cx, 96, LY.HERO.base - 8, 40, 118, 0.3);
+  if (LY.HERO) beam(LY.HERO.cx, 96, LY.HERO.base - 8, 40, 118, 0.3);
   return P.flush();
 }

@@ -1,6 +1,7 @@
-// Butiksgolvets planlösning (logiska pixlar, 512×480) och gångvägar.
-// Koordinater för personer = fötternas position. Golvet börjar vid y = WALL_Y.
-// Ingen DOM här – kan testas i Node (tools/floor2nav.mjs).
+// Butiksgolvets planlösning (logiska pixlar, 512×480) och gångvägar. Vilka platser och möbler
+// som finns beror på lokalen (floor-plans.js): setPlan(lokal) byter och räknar om hinder och
+// gångnät. Koordinater för personer = fötternas position. Golvet börjar vid y = WALL_Y. Ingen DOM.
+import { PLANS, SLOT_SIZES, MAX_SLOTS, planFor } from './floor-plans.js';
 
 export const FW = 512, FH = 480;
 export const WALL_Y = 86;            // väggens fot / golvets början
@@ -12,73 +13,69 @@ export const COUNTER = { x0: 286, x1: 506, top: 117, front: 129, base: 150, spli
 export const KEEPER_HOME = [338, 134], KEEPER_PICKUP = [453, 134];
 export const QUEUE = [[318, 176], [318, 210], [318, 244], [318, 278]];
 export const PICKUP = [[453, 176], [453, 210], [453, 244]];
-
-// Platser där montrar, bås och andra enheter kan stå: x0/x1, baslinje (golvkontakt fram)
-// och storlek (wide/medium = bordsmonter, small = torn eller automat).
-export const SLOTS = [
-  { x0: 14, x1: 170, base: 162, size: 'wide' },
-  { x0: 14, x1: 132, base: 258, size: 'medium' },
-  { x0: 14, x1: 132, base: 354, size: 'medium' },
-  { x0: 14, x1: 132, base: 450, size: 'medium' },
-  { x0: 148, x1: 280, base: 450, size: 'wide' },
-  { x0: 296, x1: 348, base: 450, size: 'small' },
-  { x0: 358, x1: 500, base: 450, size: 'wide' },
-  { x0: 466, x1: 506, base: 254, size: 'small' },
-];
 export const SLOT_DEPTH = { wide: 40, medium: 40, small: 24 };
-// de tre ursprungliga montrarna (bakåtkompatibelt namn)
-export const VITRINES = SLOTS.slice(0, 3);
 export const VIT_DEPTH = 40;
-export const HERO = { cx: 214, base: 318 };
-export const ROPE = { x0: 148, x1: 280, back: 256, front: 336 };
-export const SOFA = { x0: 356, x1: 452, base: 306 };
-export const ARMCHAIR = { x0: 462, x1: 496, base: 306 };
-export const TABLE = { x0: 388, x1: 444, base: 348 };
-export const PLANTS = [[268, 106], [496, 474]];
-export const EXTRA_PLANTS = [[140, 474], [290, 474]];   // med prylen "fler krukväxter"
 export const GATES = [179, 233];
 export const AFRAME = [148, SIDEWALK_Y + 4]; // trottoarskylt utanför
+export { SLOT_SIZES, MAX_SLOTS, PLANS };
+
+// det som byts med lokalen (live-bindningar – läs dem vid anrop, inte vid import)
+export let PLAN = planFor(3);
+export let SLOTS = [];           // platserna i den här lokalen, med kanoniskt index i
+export let VITRINES = [];
+export let HERO = null;          // { cx, base } eller null (ingen stjärnmonter i de små lokalerna)
+export let ROPE = null;          // { x0, x1, back, front } eller null
+export let SOFA = null, ARMCHAIR = null, TABLE = null, BENCH = null;
+export let PLANTS = [], EXTRA_PLANTS = [];
+export let SPOTS = [];
+export let OBSTACLES = [];
 
 // väntplatser: sit = sitter (sorteras framför soffan), via = kliv ut/in-punkt,
 // slot = platsen man tittar in i (hoppas över om den är tom)
-export const SPOTS = [
-  { x: 377, y: 305, dir: 'down', sit: true, via: [377, 322], kind: 'seat' },
-  { x: 404, y: 305, dir: 'down', sit: true, via: [404, 322], kind: 'seat' },
-  { x: 431, y: 305, dir: 'down', sit: true, via: [431, 322], kind: 'seat' },
-  { x: 479, y: 305, dir: 'down', sit: true, via: [479, 322], kind: 'seat' },
-  { x: 92, y: 175, dir: 'up', kind: 'case', slot: 0 },
-  { x: 48, y: 175, dir: 'up', kind: 'case', slot: 0 },
-  { x: 136, y: 175, dir: 'up', kind: 'case', slot: 0 },
-  { x: 73, y: 271, dir: 'up', kind: 'case', slot: 1 },
-  { x: 73, y: 367, dir: 'up', kind: 'case', slot: 2 },
-  { x: 73, y: 463, dir: 'up', kind: 'case', slot: 3 },
-  { x: 190, y: 463, dir: 'up', kind: 'case', slot: 4 },
-  { x: 240, y: 463, dir: 'up', kind: 'case', slot: 4 },
-  { x: 322, y: 463, dir: 'up', kind: 'case', slot: 5 },
-  { x: 400, y: 463, dir: 'up', kind: 'case', slot: 6 },
-  { x: 456, y: 463, dir: 'up', kind: 'case', slot: 6 },
-  { x: 486, y: 267, dir: 'up', kind: 'case', slot: 7 },
-  { x: 214, y: 352, dir: 'up', kind: 'hero' },
-  { x: 292, y: 312, dir: 'left', kind: 'hero' },
-  { x: 180, y: 352, dir: 'up', kind: 'hero' },
-];
-
-// hinder på golvet (fotnivå) [x0, y0, x1, y1]
-export const OBSTACLES = [
-  [COUNTER.x0 - 6, WALL_Y - 6, FW, COUNTER.base],
-  ...SLOTS.map((s) => [s.x0, s.base - SLOT_DEPTH[s.size], s.x1, s.base]),
-  [ROPE.x0, ROPE.back, ROPE.x1, ROPE.front],
-  [SOFA.x0, SOFA.base - 24, SOFA.x1, SOFA.base],
-  [ARMCHAIR.x0, ARMCHAIR.base - 22, ARMCHAIR.x1, ARMCHAIR.base],
-  [TABLE.x0, TABLE.base - 14, TABLE.x1, TABLE.base],
-  ...[...PLANTS, ...EXTRA_PLANTS].map(([x, y]) => [x - 8, y - 10, x + 8, y + 1]),
-  ...GATES.map((x) => [x - 3, WALL_Y, x + 3, 104]),
-];
+function makeSpots(plan) {
+  const out = [];
+  if (plan.sofa) for (const x of [377, 404, 431]) out.push({ x, y: plan.sofa.base - 1, dir: 'down', sit: true, via: [x, plan.sofa.base + 16], kind: 'seat' });
+  if (plan.armchair) out.push({ x: 479, y: plan.armchair.base - 1, dir: 'down', sit: true, via: [479, plan.armchair.base + 16], kind: 'seat' });
+  if (plan.bench) for (const x of [380, 428]) out.push({ x, y: plan.bench.base - 1, dir: 'down', sit: true, via: [x, plan.bench.base + 16], kind: 'seat' });
+  for (const s of plan.slots) {
+    const w = s.x1 - s.x0, y = s.base + 13, xs = s.size === 'wide' ? [0.5, 0.22, 0.78] : [0.5];
+    for (const f of xs) out.push({ x: Math.round(s.x0 + w * f), y, dir: 'up', kind: 'case', slot: s.i });
+  }
+  if (plan.hero) out.push({ x: plan.hero.cx, y: plan.hero.base + 34, dir: 'up', kind: 'hero' }, { x: plan.hero.cx + 78, y: plan.hero.base - 6, dir: 'left', kind: 'hero' }, { x: plan.hero.cx - 34, y: plan.hero.base + 34, dir: 'up', kind: 'hero' });
+  return out;
+}
+export function setPlan(lokal) {
+  const plan = planFor(lokal);
+  PLAN = plan;
+  SLOTS = plan.slots; VITRINES = SLOTS.slice(0, 3);
+  HERO = plan.hero || null;
+  ROPE = HERO ? { x0: HERO.cx - 66, x1: HERO.cx + 66, back: HERO.base - 62, front: HERO.base + 18 } : null;
+  SOFA = plan.sofa || null; ARMCHAIR = plan.armchair || null; TABLE = plan.table || null; BENCH = plan.bench || null;
+  PLANTS = plan.plants || []; EXTRA_PLANTS = plan.extraPlants || [];
+  SPOTS = makeSpots(plan);
+  // hinder på golvet (fotnivå) [x0, y0, x1, y1]
+  OBSTACLES = [
+    [COUNTER.x0 - 6, WALL_Y - 6, FW, COUNTER.base],
+    ...SLOTS.map((s) => [s.x0, s.base - SLOT_DEPTH[s.size], s.x1, s.base]),
+    ...(ROPE ? [[ROPE.x0, ROPE.back, ROPE.x1, ROPE.front]] : []),
+    ...(SOFA ? [[SOFA.x0, SOFA.base - 24, SOFA.x1, SOFA.base]] : []),
+    ...(ARMCHAIR ? [[ARMCHAIR.x0, ARMCHAIR.base - 22, ARMCHAIR.x1, ARMCHAIR.base]] : []),
+    ...(TABLE ? [[TABLE.x0, TABLE.base - 14, TABLE.x1, TABLE.base]] : []),
+    ...(BENCH ? [[BENCH.x0, BENCH.base - 16, BENCH.x1, BENCH.base]] : []),
+    ...[...PLANTS, ...EXTRA_PLANTS].map(([x, y]) => [x - 8, y - 10, x + 8, y + 1]),
+    ...(plan.props || []).map((p) => [p.x0, p.y0, p.x1, p.y1]),
+    ...(plan.blocked || []),
+    ...GATES.map((x) => [x - 3, WALL_Y, x + 3, 104]),
+  ];
+  INF = OBSTACLES.map((r) => inflate(r, MARGIN));
+  NODES = [...cornerNodes(INF, INF), [DOOR.cx, DOOR.inY]];
+  NAV_NODES = NODES;
+}
 const MARGIN = 6;
 const BOUNDS = [10, WALL_Y + 8, FW - 10, FH - 6];
 
 const inflate = (r, m) => [r[0] - m, r[1] - m, r[2] + m, r[3] + m];
-const INF = OBSTACLES.map((r) => inflate(r, MARGIN));
+let INF = [];
 const inside = (r, x, y) => x > r[0] && x < r[2] && y > r[1] && y < r[3];
 
 // Liang–Barsky: skär sträckan rektangelns inre?
@@ -113,8 +110,8 @@ function cornerNodes(rects, all) {
   }
   return out;
 }
-const NODES = [...cornerNodes(INF, INF), [DOOR.cx, DOOR.inY]];
-export const NAV_NODES = NODES;
+let NODES = [];
+export let NAV_NODES = NODES;
 
 // Kortaste väg inne i butiken från (sx, sy) till (tx, ty) → lista av punkter (utan start).
 // extra = tillfälliga hinder [x0, y0, x1, y1] (t.ex. kön), redan med marginal.
@@ -155,3 +152,5 @@ export function queueLane(n) {
   const [qx, qy] = QUEUE[0], last = QUEUE[Math.min(n, QUEUE.length) - 1][1];
   return [[qx - 12 - MARGIN, qy - 14 - MARGIN, qx + 12 + MARGIN, last + 4 + MARGIN]];
 }
+
+setPlan(3);

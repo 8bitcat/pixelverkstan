@@ -55,10 +55,15 @@ De tre första kunderna är guidade.
 
 ## Butiken: bås, konsoler och spelande
 
-- **Lokalen** börjar som *Källarhålan*: plywood för fönstret, spindelväv, sprickor och tre
-  platser. Sex lokaler att jobba sig upp genom – Gatuplan (4 platser), Kvartersbutiken (5),
-  Hörnbutiken (6), Datorhuset (8 + arkadrum) och Megastore (röd matta, mässing, extra
-  spotlights). 🏪 Butiken visar platserna med pixelförhandsvisning av allt som går att köpa;
+- **Lokalen** har en egen planlösning per steg (`js/core/floor-plans.js`): *Källarhålan* är
+  bara högra halvan av rummet – vänstra delen är förråd bakom en plywoodvägg med kartonger,
+  lastpall och rör – med grova trähyllor med glödlampa och 5 platser (3 hyllor från start,
+  2 lediga). *Gatuplan* öppnar hela rummet med plåthyllor, en träbänk och en papperskorg
+  (7 platser). *Kvartersbutiken* får glasmontrar, stjärnobjektet och soffgruppen (8),
+  *Hörnbutiken* ett torn till (9), *Datorhuset* svarta LED-montrar, arkadrum och en REA-skylt
+  (10), *Megastore* en ö-monter mitt i rummet, röd matta och mässing (11). Platserna har
+  fasta nummer, så inredningen följer med när man byter lokal. Kategoriskyltarna på hyllorna
+  är stora och färgade efter kategori. 🏪 Butiken visar platserna med pixelförhandsvisning;
   står det redan något på platsen frågar spelet innan det rivs (40 % tillbaka, avdraget
   från priset – eller välj en annan plats).
 - **Byt delar ur lagret.** Vid disken kan du byta en del i kundens beställning mot en annan
@@ -260,6 +265,7 @@ node tools/avtal.mjs                     # grossister och märkesprogram: rabatt
 node tools/tjanster.mjs                  # tjänster (låst utan pryl, utför från kortet, teknikern) och tillval på bygget
 node tools/spelvarianter.mjs             # Node: alla 179 titlar kör 600 steg i sin motor, varianter skiljer sig, eran följer konsolen
 node tools/spel2.mjs                     # nio titlar spelas i webbläsaren – olika motorer och era-look, skärmdumpar titel-*.png
+node tools/lokaler.mjs                   # sex lokaler: egen planlösning, fler platser, alla väntplatser nåbara, inredningen följer med
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner
 ```
 
