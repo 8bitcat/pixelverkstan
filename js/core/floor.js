@@ -6,6 +6,7 @@
 //   rect.left + offX + x*scale, rect.top + offY + y*scale. Bröstet ligger ca 12–20 px
 //   ovanför fötterna (y-12 träffar kunden).
 import { drawPerson, SHOPKEEPER, makeLook } from './people.js';
+import { stageFor as rivalStage } from './rival.js';
 import { Pix, hex, mix, mul, hsl, bayer, SMALL, BIG, textW, ctxText, eachTextPixel, css } from './floor-pix.js';
 import * as LY from './floor-layout.js';
 import * as SC from './floor-scene.js';
@@ -70,6 +71,9 @@ export class Floor {
     this.lokal = lokal; this.openSlots = open;
     this.fitSig = JSON.stringify(fit);
     this.street = SC.paintStreet({ items });
+    // konkurrentens skylt på huset mittemot
+    { const rv = rivalStage(this.game.year), sctx = this.street.getContext('2d'), label = rv.name.toUpperCase(), w = textW(SMALL, label) + 6, x = 146 - Math.round(w / 2), y = 41;
+      sctx.fillStyle = '#17151a'; sctx.fillRect(x - 1, y - 1, w + 2, 10); sctx.fillStyle = rv.color; sctx.fillRect(x, y, w, 8); ctxText(sctx, SMALL, label, x + 3, y + 2, '#17151a'); }
     this.clouds = SC.paintClouds();
     // stjärnobjektet
     const byCost = (a, b) => (b.cost || 0) - (a.cost || 0);
@@ -1123,6 +1127,13 @@ export class Floor {
       ctx.fillStyle = '#ffffff'; ctx.fillRect(bx + 1, by + 1, 13, 10); ctx.fillRect(bx + 7, by + 11, 1, 2);
       ctx.fillStyle = '#3a3d48'; ctx.fillRect(bx + 3, by + 3, 9, 5); ctx.fillRect(bx + 6, by + 8, 3, 1);
       ctx.fillStyle = Math.floor(t * 2) % 2 ? '#7ee8fa' : '#45b964'; ctx.fillRect(bx + 4, by + 4, 7, 3);
+    }
+    // "Datahörnan då!" – arga kunder som går över gatan
+    if (c.say && c.bubbleT > 0 && c.phase === 'leaving') {
+      const label = c.say.toUpperCase().slice(0, 12) + '!', w = textW(SMALL, label) + 6, bx = x - Math.round(w / 2), by = head - 20;
+      ctx.fillStyle = INK; ctx.fillRect(bx - 1, by - 1, w + 2, 10); ctx.fillRect(x - 1, by + 9, 3, 2);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(bx, by, w, 8); ctx.fillRect(x, by + 8, 1, 2);
+      ctxText(ctx, SMALL, label, bx + 3, by + 2, INK);
     }
     if (c.mood && c.bubbleT > 0) {
       const y = head - 10 - Math.round((3 - c.bubbleT) * 5);

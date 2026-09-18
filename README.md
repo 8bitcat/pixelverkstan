@@ -118,6 +118,19 @@ De tre första kunderna är guidade.
   grafikkort ur lagret. Kurser (MS-DOS, lödkurs, Novell CNE, CompTIA A+, MCSE, CCNA …)
   ger +1 stat; jobb ger XP och nivåer. Obetalda löner sänker humöret – till uppsägning.
 
+## Konkurrenten, bokslutet och galan
+
+- **🏬 Konkurrenten** på andra sidan gatan (skylten syns i fönstret) byter skepnad med eran:
+  Datahörnan (lokal butik) → ElektroCity (varuhuskedja, 1992) → Kompletta.se (nätbutik,
+  2001) → Amazonas (jättesajt, 2013). Styrkan drar kunder från dig och sjunker med ditt
+  rykte, din dragningskraft och din personal. Vartannat år gör den ett drag – priskrig,
+  reklam, värvning av din personal – som du svarar på i händelsedialogen. Arga kunder säger
+  vart de går i stället.
+- **📒 Bokslut** i nyårsdialogen: intäkter, utgifter, resultat, kunder, löner, rykte och
+  konkurrentens styrka för året som gick. **🏆 Galan** vid varje decennieskifte (och 2026)
+  delar ut medaljer i ekonomi, service, rykte, modeller och butik – guld ger rykte.
+  Allt syns under 📰 Händelser.
+
 ## Avatar och co-op
 
 - **👤 Min avatar** i menyn: bygg din figur (frisyr, kläder, glasögon, huvudbonad …),
@@ -214,6 +227,7 @@ node tools/konsolspel.mjs                # Node: varje konsol har spel varje år
 node tools/modeller.mjs                  # egna modeller: guiden, recensionen, postorder, uppföljare, händelse med val, avtal
 node tools/handelser.mjs                 # Node: alla händelser giltiga, auto-förslag byggbara varje år, betyg 1–10
 node tools/personal.mjs                  # personal: anställ, säljaren tar emot, teknikern bygger, ta över, kurs, lön, sparka
+node tools/rival.mjs                     # konkurrenten: skylt, styrka, drag med val, arg kund, bokslut + gala 2000
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner
 ```
 

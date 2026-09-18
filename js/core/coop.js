@@ -20,7 +20,7 @@ export const PLAYER_COLORS = ['#7ee8fa', '#f5c542', '#ff7ab6', '#8be36b', '#b58c
 
 export function econSnap(g) {
   return {
-    money: g.money, xp: g.xp, stock: g.stock, shown: g.shown, stats: g.stats, tutorialStep: g.tutorialStep, startYear: g.startYear, fit: g.fit, demand: g.demand, deskPc: g.deskPc, models: g.models, events: g.events, bulk: g.bulk, staff: g.staff, staffing: g.staffing,
+    money: g.money, xp: g.xp, stock: g.stock, shown: g.shown, stats: g.stats, tutorialStep: g.tutorialStep, startYear: g.startYear, fit: g.fit, demand: g.demand, deskPc: g.deskPc, models: g.models, events: g.events, bulk: g.bulk, staff: g.staff, staffing: g.staffing, rival: g.rival, years: g.years, awards: g.awards,
     deliveries: g.deliveries.map((d) => ({ id: d.id, items: d.items, state: d.state, left: Math.max(0, (d.eta ?? 0) - g.time) })),
     start: g.startInfo ? { template: g.startInfo.template, builds: (g.startInfo.builds || []).map((b) => (b || []).map((p) => p.id)) } : null,
   };
@@ -34,6 +34,9 @@ export function applyEcon(g, e) {
   if (e.bulk) g.bulk = e.bulk;
   if (e.staff) g.staff = e.staff;
   if (e.staffing) g.staffing = e.staffing;
+  if (e.rival) g.rival = e.rival;
+  if (e.years) g.years = e.years;
+  if (e.awards) g.awards = e.awards;
   if (e.deskPc !== undefined) { const before = JSON.stringify(g.deskPc); g.deskPc = e.deskPc; if (JSON.stringify(e.deskPc) !== before) g.emit('fit'); }
   g.deliveries = e.deliveries.map((d) => ({ ...d, eta: g.time + d.left }));
   if (e.start) g.startInfo = { template: e.start.template, builds: e.start.builds.map((ids) => ids.map((id) => g.shop.part[id]).filter(Boolean)) };

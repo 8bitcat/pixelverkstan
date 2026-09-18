@@ -3,6 +3,7 @@
 import { FIRST_NAMES, makeLook } from './people.js';
 import { SLOTS as FLOOR_SLOTS } from './floor-layout.js';
 import { tickStaff, hire as staffHire, fire as staffFire, train as staffTrain, release as staffRelease } from './staff.js';
+import { initRival, tickRival, stageFor } from './rival.js';
 
 const QUEUE_PATIENCE = 75;   // sekunder i kön
 const MAX_QUEUE = 3;
@@ -46,6 +47,10 @@ export class Game {
     this.bulk = [];         // avtal: leverera n st av en modell
     this.staff = [];        // anställda (core/staff.js)
     this.staffing = { cands: [], candYear: null, payT: 0 };
+    this.rival = null;      // konkurrenten (core/rival.js)
+    this.years = [];        // bokslut per år som gått
+    this.awards = [];       // galor: decenniets butik
+    this.ledger = null;     // snapshot vid årets början
     // mirror = klient i co-op: läget kommer från värden, ingen egen simulering eller sparning
     this.mirror = !!opts.mirror;
     if (this.mirror) { this.startYear = opts.startYear ?? 2021; this.xp = 0; this.money = 0; this.stock = {}; this.stats = { served: 0, declined: 0, lost: 0, earned: 0, stars: 0 }; this.tutorialStep = 99; }
@@ -72,8 +77,9 @@ export class Game {
     this.customers = []; this.orders = [];
     this.fit = this.emptyFit(); this.demand = {}; this.deskPc = null;
     this.models = []; this.bulk = []; this.staff = []; this.staffing = { cands: [], candYear: null, payT: 0 };
+    initRival(this); this.years = []; this.awards = []; this.ledger = this.newLedger(startYear);
     // händelser före startåret har redan hänt
-    this.events = { seen: (this.shop.events?.EVENTS || []).filter((e) => e.year < startYear).map((e) => e.id), active: [], pending: null };
+    this.events = { seen: (this.shop.events?.EVENTS || []).filter((e) => e.year < startYear).map((e) => e.id), active: [], pending: null, dyn: {} };
     this.save();
   }
   save() {
@@ -89,7 +95,7 @@ export class Game {
     const start = this.startInfo ? { template: this.startInfo.template, builds: (this.startInfo.builds || []).map((b) => (b || []).map((p) => p.id)) } : null;
     // lådor som är på väg sparas som framme
     const deliveries = this.deliveries.map((d) => ({ id: d.id, items: d.items, state: 'arrived' }));
-    const data = { v: 7, money, xp, stock, shown: this.shown, deliveries, stats: this.stats, tutorialStep, startYear: this.startYear, start, nextId: this.nextId, fit: this.fit, demand: this.demand, deskPc: this.deskPc, models: this.models, events: this.events, bulk: this.bulk, staff: this.staff, staffing: this.staffing };
+    const data = { v: 7, money, xp, stock, shown: this.shown, deliveries, stats: this.stats, tutorialStep, startYear: this.startYear, start, nextId: this.nextId, fit: this.fit, demand: this.demand, deskPc: this.deskPc, models: this.models, events: this.events, bulk: this.bulk, staff: this.staff, staffing: this.staffing, rival: this.rival, years: this.years, awards: this.awards, ledger: this.ledger };
     try { localStorage.setItem(this.saveKey, JSON.stringify(data)); } catch { /* privat läge */ }
   }
   load() {
@@ -109,10 +115,15 @@ export class Game {
       // beställningar sparas inte, så ingen har ett jobb när man laddar
       this.staff = Array.isArray(d.staff) ? d.staff.filter((x) => x && x.stats && x.role).map((x) => ({ ...x, job: null, progress: 0, pct: 0 })) : [];
       this.staffing = d.staffing && typeof d.staffing === 'object' ? { cands: d.staffing.cands || [], candYear: d.staffing.candYear ?? null, payT: d.staffing.payT || 0 } : { cands: [], candYear: null, payT: 0 };
+      if (d.rival && typeof d.rival.strength === 'number') this.rival = { ...d.rival, t: 0 }; else initRival(this);
+      this.years = Array.isArray(d.years) ? d.years : [];
+      this.awards = Array.isArray(d.awards) ? d.awards : [];
+      this.ledger = d.ledger && typeof d.ledger === 'object' ? d.ledger : this.newLedger(year);
+      if (this.events && !this.events.dyn) this.events.dyn = d.events?.dyn || {};
       const year = Math.min(this.lastYear, this.startYear + Math.floor((this.xp || 0) / XP_PER_YEAR));
       // äldre sparningar: det som redan hänt räknas som sett, så att inte alla händelser kommer på en gång
-      this.events = d.events && typeof d.events === 'object' ? { seen: d.events.seen || [], active: d.events.active || [], pending: d.events.pending || null }
-        : { seen: (this.shop.events?.EVENTS || []).filter((e) => e.year < year).map((e) => e.id), active: [], pending: null };
+      this.events = d.events && typeof d.events === 'object' ? { seen: d.events.seen || [], active: d.events.active || [], pending: d.events.pending || null, dyn: d.events.dyn || {} }
+        : { seen: (this.shop.events?.EVENTS || []).filter((e) => e.year < year).map((e) => e.id), active: [], pending: null, dyn: {} };
       // äldre sparningar hade inget förråd: allt står framme
       this.shown = d.shown ? Object.fromEntries(Object.entries(d.shown).filter(([id]) => this.shop.part[id])) : { ...stock };
       this.deliveries = (d.deliveries || []).map((x) => ({ ...x, items: Object.fromEntries(Object.entries(x.items || {}).filter(([id]) => this.shop.part[id])), state: 'arrived' })).filter((x) => Object.keys(x.items).length);
@@ -295,7 +306,7 @@ export class Game {
     for (const id of m.parts) { this.stock[id]--; this.clampShown(id); }
     const price = Math.round(m.price * mul / 10) * 10;
     this.money += price; this.stats.earned += price; this.xp += 2;
-    m.sold++; m.earned += price;
+    m.sold++; m.earned += price; this.stats.modelSold = (this.stats.modelSold || 0) + 1;
     return price;
   }
   modelTick() {
@@ -329,6 +340,43 @@ export class Game {
     for (const t of notes.slice(0, 3)) this.emit('toast', { text: t, kind: /^[⚠🕰]/u.test(t) ? 'bad' : 'good' });
     if (notes.length) { this.save(); this.emit('change'); }
   }
+  // ---------- Bokslut och gala ----------
+  newLedger(year) { return { year, money: this.money, earned: this.stats?.earned || 0, served: this.stats?.served || 0, lost: this.stats?.lost || 0, stars: this.stats?.stars || 0, sold: this.stats?.modelSold || 0, wages: this.stats?.wages || 0 }; }
+  // året som gick: intäkter, utgifter (= intäkter − kassaförändring), resultat, kunder
+  closeYear(year) {
+    const L = this.ledger || this.newLedger(year);
+    const revenue = (this.stats.earned || 0) - L.earned, cash = this.money - L.money;
+    const e = { year, revenue, expenses: Math.max(0, revenue - cash), profit: cash, served: this.stats.served - L.served, lost: this.stats.lost - L.lost, sold: (this.stats.modelSold || 0) - (L.sold || 0), wages: (this.stats.wages || 0) - (L.wages || 0), rykte: this.rykte, rival: this.rival ? { name: stageFor(year).name, strength: +this.rival.strength.toFixed(2) } : null };
+    (this.years ||= []).push(e);
+    if (this.years.length > 60) this.years.shift();
+    this.ledger = this.newLedger(this.year);
+    return e;
+  }
+  // gala vid decennieskifte och sista året: medaljer i fem grenar
+  gala(year) {
+    if (!(year % 10 === 0 || year >= this.lastYear)) return null;
+    const had = (this.awards || []).find((a) => a.year === year);
+    if (had) return had;
+    const span = (this.years || []).filter((e) => e.year >= year - 10 && e.year < year);
+    const profit = span.reduce((s, e) => s + e.profit, 0), served = span.reduce((s, e) => s + e.served, 0), lost = span.reduce((s, e) => s + e.lost, 0);
+    const lostShare = served + lost ? lost / (served + lost) : 0;
+    const medal = (v, g, sv, b) => (v >= g ? '🥇' : v >= sv ? '🥈' : v >= b ? '🥉' : '—');
+    const lokal = this.lokal;
+    const m = [
+      { name: 'Ekonomi', icon: '💰', medal: medal(profit, 200000, 60000, 1), text: `${profit >= 0 ? '+' : ''}${fmt(profit)} kr på tio år` },
+      { name: 'Service', icon: '😊', medal: served + lost ? medal(1 - lostShare, 0.9, 0.75, 0.5) : '—', text: `${served} betjänade, ${Math.round(lostShare * 100)} % tröttnade` },
+      { name: 'Rykte', icon: '⭐', medal: medal(this.rykte, 12, 6, 2), text: `⭐ ${this.rykte}` },
+      { name: 'Modeller', icon: '🧩', medal: medal((this.stats.hof || 0) * 2 + ((this.models || []).length ? 1 : 0), 4, 2, 1), text: `${(this.models || []).length} modeller, ${this.stats.hof || 0} i Hall of Fame` },
+      { name: 'Butiken', icon: '🏬', medal: medal(lokal, 5, 3, 1), text: this.shop.fit?.LOKAL_NAME?.[lokal] || `lokal ${lokal}` },
+    ];
+    const gold = m.filter((x) => x.medal === '🥇').length;
+    const title = gold >= 4 ? 'Decenniets datorbutik' : gold >= 2 ? 'Kvarterets stolthet' : m.some((x) => x.medal === '🥇' || x.medal === '🥈') ? 'En butik att räkna med' : 'Överlevaren';
+    const a = { year, title, medals: m, gold };
+    (this.awards ||= []).push(a);
+    this.stats.stars = (this.stats.stars || 0) + gold * 3;
+    this.save();
+    return a;
+  }
   // ---------- Personal (core/staff.js) ----------
   hire(id) { const ok = staffHire(this, id); if (ok) { this.save(); this.emit('change'); } return ok; }
   fire(id) { const ok = staffFire(this, id); if (ok) { this.save(); this.emit('change'); } return ok; }
@@ -342,7 +390,8 @@ export class Game {
     return true;
   }
   // ---------- Händelser (shops/dator/events.js) ----------
-  get activeEvents() { const E = this.shop.events; return E ? (this.events?.active || []).map((a) => ({ ...a, ev: E.EVENT[a.id] })).filter((a) => a.ev) : []; }
+  eventOf(id) { return this.shop.events?.EVENT[id] || this.events?.dyn?.[id] || null; }
+  get activeEvents() { return this.shop.events ? (this.events?.active || []).map((a) => ({ ...a, ev: this.eventOf(a.id) })).filter((a) => a.ev) : []; }
   // faktor för en nyckel ('spawn', 'price' + kategori, 'sales' + användning …) över alla pågående händelser
   eventMul(key, sub = null) {
     let f = 1;
@@ -366,7 +415,7 @@ export class Game {
     if (this.events.active.length !== before) { this.save(); this.emit('change'); }
     if (this.events.pending) {
       // efter omladdning: visa den väntande händelsen igen
-      if (this._shownEvent !== this.events.pending) { this._shownEvent = this.events.pending; const ev = E.EVENT[this.events.pending]; if (ev) this.emit('event', ev); }
+      if (this._shownEvent !== this.events.pending) { this._shownEvent = this.events.pending; const ev = this.eventOf(this.events.pending); if (ev) this.emit('event', ev); else this.events.pending = null; }
       return;
     }
     // första rubriken kommer efter första betalande kunden på egen hand – inte mitt i guiden
@@ -377,8 +426,8 @@ export class Game {
     this.save(); this.emit('event', ev);
   }
   chooseEvent(id, choiceId) {
-    const E = this.shop.events, ev = E?.EVENT[id];
-    if (!ev || this.events.pending !== id) return false;
+    const E = this.shop.events, ev = this.eventOf(id);
+    if (!E || !ev || this.events.pending !== id) return false;
     const ch = ev.choices.find((c) => c.id === choiceId) || ev.choices[ev.choices.length - 1];
     const need = E.needText(ch.need, this);
     if (need) { this.emit('toast', { text: `Går inte: ${need}.`, kind: 'bad' }); return false; }
@@ -397,6 +446,8 @@ export class Game {
       if (p) { this.money -= p.cost * n; this.stock[p.id] = (this.stock[p.id] || 0) + n; this.shown[p.id] = (this.shown[p.id] || 0) + n; }
     }
     if (eff.bulk) this.bulk.push({ ...eff.bulk, left: eff.bulk.n, until: this.year + (ev.dur || 1) });
+    if (eff.staffRaise) { const s = this.staff.find((x) => x.id === eff.staffRaise); if (s) { s.lon = Math.round(s.lon * 1.15 / 50) * 50; s.mood = 100; } }
+    if (eff.staffQuit) { const s = this.staff.find((x) => x.id === eff.staffQuit); if (s) { staffRelease(this, s); this.staff = this.staff.filter((x) => x !== s); } }
     const lasting = {};
     for (const k of [...E.MUL_KEYS, ...E.MAP_KEYS, 'repair', 'bonus']) if (eff[k] !== undefined) lasting[k] = eff[k];
     this.events.seen.push(id); this.events.pending = null;
@@ -619,7 +670,7 @@ export class Game {
   queue() { return this.customers.filter((c) => c.phase === 'arriving' || c.phase === 'queue'); }
   // trivsel ger tålamod, dragningskraft ger fler kunder, extra kassa längre kö
   get patienceMul() { return (1 + 0.05 * this.fitStats.trivsel) * this.eventMul('patience'); }
-  get spawnMul() { return 1 / ((1 + 0.12 * this.fitStats.drag) * this.eventMul('spawn')); }
+  get spawnMul() { return (1 + 0.4 * (this.rival?.strength || 0)) / ((1 + 0.12 * this.fitStats.drag) * this.eventMul('spawn')); }
   get maxQueue() { return MAX_QUEUE + this.fitStats.queue; }
 
   update(dt, { shopVisible }) {
@@ -670,8 +721,9 @@ export class Game {
     }
     this.eventT = (this.eventT || 0) + dt;
     if (this.eventT >= 1) { this.eventT = 0; this.eventCheck(); }
-    // personalen jobbar
+    // personalen jobbar, konkurrenten rör sig
     if (this.staff?.length) tickStaff(this, dt);
+    if (this.rival) tickRival(this, dt);
     // leveranser
     for (const d of this.deliveries) {
       if (d.state === 'coming' && this.time >= d.eta) {
@@ -720,6 +772,8 @@ export class Game {
       this.stats.lost++;
       this.emit('toast', { text: `${c.name} tröttnade på att köa.`, kind: 'bad' });
     }
+    // arga kunder säger ibland vart de går i stället
+    if (mood === 'angry' && this.rival && Math.random() < 0.3 + this.rival.strength * 0.5) c.say = stageFor(this.year).name;
     c.phase = 'leaving'; c.mood = mood; c.bubbleT = 2.5;
     this.save(); this.emit('change');
   }
@@ -777,7 +831,7 @@ export class Game {
     const tipMul = 1 + this.rykte / 40 + (this.fit.items.kaffe ? 0.05 : 0);
     const tip = result.stars >= 3 ? Math.round(this.shop.feeFor(o) * 0.5 * tipMul / 10) * 10 : result.stars === 2 ? Math.round(this.shop.feeFor(o) * 0.2 * tipMul / 10) * 10 : 0;
     const bonus = (result.help === false ? Math.round(price * 0.15 / 10) * 10 : 0) + (this.eventVal('bonus') || 0);
-    if (o.model) { const m = this.modelOf(o.model); if (m) { m.sold++; m.earned += price; m.hype = Math.min(2, m.hype + 0.03); } }
+    if (o.model) { const m = this.modelOf(o.model); if (m) { m.sold++; m.earned += price; m.hype = Math.min(2, m.hype + 0.03); this.stats.modelSold = (this.stats.modelSold || 0) + 1; } }
     o.payout = { price, tip, bonus, total: price + tip + bonus, xp: this.shop.xpFor(o) + result.stars * 2 + (bonus ? 5 : 0), stars: result.stars };
     this.orders = this.orders.filter((x) => x !== o);
     if (c) { c.phase = 'ready'; c.payout = o.payout; c.patience = Infinity; }
@@ -799,6 +853,7 @@ export class Game {
         const swaps = this.refreshOrder(cu.order);
         if (swaps?.length) this.emit('toast', { text: `${cu.name} bytte till ${swaps[0][1]} (${swaps[0][0]} säljs inte längre).`, kind: '' });
       }
+      this.closeYear(before);
       this.emit('levelup', { ...this.levelInfo(), from: before });
     }
     this.save(); this.emit('change');

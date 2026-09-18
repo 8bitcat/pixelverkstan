@@ -521,3 +521,12 @@ body[data-screen="build"] #chatlog { bottom: 150px; left: 280px; }
 .scard .sp { font-size: 16px; color: var(--muted); margin-top: 2px; }
 .stat { font-family: var(--font); letter-spacing: 1px; margin-right: 6px; white-space: nowrap; }
 .sbar { display: inline-block; width: 70px; height: 9px; border: 2px solid var(--ink); background: #fff; vertical-align: middle; } .sbar i { display: block; height: 100%; background: var(--green); } .sbar.low i { background: var(--red2); }
+
+/* bokslut och gala */
+.bokslut { background: #fff; border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); padding: 8px 10px; margin: 8px 0; }
+.bokslut > b { font: 22px var(--head); }
+.bgrid { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 18px; margin-top: 4px; } .bgrid span { color: var(--muted); } .bgrid b { text-align: right; }
+.gala { background: #fbe8a6; border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); padding: 8px 10px; margin: 8px 0; text-align: center; }
+.gala > b { font: 24px var(--head); }
+.medals { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; margin: 6px 0 2px; }
+.medals div { background: #fff; border: 2px solid var(--ink); padding: 4px; } .medals .md { display: block; font-size: 30px; line-height: 1; } .medals b { display: block; font: 18px var(--head); } .medals small { display: block; font-size: 14px; color: var(--muted); line-height: 1.1; }

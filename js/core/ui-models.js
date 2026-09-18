@@ -2,6 +2,7 @@
 // events.js; allt som ändrar spelet går via act() så att det fungerar i co-op.
 import { openModal, closeModal, modalOpen, doAct as act, toast } from './ui.js';
 import { fmt } from './game.js';
+import { stageFor, bars } from './rival.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const W = { wiz: null };
@@ -158,7 +159,10 @@ export function openNews(game) {
   const active = game.activeEvents || [];
   const seen = (game.events?.seen || []).map((id) => E.EVENT[id]).filter((e) => e && e.year >= game.startYear).reverse().slice(0, 12);
   const row = (icon, nm, sp) => `<div class="prow" style="grid-template-columns:44px 1fr"><span style="font-size:28px;text-align:center">${icon}</span><div><div class="nm">${nm}</div>${sp ? `<div class="sp">${sp}</div>` : ''}</div></div>`;
-  const body = `<h3 style="margin-top:0">Pågår</h3>${active.length ? `<div class="plist">${active.map((a) => row(a.ev.icon, esc(a.ev.title), `${esc(a.ev.choices.find((c) => c.id === a.choice)?.label || '')} · till och med ${a.until}`)).join('')}</div>` : '<p class="sp" style="font-size:17px">Inget särskilt just nu.</p>'}
+  const st = stageFor(game.year), rv = game.rival;
+  const rival = rv ? `<div class="news"><b>🏬 Konkurrent: ${esc(st.name)}</b> <small>(${esc(st.kind)})</small><i>${esc(st.desc)}</i><i>Styrka ${bars(rv.strength)} – sjunker med ditt rykte, din dragningskraft och din personal. Ju starkare, desto fler kunder går över gatan.</i></div>` : '';
+  const awards = (game.awards || []).length ? `<h3>Priser</h3><div class="plist">${game.awards.map((a) => row('🏆', `${a.year} · ${esc(a.title)}`, a.medals.map((m) => `${m.medal} ${esc(m.name)}`).join(' · '))).join('')}</div>` : '';
+  const body = `${rival}${awards}<h3>Pågår</h3>${active.length ? `<div class="plist">${active.map((a) => row(a.ev.icon, esc(a.ev.title), `${esc(a.ev.choices.find((c) => c.id === a.choice)?.label || '')} · till och med ${a.until}`)).join('')}</div>` : '<p class="sp" style="font-size:17px">Inget särskilt just nu.</p>'}
     ${game.bulk?.length ? `<h3>Avtal</h3><div class="plist">${game.bulk.map((b) => row('🏢', esc(b.name), `${b.left} st ${esc(game.shop.models?.useName(b.use) || b.use)} kvar att leverera · senast ${b.until}`)).join('')}</div>` : ''}
     <h3>Tidigare</h3>${seen.length ? `<div class="plist">${seen.map((e) => row(e.icon, `${e.year} · ${esc(e.title)}`, '')).join('')}</div>` : '<p class="sp" style="font-size:17px">Inget än.</p>'}`;
   openModal('📰 Händelser', body, [{ label: 'Stäng', onClick: closeModal }]);
