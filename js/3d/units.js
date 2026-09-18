@@ -354,9 +354,19 @@ export class Units {
     if (this.ctx.game.year % 3 === 0) put('WetFloorSign_01', { x: C.toX(LY.DOOR.cx) + 0.8, z: 1.6 }, 0.6, { h: 0.6 });
   }
 
+  // hetaste varorna uppradade på skåpet bakom disken
+  backCabinet() {
+    const top = this.ctx.room?.cabinetTop;
+    if (!top) return;
+    const g = new THREE.Group(); g.position.set((top.x0 + top.x1) / 2, top.y, top.z);
+    const parts = this.floor.owned().filter((p) => p.cat !== 'spel' && p.cat !== 'konsol' && p.cat !== 'arkad').sort((a, b) => this.shop.hypeAt(b, this.year) - this.shop.hypeAt(a, this.year)).slice(0, 9);
+    this.row(g, parts, 0, top.x1 - top.x0, { gap: 0.08, jitter: 0.12 });
+    this.group.add(g);
+  }
   rebuild() {
     this.clear();
     this.boxCount = 0;
+    this.backCabinet();
     for (const u of this.floor.unitList || []) {
       if (u.empty) this.empty(u);
       else if (u.unit === 'tv') this.tvCorner(u);

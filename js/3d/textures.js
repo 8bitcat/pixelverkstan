@@ -114,6 +114,30 @@ export function coverArt(product, sprite, { color = '#3a78d8', label = '' } = {}
   return t;
 }
 
+// Affisch: stjärnobjektet med pixelikon, "NYHET!" och namn
+export function poster(part, icon, color = '#7ee8fa', tagline = 'NYHET!') {
+  const key = 'poster:' + (part?.id || 'x') + color;
+  if (cache.has(key)) return cache.get(key);
+  const W = 512, H = 720, c = mk(W, H), x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#1b1a22'); g.addColorStop(1, css(color, 0.35));
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  x.strokeStyle = color; x.lineWidth = 10; x.strokeRect(24, 24, W - 48, H - 48);
+  x.fillStyle = color; x.font = `bold 92px ${HEAD}`; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(tagline, W / 2, 110);
+  if (icon && icon.width) {
+    x.imageSmoothingEnabled = false;
+    const s = Math.min(380 / icon.width, 300 / icon.height), iw = icon.width * s, ih = icon.height * s;
+    x.save(); x.shadowColor = color; x.shadowBlur = 40; x.drawImage(icon, (W - iw) / 2, 190 + (300 - ih) / 2, iw, ih); x.restore();
+    x.imageSmoothingEnabled = true;
+  }
+  x.fillStyle = '#ffffff'; x.font = `bold 44px ${FONT}`;
+  wrap(x, part?.name || '', W - 90, 2).forEach((l, i) => x.fillText(l, W / 2, 560 + i * 50));
+  x.font = `26px ${FONT}`; x.fillStyle = 'rgba(255,255,255,.75)'; x.fillText('Fråga oss i butiken', W / 2, 670);
+  const t = canvasTex(c);
+  cache.set(key, t);
+  return t;
+}
+
 // Skylt: text på färgad platta (kategorinamn, BESTÄLL, Ledig plats …)
 export function plate(text, { bg = '#3a78d8', fg = null, w = 512, h = 128, sub = '', font = HEAD, size = 0 } = {}) {
   const key = 'plate:' + text + '|' + sub + '|' + bg + '|' + w + 'x' + h;

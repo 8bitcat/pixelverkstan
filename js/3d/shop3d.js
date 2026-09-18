@@ -85,6 +85,7 @@ export class Shop3D {
     this.room?.dispose(); this.units?.dispose();
     const ctx = this.ctx();
     this.room = buildRoom(this.scene, ctx);
+    ctx.room = this.room;
     this.units = new Units(this.scene, ctx);
     this.units.rebuild();
     this.lokal = this.floor.lokal; this.fitSig = this.floor.fitSig; this.sig = this.floor.sig; this.year = this.game.year;
@@ -269,7 +270,10 @@ export class Shop3D {
       const key = 'c' + c.id, x = C.toX(c.x), z = C.toZ(c.y) + (c._sit ? 0.32 : 0), yaw = c.moving ? this.yawFor(key, x, z, c.dir) : (this.lastPos.get(key)?.yaw ?? C.yawOf(c.dir));
       if (!c.moving) this.lastPos.set(key, { x, z, yaw: C.yawOf(c.dir) });
       const cl = fl.clickable(c);
-      out.push({ key, x, z, yaw: c.moving ? yaw : C.yawOf(c.dir), moving: c.moving, kid: !!c.look?.kid, color: c.look?.shirt || '#7ea0c8', label: cl ? c.name : say(c) || (c.phase === 'ready' ? c.name + ' – hämtar' : ''), labelColor: cl ? '#f5c542' : '#7ee8fa', mark: cl });
+      const want = c.order?.title || c.order?.want || '';
+      const mood = c.phase === 'leaving' ? (c.mood === 'angry' ? ' 😠' : c.mood === 'happy' ? ' 😊' : '') : '';
+      const label = cl ? (want ? `${c.name}: ${want}` : c.name) : say(c) || (c.phase === 'ready' ? c.name + ' hämtar' : c.phase === 'leaving' && mood ? c.name + mood : '');
+      out.push({ key, x, z, yaw: c.moving ? yaw : C.yawOf(c.dir), moving: c.moving, kid: !!c.look?.kid, color: c.look?.shirt || '#7ea0c8', label, labelColor: cl ? '#f5c542' : c.mood === 'angry' ? '#e23b5a' : '#7ee8fa', mark: cl });
       seen.add(key);
     }
     for (const pl of fl.players) {

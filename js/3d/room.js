@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import * as A from './assets.js';
 import * as C from './coords.js';
-import { plate, neon } from './textures.js';
+import { plate, neon, poster } from './textures.js';
 import * as LY from '../core/floor-layout.js';
 
 const R = C.ROOM;
@@ -197,8 +197,11 @@ export function buildRoom(scene, ctx) {
 
   // neonskylten på bakväggen och en affisch
   { const n = neonSign(shop.sign || 'BUTIKEN', theme.neon || '#7ee8fa', 3.8, 0.95, 2.0); n.position.set(0.2, 2.55, D - 0.03); n.rotation.y = Math.PI; g.add(n); out.neon = n; }
-  const pic = A.instance(A.get('hanging_picture_frame_01'), { fit: { h: 0.9 } });
-  if (pic) { pic.position.set(X1 - 0.02, 1.4, D * 0.62); pic.rotation.y = -Math.PI / 2; g.add(pic); }
+  // affisch med stjärnobjektet på högerväggen (och i skyltfönstret om man köpt affischen)
+  const hp = ctx.floor.heroPart, icon = hp ? ctx.floor.icon(hp, 120, 80) : null;
+  const mkPoster = (w) => { const pg = new THREE.Group(); slab(pg, -w / 2 - 0.03, w / 2 + 0.03, -w * 0.7 - 0.03, w * 0.7 + 0.03, -0.02, 0, paintMat(0x17151a, 0.5)); const p = new THREE.Mesh(new THREE.PlaneGeometry(w, w * 1.4), new THREE.MeshStandardMaterial({ map: poster(hp, icon, theme.neon || '#7ee8fa'), roughness: 0.6 })); p.position.z = 0.002; pg.add(p); return pg; };
+  if (hp) { const p1 = mkPoster(0.7); p1.position.set(X1 - 0.02, 1.55, D * 0.62); p1.rotation.y = -Math.PI / 2; g.add(p1); }
+  if (hp && ctx.game.fit?.items?.affisch && winL.x1 - winL.x0 > 0.5) { const p2 = mkPoster(0.5); p2.position.set(winL.x0 + 0.5, 1.5, -0.03); p2.rotation.y = Math.PI; g.add(p2); }
   const clock = A.instance(A.get('wall_clock'), { fit: { h: 0.4 } });
   if (clock) { clock.position.set(X0 + 0.04, 2.25, D * 0.5); clock.rotation.y = Math.PI / 2; g.add(clock); }
   const cam = A.instance(A.get('security_camera_01'), { fit: { h: 0.22 } });
