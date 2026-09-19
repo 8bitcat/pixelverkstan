@@ -49,6 +49,14 @@ function retarget(clip, prefix, ratio) {
   }
   return c;
 }
+// Figurernas drag (Mixamo-exporterna i assets/3d/chars): kvinna/man, skägg, ung – så att en
+// skäggig kund får en skäggig figur och ett barn en ung utan skägg
+const TRAITS = {
+  'ch03.glb': { fem: 1, young: 1 }, 'ch22.glb': { fem: 1, young: 1 }, 'ch13.glb': { fem: 1 }, 'ch37.glb': { fem: 1 }, 'ch02.glb': { fem: 1, young: 1 },
+  'ch31.glb': {}, 'ch42.glb': { young: 1 }, 'shoes.glb': { young: 1 }, 'ch08.glb': { beard: 1 }, 'ch17.glb': { beard: 1 },
+};
+const FEM_NAMES = new Set(['alva', 'elsa', 'maja', 'ella', 'wilma', 'saga', 'nora', 'vera', 'liv', 'stina', 'ines', 'greta', 'leila', 'mira', 'aiko', 'sofia', 'olga', 'birgitta', 'agneta', 'eva', 'anna', 'karin', 'lena', 'sara', 'emma', 'linnea', 'astrid', 'ebba', 'klara', 'freja', 'signe', 'tuva', 'moa', 'ida', 'julia', 'hanna', 'lisa', 'malin']);
+const MASC_NAMES = new Set(['oscar', 'liam', 'noah', 'hugo', 'william', 'elias', 'ludvig', 'sixten', 'vincent', 'frans', 'kalle', 'bosse', 'ahmed', 'yusuf', 'kenji', 'mateo', 'ivan', 'gunnar', 'sven', 'nils', 'erik', 'lars', 'anders', 'johan', 'karl', 'per', 'olle', 'axel', 'arvid', 'viktor', 'leo', 'adam', 'samuel', 'samos', 'carl', 'jonas', 'martin', 'fredrik', 'mikael']);
 const hashStr = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return (h ^ (h >>> 13)) >>> 0; };
 function dressHead(head, look, cols) {
   const hair = new THREE.Color(look.hair || '#4a2f1d');
@@ -103,7 +111,18 @@ export class People {
   // vilken figur en person får: bestäms av nyckeln (samma kund → samma figur)
   charFor(a) {
     if (!this.chars.length) return null;
-    return this.chars[hashStr(a.key + '|' + (a.look?.skin || '') + (a.look?.hair || '')) % this.chars.length];
+    const L = a.look || {}, first = String(a.name || '').split(/[\s·]/)[0].toLowerCase();
+    // kvinna/man: namnet, annars frisyren
+    const fem = FEM_NAMES.has(first) ? true : MASC_NAMES.has(first) ? false : /long|ponytail|bun|bob|braids|pigtails|wavy/.test(L.style || '') ? true : /buzz|mohawk|bald|spiky/.test(L.style || '') ? false : null;
+    const beard = !!L.beard && !L.kid;
+    const t = (c) => TRAITS[c.file] || {};
+    let cands = this.chars;
+    if (L.kid) cands = cands.filter((c) => t(c).young && !t(c).beard);
+    else if (beard) cands = cands.filter((c) => t(c).beard);
+    else cands = cands.filter((c) => !t(c).beard);
+    if (fem !== null) { const g = cands.filter((c) => !!t(c).fem === fem); if (g.length) cands = g; }
+    if (!cands.length) cands = this.chars;
+    return cands[hashStr(a.key + '|' + (L.skin || '') + (L.hair || '')) % cands.length];
   }
   // laddar figuren (en gång) och gör om Xbots clips för dess skelett
   ensureChar(c) {

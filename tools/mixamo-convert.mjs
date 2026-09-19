@@ -47,6 +47,9 @@ for (const f of files) {
     const loader = new THREE.TextureLoader();
     const loadTex = (t) => new Promise((res) => loader.load('/assets/3d/mixamo-tex/' + encodeURIComponent(t.d) + '/' + encodeURIComponent(t.f), (tx) => res(tx), undefined, () => res(null)));
     const matsSeen = []; g.traverse((o) => { for (const m of (o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [])) if (!matsSeen.includes(m)) matsSeen.push(m); });
+    // figurens texturmapp: meshens namn (Ch37_body → ch37); materialet kan heta något annat (Ch38_body)
+    let meshBase = ''; g.traverse((o) => { if (!meshBase && o.isSkinnedMesh && o.name) meshBase = o.name.split('_')[0].toLowerCase(); });
+    const dirOf = (d) => d.toLowerCase();
     const texLog = [], stdOf = new Map();
     for (const [mi, m] of matsSeen.entries()) {
       for (const k of ['roughnessMap', 'metalnessMap', 'specularMap', 'emissiveMap', 'aoMap', 'bumpMap', 'alphaMap', 'lightMap']) if (m[k]) m[k] = null;
@@ -54,7 +57,7 @@ for (const f of files) {
       for (const [k, kind] of [['map', 'diffuse'], ['normalMap', 'normal']]) {
         const nm = String(m[k]?.name || '').toLowerCase().replace(/\.[a-z]+$/, '');
         let t = nm ? allTex.find((x) => x.base.endsWith(kind) && (nm.includes(x.base) || x.base.includes(nm))) : null;
-        if (!t) t = allTex.find((x) => x.base.endsWith(kind) && x.base.startsWith(prefix) && x.base.includes('_' + (1001 + mi) + '_'));   // 1001 = första materialet osv.
+        if (!t) t = allTex.find((x) => x.base.endsWith(kind) && (dirOf(x.d) === meshBase || x.base.startsWith(prefix)) && x.base.includes('_' + (1001 + mi) + '_'));   // 1001 = första materialet osv.
         if (!t && matsSeen.length === 1) t = allTex.find((x) => x.base.endsWith(kind) && x.base.startsWith(prefix));
         const tx = t ? await loadTex(t) : null;
         if (tx) { if (k === 'map') tx.colorSpace = THREE.SRGBColorSpace; if (/\.jpe?g$/i.test(t.f)) tx.userData.mimeType = 'image/jpeg'; m[k] = tx; } else m[k] = null;

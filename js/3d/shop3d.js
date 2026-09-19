@@ -27,7 +27,7 @@ export class Shop3D {
   constructor(canvas, hooks) {
     this.canvas = canvas; this.hooks = hooks;
     this.active = false; this.ready = false; this.placed = false;
-    this.keys = new Set(); this.locked = false; this.hover = null; this.hoverT = 0;
+    this.keys = new Set(); this.locked = false; this.hover = null; this.hoverT = 0; this.drag = null; this.lastDrag = 0;
     this.yaw = Math.PI; this.pitch = -0.04; this.pos = new THREE.Vector3(0, 0, 3); this.vel = new THREE.Vector3(); this.moving = false; this.bob = 0;
     this.quality = QUALITIES.includes(store.get('pixelverkstan_3dq')) ? store.get('pixelverkstan_3dq') : 'hög';
     this.perf = { t: 0, n: 0, steps: 0, warm: 0, last: 0, avg: 0 };
@@ -230,9 +230,20 @@ export class Shop3D {
     const c = this.canvas;
     c.addEventListener('click', () => {
       if (!this.active || this.mode !== 'walk' || this.hooks.modalOpen()) return;
+      if (this.lastDrag > 4) { this.lastDrag = 0; return; }   // man drog för att titta – inget klick
       if (!this.locked) { c.requestPointerLock?.(); return; }
       this.interact();
     });
+    // högerklick i bilden ska inte öppna webbläsarens meny
+    document.addEventListener('contextmenu', (e) => { if (this.active && this.mode === 'walk' && !this.hooks.modalOpen() && !e.target.closest?.('#hud, #orders, #modal, #chatbar, input, textarea')) e.preventDefault(); });
+    // dra med musen för att titta – fungerar även när muslåset inte går att få
+    c.addEventListener('mousedown', (e) => { if (!this.active || this.mode !== 'walk' || this.locked || e.button !== 0) return; this.drag = { x: e.clientX, y: e.clientY, moved: 0 }; });
+    window.addEventListener('mousemove', (e) => {
+      const d = this.drag; if (!d || this.locked) return;
+      const dx = e.clientX - d.x, dy = e.clientY - d.y; d.x = e.clientX; d.y = e.clientY; d.moved += Math.abs(dx) + Math.abs(dy);
+      if (d.moved > 4) { this.yaw -= dx * 0.004; this.pitch = Math.max(-1.35, Math.min(1.35, this.pitch - dy * 0.004)); }
+    });
+    window.addEventListener('mouseup', () => { this.lastDrag = this.drag ? this.drag.moved : 0; this.drag = null; });
     document.addEventListener('pointerlockchange', () => { this.locked = document.pointerLockElement === c; this.hint(); });
     document.addEventListener('mousemove', (e) => {
       if (!this.locked || !this.active) return;
@@ -268,7 +279,7 @@ export class Shop3D {
   hint(text = null) {
     const el = $('#hint3d'); if (!el) return;
     if (text !== null) { el.textContent = text; el.classList.toggle('hidden', !text); return; }
-    el.textContent = this.locked ? '' : 'Klicka i bilden för att styra · W A S D går · musen tittar · klicka på kunder, montrar och lådor · bygg datorer vid arbetsbänken bakom disken · Esc släpper musen · Q byter grafikkvalitet';
+    el.textContent = this.locked ? '' : 'Klicka i bilden för att styra · W A S D går · musen tittar (eller dra i bilden) · piltangenter går och vänder · klicka på kunder, montrar och lådor · bygg vid arbetsbänken bakom disken · Esc släpper musen · Q byter grafikkvalitet';
     el.classList.toggle('hidden', this.locked);
   }
 
@@ -282,7 +293,10 @@ export class Shop3D {
   }
   move(dt) {
     const k = this.keys, fwd = (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0);
-    const str = (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
+    const str = (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0);
+    // piltangenterna vänster/höger vänder (tangentbord utan mus)
+    if (k.has('ArrowLeft')) this.yaw += dt * 2.0;
+    if (k.has('ArrowRight')) this.yaw -= dt * 2.0;
     const run = k.has('ShiftLeft') || k.has('ShiftRight');
     const sp = run ? RUN : SPEED;
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw), rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
@@ -331,18 +345,18 @@ export class Shop3D {
       const want = c.order?.title || c.order?.want || '';
       const mood = c.phase === 'leaving' ? (c.mood === 'angry' ? ' 😠' : c.mood === 'happy' ? ' 😊' : '') : '';
       const label = cl ? (want ? `${c.name}: ${want}` : c.name) : say(c) || (c.phase === 'ready' ? c.name + ' hämtar' : c.phase === 'leaving' && mood ? c.name + mood : '');
-      out.push({ key, x, z, yaw: c.moving ? yaw : C.yawOf(c.dir), moving: c.moving, kid: !!c.look?.kid, color: c.look?.shirt || '#7ea0c8', look: c.look, label, labelColor: cl ? '#f5c542' : c.mood === 'angry' ? '#e23b5a' : '#7ee8fa', mark: cl });
+      out.push({ key, x, z, yaw: c.moving ? yaw : C.yawOf(c.dir), moving: c.moving, kid: !!c.look?.kid, name: c.name, color: c.look?.shirt || '#7ea0c8', look: c.look, label, labelColor: cl ? '#f5c542' : c.mood === 'angry' ? '#e23b5a' : '#7ee8fa', mark: cl });
       seen.add(key);
     }
     for (const pl of fl.players) {
       if (pl.local || pl.away || pl.x === undefined) continue;
       const key = 'p' + pl.id, x = C.toX(pl.x), z = C.toZ(pl.y);
-      out.push({ key, x, z, yaw: pl.moving ? this.yawFor(key, x, z, pl.dir) : C.yawOf(pl.dir), moving: !!pl.moving, kid: !!pl.look?.kid, color: pl.color || '#7ee8fa', look: pl.look, label: pl.say && performance.now() < pl.say.until ? pl.say.text : pl.name, labelColor: pl.color || '#7ee8fa', big: !!(pl.say && performance.now() < pl.say.until) });
+      out.push({ key, x, z, yaw: pl.moving ? this.yawFor(key, x, z, pl.dir) : C.yawOf(pl.dir), moving: !!pl.moving, kid: !!pl.look?.kid, name: pl.name, color: pl.color || '#7ee8fa', look: pl.look, label: pl.say && performance.now() < pl.say.until ? pl.say.text : pl.name, labelColor: pl.color || '#7ee8fa', big: !!(pl.say && performance.now() < pl.say.until) });
     }
     for (const s of g.staff || []) {
       if (s.course) continue;
       const p = fl.staffPos(s), key = 's' + s.id;
-      out.push({ key, x: C.toX(p.x), z: C.toZ(p.y), yaw: C.yawOf(p.dir), moving: !!s.job, kid: false, color: s.role === 'tekniker' ? '#f5a142' : '#8be36b', look: s.look, label: `${s.name.split(' ')[0]} · ${s.role}${s.job ? ' ' + Math.round((s.progress || 0) * 100) + ' %' : ''}`, labelColor: s.role === 'tekniker' ? '#f5a142' : '#8be36b' });
+      out.push({ key, x: C.toX(p.x), z: C.toZ(p.y), yaw: C.yawOf(p.dir), moving: !!s.job, kid: false, name: s.name, color: s.role === 'tekniker' ? '#f5a142' : '#8be36b', look: s.look, label: `${s.name.split(' ')[0]} · ${s.role}${s.job ? ' ' + Math.round((s.progress || 0) * 100) + ' %' : ''}`, labelColor: s.role === 'tekniker' ? '#f5a142' : '#8be36b' });
     }
     for (const w of fl.walkers || []) {
       let id = this.walkerIds.get(w); if (!id) { id = this.nextWalker++; this.walkerIds.set(w, id); }

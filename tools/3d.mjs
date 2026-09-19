@@ -33,6 +33,9 @@ const info = await page.evaluate(() => PV.view3d.info());
 console.log('info', JSON.stringify(info));
 ok(info.ready && info.pick >= 5, `scenen byggd: ${info.pick} klickbara enheter, ${info.people} personer, ${info.drawCalls} draw calls, ${info.tris} trianglar`);
 ok(await page.evaluate(() => document.querySelector('#floor').classList.contains('hidden') && !document.querySelector('#floor3d').classList.contains('hidden')), '3D-canvasen visas, 2D-golvet gömt');
+// klick mitt i bilden ska nå canvasen (muslåset), inte butiksskärmen ovanpå; HUD-knapparna ska ändå gå att klicka
+const hit = await page.evaluate(() => { const r = document.querySelector('[data-h="view3d"]').getBoundingClientRect(); return { mitt: document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.id, knapp: document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.dataset?.h }; });
+ok(hit.mitt === 'floor3d' && hit.knapp === 'view3d', `klick i bilden når 3D-canvasen, HUD-knapparna ovanpå (${JSON.stringify(hit)})`);
 console.log('enheter', await page.evaluate(() => PV.floor.unitList.map((u) => u.i + ':' + (u.empty ? 'tom' : u.unit || u.cat) + (u.frame && PV.floor.partsFor ? '(' + PV.floor.partsFor(u).length + ')' : '')).join(' ')));
 console.log('modeller', JSON.stringify(info.models));
 ok(info.products > 3, `produktkartonger i montrarna: ${info.products}`);

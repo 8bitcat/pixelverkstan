@@ -543,7 +543,8 @@ body[data-screen="build"] #chatlog { bottom: 150px; left: 280px; }
 
 /* ---------- 3D-läget ---------- */
 #floor3d { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: auto; }
-body.view3d #shop { background: transparent; }
+body.view3d #shop { background: transparent; pointer-events: none; }   /* klick i bilden ska nå 3D-canvasen under */
+body.view3d #shop > :not(#hud3d) { pointer-events: auto; }
 /* byggläget i 3D: bänken syns genom byggytan, #board ritar bara kablar och markeringar */
 body.bench3d #build, body.bench3d #build-stage { background: transparent; }
 #hud3d { position: absolute; inset: 0; pointer-events: none; }

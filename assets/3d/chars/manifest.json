@@ -71,20 +71,6 @@
    "bytes": 2564732
   },
   {
-   "file": "ch37.glb",
-   "src": "Catwalk Walk Forward HighKnees (6).fbx",
-   "base": "Ch37",
-   "height": 174.2,
-   "bones": 118,
-   "prefix": "mixamorig6",
-   "tris": 52118,
-   "mats": [
-    "Ch38_body",
-    "Ch37_hair"
-   ],
-   "bytes": 2624632
-  },
-  {
    "file": "ch02.glb",
    "src": "Catwalk Walk Forward HighKnees (7).fbx",
    "base": "Ch02",
@@ -143,6 +129,20 @@
     "Eyelashmat"
    ],
    "bytes": 2157380
+  },
+  {
+   "file": "ch37.glb",
+   "src": "Catwalk Walk Forward HighKnees (6).fbx",
+   "base": "Ch37",
+   "height": 174.2,
+   "bones": 118,
+   "prefix": "mixamorig6",
+   "tris": 52118,
+   "mats": [
+    "Ch38_body",
+    "Ch37_hair"
+   ],
+   "bytes": 2717820
   }
  ]
 }
