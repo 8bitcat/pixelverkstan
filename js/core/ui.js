@@ -419,13 +419,13 @@ export function showResult(order, payout, result, onClose, game = null) {
   const body = `<div style="text-align:center;font-size:44px;letter-spacing:4px">${stars}</div>
     <p style="text-align:center;font-size:18px;margin:6px 0 14px">${esc(game?.shop.text?.pickup ? game.shop.text.pickup(order.name) : `${order.name} kommer och hämtar datorn vid utlämningen.`)}</p>
     <div class="plist">
-      <div class="prow" style="grid-template-columns:1fr auto"><span>Delar + montering</span><b>${fmt(payout.price)} kr</b></div>
+      <div class="prow" style="grid-template-columns:1fr auto"><span>${esc(game?.shop.text?.resultParts || 'Delar + montering')}</span><b>${fmt(payout.price)} kr</b></div>
       <div class="prow" style="grid-template-columns:1fr auto"><span>Dricks ${payout.stars >= 3 ? '(snabbt och felfritt!)' : payout.stars === 2 ? '(bra jobbat)' : ''}</span><b>${fmt(payout.tip)} kr</b></div>
       ${payout.bonus ? `<div class="prow" style="grid-template-columns:1fr auto"><span>😎 Proffsbonus (utan hjälp)</span><b>${fmt(payout.bonus)} kr</b></div>` : ''}
       <div class="prow" style="grid-template-columns:1fr auto"><span>Erfarenhet</span><b>+${payout.xp} XP</b></div>
     </div>
     ${result.warnings?.length ? `<p class="sp" style="color:var(--red2);margin-top:10px">⚠️ ${result.warnings.map(esc).join(' ')}</p>` : ''}
-    <p class="sp" style="color:var(--muted);margin-top:10px">Byggtid ${Math.round(result.time)} s · ${result.errors} misstag · ${result.help ? 'med hjälp' : 'utan hjälp'}</p>`;
+    <p class="sp" style="color:var(--muted);margin-top:10px">${esc(game?.shop.text?.resultTime || 'Byggtid')} ${Math.round(result.time)} s · ${result.errors} misstag · ${result.help ? 'med hjälp' : 'utan hjälp'}</p>`;
   openModal(game?.shop.text?.resultTitle || '🎉 Datorn fungerar!', body, [{ label: 'Till butiken', cls: 'btn-go', onClick: () => { closeModal(); onClose?.(); } }]);
 }
 

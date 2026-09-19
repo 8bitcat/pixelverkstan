@@ -14,7 +14,7 @@ export default {
   sign: 'HAMBURGERBAREN',
   product: 'burgare',
   worker: 'kock',
-  theme: { wall: '#c94a3a', wallDark: '#9a2f24', floorA: '#f2efe6', floorB: '#2a2a30', counter: '#e8e4dc', neon: '#ff6f9c' },
+  theme: { wall: '#c94a3a', wallDark: '#9a2f24', floorA: '#f2efe6', floorB: '#2a2a30', counter: '#e8e4dc', neon: '#ff6f9c', workshopSign: 'KÖKET' },
   // läskkylen står framme från start; dessertdisken köps
   showcases: [{ cat: 'dryck', title: 'Läskkyl' }],
   hero: null,
@@ -68,6 +68,7 @@ export default {
   optsFor: orders.optsFor,
   // texter i den generiska byggvyn och dialogerna
   text: {
+    signSale: 'MENY', signTag: 'ALLTID NYGRILLAT', resultParts: 'Mat + tillagning', resultTime: 'Tillagning',
     thing: 'burgare', things: 'burgare', place: 'köket',
     titleFor: (order, gen) => `${order.title} åt ${order.name}`,
     welcome: (name) => `Välkommen till köket! Nu bygger vi ${name}s burgare lager för lager. Följ de gula markeringarna.`,

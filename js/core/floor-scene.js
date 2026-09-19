@@ -400,7 +400,8 @@ function paintWallDecor(P, wall, wallDk, theme, items = {}, lokal = 2) {
   P.rect(490, 60, 4, 10, 0xc8ccd2); P.vl(490, 60, 10, 0xeef0f3);
   for (let y = 77; y < WALL_Y; y++) for (let x = dx0; x < dx1; x++) P.px(x, y, ((x + y) >> 2) % 2 ? 0xe8b230 : 0x23232a);
   P.rect(452, 24, 52, 10, 0x1b1f2a); P.box(452, 24, 52, 10, 0xe8b230, 0.8);
-  text(P, SMALL, 'VERKSTAD', 478 - (textW(SMALL, 'VERKSTAD') >> 1), 27, 0xe8b230);
+  const wsign = theme?.workshopSign || 'VERKSTAD';
+  text(P, SMALL, wsign, 478 - (textW(SMALL, wsign) >> 1), 27, 0xe8b230);
   // eluttag
   P.rect(268, 68, 6, 6, 0xe8e4da); P.px(270, 70, 0x555555); P.px(272, 70, 0x555555);
   // stereo på bänken bakom disken

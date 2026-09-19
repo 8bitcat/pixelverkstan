@@ -5,6 +5,8 @@ i verkstaden. Första verksamheten är **Datorbutiken**: över **12 000 riktiga
 komponenter från 1983 till 2026** (IBM, Intel, AMD, 3dfx, NVIDIA, Creative, Corsair,
 Samsung …) byggs ihop i en isometrisk vy, och spelet lär ut datorarkitektur
 (systembuss, minneshierarki, pipeline, von Neumann) och datorhistoria.
+Andra verksamheten är **Hamburgerbaren** (1955–2026): 416 ingredienser och 155 menyer
+genom epokerna, burgaren byggs lager för lager på brickan i samma motor.
 
 ## Epoker
 
@@ -224,7 +226,41 @@ valet sparas (`pixelverkstan_3d`). 2D-läget finns kvar orört.
 - **Tillgångar:** `assets/3d/` (modeller, texturer, HDRI, Xbot), hämtade med
   `python tools/ph-fetch.py`; licenser i `assets/3d/LICENSES.md`.
 
-## Struktur
+## Hamburgerbaren
+
+Andra verksamheten i menyn. Samma motor som datorbutiken (kunder, lager, grossist, lådor,
+montrar, inredning, co-op) men med ett kök i stället för en verkstad:
+
+- **Epoker 1955–2026:** femtiotalsdinern (pannbiff, rödbetssallad, patty melt, Oklahoma
+  onion burger), sextiotalets bacon och milkshake, grillkiosken (korv i bröd, räksallad,
+  bostongurka, tunnbrödsrullen), kycklingburgarens intåg, kedjan (kebab, chili cheese,
+  bearnaise), vego och aioli, gourmetburgaren (brioche, chuck & brisket, tryffel) och
+  smash/plantbaserat (wagyu, dry aged, chili crisp, vegansk fisk). Startår 1955, 1965,
+  1975, 1985, 1996, 2005, 2016, 2022.
+- **416 ingredienser** i nio kategorier (`js/shops/restaurang/menu.js`): 33 bröd (från
+  formbröd och kaiser till bao, ramen, donut och våffla), 67 biffar (nöt i alla storlekar,
+  kalv, fläsk, korv, kebab, älg, ren, vildsvin, bison, kyckling i sju varianter, fisk och
+  skaldjur, lamm, 17 vegoalternativ), 33 ostar, 46 toppings, 40 grönsaker, 61 såser,
+  40 tillbehör, 58 drycker (Cuba Cola, Trocadero, Pommac, milkshakes, slush, bubble tea …)
+  och 38 efterrätter. Varje ingrediens har ett år, en nivå och ett eget utseende.
+- **155 menyer** (`orders.js`): recept lager för lager med tillåtna ingredienser per lager,
+  år, nivå, pris, kundrepliker och brödkrav. Kunden beställer det som finns i kylen (helst),
+  ibland något som saknas, ibland får du välja drycken.
+- **Köket** (`rig.js`): rosta brödet i brödrosten → underbrödet → lägg biffen på grillen,
+  vänd, salta och peppra → lager i rätt ordning → toppbrödet (samma sort som under) →
+  pommes/tillbehör i fickan och drycken på brickan. Fakta om Maillard, kärntemperaturer,
+  dubbelfritering m.m. i guiden.
+- **Servering** (`serve.js`): kunden vid luckan smakar, betyg beror på tid och kladd,
+  betalar när brickan hämtas. Fungerar i 3D på arbetsbänken (brickan, grillen och
+  brödrosten voxlas som datorbygget).
+- **Inredning** (`upgrades.js`): läskkyl och dessertdisk som montrar, jukebox, godishylla,
+  såsbar, lekhörna, kaffemaskin; lokaler Gatuköket → Megaburger; dubbelgrill, fritös,
+  milkshakemaskin, menytavla; kylrum 2–4 för dyrare kött.
+- **Grafik** (`art.js`): allt ritas som isometriska lådor – runda lager, smält ost som
+  droppar, delad korv, hyvlad parmesan, ringlade såser, pommes med topping, slushkupol,
+  tapiokapärlor, mjukglass i strut, dammsugare, banana split. `tools/restaurang-ikoner.mjs`
+  ritar alla ikoner i ett ark per kategori (`tools/out/rest-ikoner-*.png`).
+
 
 ```
 js/3d/          3D-läget: shop3d.js (renderare, kamera, styrning, sikte), room.js, units.js,
@@ -263,6 +299,15 @@ js/shops/
     desk.js         finalen: skrivbord, inkoppling, startsekvens/felsökning
     desk-era.js     epokens skärm/tangentbord/mus/OS och baksidans uttag
     desk-props.js   skärm, tangentbord, mus; desk-art.js skärminnehåll, baksidan, insidan
+  restaurang/   Hamburgerbaren
+    menu.js         416 ingredienser (bröd, biff, ost, extra, grönt, sås, tillbehör, dryck, efterrätt), epoker, höjder
+    orders.js       155 menyer med recept per lager, generator, start, guidade kunder, priser
+    rig.js          köket: brödrost, grill (lägg på/vänd/salta), lagren på brickan, ficka och dryck
+    art.js          isometrisk grafik för alla former + ikoner
+    serve.js        finalen: servera brickan, kunden smakar och betalar
+    upgrades.js     läskkyl/dessertdisk, jukebox m.m., lokaler Gatuköket → Megaburger, kylrum
+    products.js     drycker och efterrätter över disk (hype per år)
+    index.js        modulens kontrakt + texter för byggvyn (shop.text)
 tools/          tester och verktyg
 ```
 
@@ -318,6 +363,10 @@ node tools/spel2.mjs                     # nio titlar spelas i webbläsaren – 
 node tools/lokaler.mjs                   # sex lokaler: egen planlösning, fler platser, alla väntplatser nåbara, inredningen följer med
 node tools/3d.mjs [--snabb]              # 3D-läget: laddar, bygger Källarhålan + Kvartersbutiken, skärmdumpar 3d-*.png, sikte + klick på kund
 node tools/bygg3d.mjs                    # byggläget i 3D: bänken, kameran matchar 2D-projektionen, delar i, klicktest, zoom, ut igen
+node tools/restaurang-rig.mjs            # Node: hamburgerbarens katalog, alla 155 menyer görbara varje år, köksreglerna steg för steg, alla former ritar
+node tools/restaurang.mjs                # hamburgerbaren i webbläsaren: meny → grossist → guidad kund → kök → servera → betalt
+node tools/restaurang3d.mjs              # hamburgerbaren i 3D: stor burgare i 2D-köket, köket på bänken, servering i 3D
+node tools/restaurang-ikoner.mjs         # ritar alla ingrediensers ikoner i ark per kategori (rest-ikoner-*.png)
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner
 ```
 

@@ -884,8 +884,9 @@ export class Floor {
       ctxText(ctx, SMALL, title, x0 + Math.round((w - textW(SMALL, title)) / 2), y1 - 7, lt % 0.8 < 0.6 ? '#76ff4a' : '#ffffff');
     } else if (scene === 1) {
       const on = lt % 0.7 < 0.5;
-      ctxText(ctx, BIG, 'REA', x0 + Math.round((w - textW(BIG, 'REA')) / 2), y0 + 5, on ? '#ffd23a' : '#ff6a6a');
-      ctxText(ctx, SMALL, 'BYGG DIN PC', x0 + Math.round((w - textW(SMALL, 'BYGG DIN PC')) / 2), y0 + 17, '#ffffff');
+      const sale = this.shop.text?.signSale || 'REA', tag = this.shop.text?.signTag || 'BYGG DIN PC';
+      ctxText(ctx, BIG, sale, x0 + Math.round((w - textW(BIG, sale)) / 2), y0 + 5, on ? '#ffd23a' : '#ff6a6a');
+      ctxText(ctx, SMALL, tag, x0 + Math.round((w - textW(SMALL, tag)) / 2), y0 + 17, '#ffffff');
     } else {
       const txt = (this.shop.sign || '') + '   ', tw = textW(SMALL, txt);
       const off = Math.round((lt * 22) % (tw + 4));

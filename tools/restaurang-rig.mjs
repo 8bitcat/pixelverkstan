@@ -10,7 +10,7 @@ const errors = [];
 const ok = (c, m) => { console.log((c ? 'OK   ' : 'FEL  ') + m); if (!c) errors.push(m); };
 const shop = { part: M.DB.part, layout: { rigFor } };
 console.log(`ingredienser ${M.DB.parts.length}, menyer ${O.TEMPLATES.length}`);
-ok(M.DB.parts.length >= 140 && O.TEMPLATES.length >= 45, 'katalogen är stor');
+ok(M.DB.parts.length >= 400 && O.TEMPLATES.length >= 150, 'katalogen är stor');
 for (const y of [1955, 1965, 1975, 1985, 1996, 2005, 2016, 2022]) {
   const game = { year: y, stock: {}, stockFree: () => 2, shownFree: () => 2, canSell: () => true, money: 1000 };
   let n = 0, prod = 0, sides = 0;
@@ -54,6 +54,23 @@ ok(!L.canRemove(L.SLOT.l1, b).ok, 'ett lager mitt i kan inte tas bort: ' + L.can
 ok(L.standCheck(b).length === 0, 'standCheck ok');
 let boxes = 0; const R = { k: 16, hz: 13, ox: 0, oy: 0, defaultId: 0, box: () => boxes++, proj: (u, v, z) => [u - v, (u + v) / 2 - z] };
 L.drawScene(R, b, {}); ok(boxes > 10, `drawScene ritar ${boxes} lådor`);
+// varje obligatoriskt lager i ett recept ska ha ingredienser i sortimentet redan från menyns första år
+for (const t of O.TEMPLATES) {
+  const sale = M.onSale(t.years[0]);
+  const bread = t.bread || ((p) => !(p.look.mini || p.look.flat || p.look.lettuce || p.look.hole || p.look.novelty || p.look.square));
+  if (!sale.some((p) => p.cat === 'brod' && bread(p))) errors.push(`${t.name}: inget bröd ${t.years[0]}`);
+  t.recipe.forEach((r, i) => { if (r.p === undefined && !sale.some((p) => p.cat === r.cat && (!r.pick || r.pick(p)))) errors.push(`${t.name}: lager ${i} (${r.cat}) saknar ingrediens ${t.years[0]}`); });
+  t.recipe.forEach((r, i) => { if (r.pick && !M.DB.parts.some((p) => p.cat === r.cat && r.pick(p))) errors.push(`${t.name}: lager ${i} pekar på okänd ingrediens`); });
+}
+ok(!errors.some((e) => /saknar ingrediens|okänd ingrediens|inget bröd/.test(e)), 'alla recept pekar på ingredienser som finns från menyns första år');
+// alla former ritas (ikonritningen i Node med en stub-raster)
+{
+  const A = await import('../js/shops/restaurang/art.js');
+  let n = 0, fail = [];
+  const R = { k: 12, hz: 10, ox: 100, oy: 40, defaultId: 0, box: () => n++, proj: (u, v, z) => [u - v, (u + v) / 2 - z] };
+  for (const p of M.DB.parts) { const before = n; try { if (M.BURGER_CATS.includes(p.cat)) { A.drawLayer(R, p, { id: 1, at: [5, 5, 0], r: 3, top: p.cat === 'brod' }); A.drawLayer(R, p, { id: 1, at: [5, 5, 0], r: 3 }); } else A.drawSide(R, p, { id: 1, at: [5, 5, 0] }); } catch (e) { fail.push(p.id + ': ' + e.message); } if (n === before) fail.push(p.id + ': ritar inget'); }
+  ok(!fail.length, `alla ${M.DB.parts.length} ingredienser ritar lådor (${n} st)` + (fail.length ? ': ' + fail.slice(0, 5).join(', ') : ''));
+}
 // varje meny går att sätta ihop varje år den finns på menyn
 for (const t of O.TEMPLATES) for (const y of [t.years[0], Math.min(t.years[1], t.years[0] + 10), t.years[1]]) { let got = null; for (let i = 0; i < 20 && !got; i++) got = O.composeBuild(t, y); if (!got) errors.push(`${t.name} går inte att göra ${y}`); }
 ok(!errors.some((e) => e.includes('går inte att göra')), 'alla menyer går att göra under hela sin tid');

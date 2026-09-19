@@ -23,6 +23,10 @@ export function disc(R, cu, cv, z0, z1, r, tex, id = 0, opt = {}) {
     return c < 0 ? c : shade(c, 1 - t * t * 0.35);
   }, id, { noEdges: true, ...opt.box });
 }
+// fyrkantig platta med samma textursignatur (d = avstånd från mitten 0..1)
+function slab(R, cu, cv, z0, z1, s, tex, id = 0) {
+  R.box(cu - s, cu + s, cv - s, cv + s, z0, z1, (f, x, y, W, Hh) => (f === 'top' ? tex('top', x, y, W, Hh, Math.max(Math.abs(x - W / 2) / (W / 2), Math.abs(y - Hh / 2) / (Hh / 2))) : tex(f, x, y, W, Hh, 0)), id, { noEdges: true });
+}
 
 // ---------- Lager i burgaren ----------
 // o = { id, at: [cu, cv, z0], r, bottom: true|false (underbröd), top: true (toppbröd) }
@@ -45,23 +49,39 @@ export function drawLayer(R, part, o) {
         }
         return hash(x * 3 | 0, y * 3 | 0) > 0.85 ? dark : shade(col, 0.9);
       };
+      if (L.split) {   // delad korv: två halvor sida vid sida med ljus snittyta
+        for (const dy of [-0.55, 0.55]) R.box(cu - r * 0.95, cu + r * 0.95, cv + dy * r - r * 0.42, cv + dy * r + r * 0.42, z0, z0 + h, (f, x, y, W, Hh) => (f === 'top' ? (Math.abs(y - Hh / 2) < Hh * 0.28 ? shade(col, 1.3) : col) : (hash(x * 3 | 0, y * 3 | 0) > 0.88 ? dark : col)), id, { noEdges: true });
+        return;
+      }
       if (sq) R.box(cu - r * 0.9, cu + r * 0.9, cv - r * 0.9, cv + r * 0.9, z0, z0 + h, (f, x, y, W, Hh) => tex(f, x, y, W, Hh, 0), id, { noEdges: true });
       else disc(R, cu, cv, z0, z0 + h, r * 0.98, tex, id, { wave: L.crispy ? 0.05 : 0.02, waveN: 9, seed: 1 });
       return;
     }
     case 'cheese': {
       const s = L.round ? r * 0.7 : r * 1.06, h = layerHeight(part);
-      const spots = L.spots ? H(L.spots) : null;
-      const tex = (f, x, y, W, Hh) => {
+      const spots = L.spots ? H(L.spots) : null, rind = L.rind ? H(L.rind) : null;
+      if (L.crumbled) {   // smulad ost: många små kuber
+        for (let i = 0; i < 9; i++) { const x = cu - r * 0.7 + (i % 3) * r * 0.7 + hash(i, 1) * 0.5, y = cv - r * 0.7 + Math.floor(i / 3) * r * 0.7 + hash(i, 2) * 0.5, s2 = 0.35 + hash(i, 3) * 0.3; R.box(x, x + s2, y, y + s2, z0, z0 + 0.35, (f) => (f === 'top' ? col : shade(col, 0.88)), id, { noEdges: true }); }
+        return;
+      }
+      if (L.flakes) {   // hyvlade flingor
+        for (let i = 0; i < 7; i++) { const x = cu - r * 0.8 + hash(i, 4) * r * 1.5, y = cv - r * 0.8 + hash(i, 5) * r * 1.5, w = 0.6 + hash(i, 6) * 0.6; R.box(x, x + w, y, y + 0.35, z0 + (i % 2) * 0.08, z0 + 0.1 + (i % 2) * 0.08, () => (hash(i, 7) > 0.5 ? col : shade(col, 0.92)), id, { noEdges: true }); }
+        return;
+      }
+      const tex = (f, x, y, W, Hh, d) => {
+        if (L.grillmarks && f === 'top' && ((x + y) % 1.1) < 0.18) return shade(col, 0.6);
+        if (rind && f === 'top' && d > 0.85) return rind;
+        if (L.crumbs && f === 'top' && hash(x * 4 | 0, y * 4 | 0) > 0.6) return shade(col, 0.8);
         if (spots && hash(x * 2 | 0, y * 2 | 0) > 0.86) return spots;
         if (L.holes && hash(x * 1.5 | 0, y * 1.5 | 0) > 0.9) return shade(col, 0.75);
+        if (L.drip && f !== 'top') return hash(x * 2 | 0, 1) > 0.5 ? col : -1;   // rinner ner längs sidorna
         return f === 'top' ? col : shade(col, 0.88);
       };
-      if (L.round) disc(R, cu, cv, z0, z0 + h, s, tex, id);
-      else R.box(cu - s, cu + s, cv - s, cv + s, z0, z0 + h, (f, x, y, W, Hh) => {
+      if (L.round) disc(R, cu, cv, z0, z0 + (L.crumbs ? 0.5 : h), s, tex, id);
+      else R.box(cu - s, cu + s, cv - s, cv + s, z0, z0 + h + (L.drip ? 0.2 : 0), (f, x, y, W, Hh) => {
         // smält ost: hörnen droppar av
         if (L.melt !== false && f === 'top') { const c = Math.min(x, W - x, y, Hh - y); if (c < 0.4 && hash(x * 3 | 0, y * 3 | 0) > 0.55) return -1; }
-        return tex(f, x, y, W, Hh);
+        return tex(f, x, y, W, Hh, Math.max(Math.abs(x - W / 2) / (W / 2), Math.abs(y - Hh / 2) / (Hh / 2)));
       }, id, { noEdges: true });
       return;
     }
@@ -99,7 +119,7 @@ export function drawLayer(R, part, o) {
     case 'slice': {
       const inner = H(L.inner || shade(col, 1.3)), n = L.n || 2, rr = L.big ? r * 0.95 : L.small ? r * 0.32 : r * 0.55, h = layerHeight(part);
       for (let i = 0; i < n; i++) {
-        const a = i * (Math.PI * 2 / n) + 0.7, x = n === 1 ? cu : cu + Math.cos(a) * r * 0.42, y = n === 1 ? cv : cv + Math.sin(a) * r * 0.42;
+        const a = i * (Math.PI * 2 / n) + 0.7, x = n === 1 ? cu : cu + Math.cos(a) * r * (L.small ? 0.5 : 0.42), y = n === 1 ? cv : cv + Math.sin(a) * r * (L.small ? 0.5 : 0.42);
         disc(R, x, y, z0, z0 + h, rr, (f, xx, yy, W, Hh, d) => (f === 'top' ? (d > 0.82 ? col : d < 0.5 && hash(xx * 2 | 0, yy * 2 | 0) > 0.6 ? shade(inner, 1.1) : inner) : shade(col, 0.85)), id);
       }
       return;
@@ -124,9 +144,24 @@ export function drawLayer(R, part, o) {
       disc(R, cu, cv, z0, z0 + h, r * 0.9, (f, x, y, W, Hh, d) => (spots && hash(x * 3 | 0, y * 3 | 0) > 0.9 ? spots : f === 'top' ? (d < 0.3 ? shade(col, 1.12) : col) : shade(col, 0.85)), id, { wave: L.drops ? 0.15 : 0.06, waveN: 5, seed: 5 });
       return;
     }
+    case 'drizzle': {   // ringlad sås: sicksack-linjer
+      const spots = L.spots ? H(L.spots) : null;
+      for (let i = 0; i < 5; i++) { const v = cv - r * 0.8 + i * r * 0.4, x0 = cu - r * 0.85 + (i % 2) * 0.4; R.box(x0, x0 + r * 1.5, v, v + 0.22, z0, z0 + 0.1, (f, x) => (spots && hash(x * 4 | 0, i) > 0.7 ? spots : col), id, { noEdges: true }); }
+      for (let i = 0; i < 4; i++) { const v = cv - r * 0.6 + i * r * 0.4, x0 = (i % 2) ? cu - r * 0.85 : cu + r * 0.45; R.box(x0, x0 + 0.22, v, v + r * 0.4, z0, z0 + 0.1, () => col, id, { noEdges: true }); }
+      return;
+    }
     case 'chunky': {
       const light = H(L.light || shade(col, 1.3)), h = layerHeight(part);
       disc(R, cu, cv, z0, z0 + h, r * 0.9, (f, x, y, W, Hh, d) => (hash(x * 2.5 | 0, y * 2.5 | 0) > (L.crisp ? 0.45 : 0.6) ? light : col), id, { wave: 0.12, waveN: 11, seed: 6 });
+      return;
+    }
+    case 'square': {   // platt fyrkant (hash brown, tempeh)
+      const h = layerHeight(part);
+      slab(R, cu, cv, z0, z0 + h, r * 0.85, (f, x, y, W, Hh) => (f === 'top' ? (L.crumbs && hash(x * 4 | 0, y * 4 | 0) > 0.55 ? dark : hash(x * 3 | 0, y * 3 | 0) > 0.9 ? shade(col, 1.15) : col) : shade(col, 0.85)), id);
+      return;
+    }
+    case 'herb': {   // hackade örter: små bitar utspridda
+      for (let i = 0; i < 14; i++) { const x = cu - r * 0.85 + hash(i, 11) * r * 1.7, y = cv - r * 0.85 + hash(i, 12) * r * 1.7; R.box(x, x + 0.3, y, y + 0.3, z0, z0 + 0.12, () => (hash(i, 13) > 0.5 ? col : shade(col, 0.8)), id, { noEdges: true }); }
       return;
     }
   }
@@ -137,44 +172,69 @@ function bunTex(part, L, col, crust, top) {
     if (f !== 'top') return d > 0.4 && hash(x * 3 | 0, y * 3 | 0) > 0.85 ? shade(crust, 0.9) : crust;
     if (!top) { // snittytan: ljust inkråm med skorpa runt om
       if (d > 0.88) return crust;
+      if (L.grain) return hash(x * 4 | 0, y * 4 | 0) > 0.6 ? 0xf8f6f0 : 0xe8e4d8;
       return hash(x * 3 | 0, y * 3 | 0) > 0.85 ? shade(0xf0dcb0, 0.92) : 0xf0dcb0;
     }
     if (L.lettuce) return hash(x * 2 | 0, y * 2 | 0) > 0.8 ? shade(col, 0.8) : col;
+    if (L.glaze && d < 0.92) return hash(x * 3 | 0, y * 3 | 0) > 0.9 ? shade(H(L.glaze), 0.94) : H(L.glaze);
+    if (L.waffle) return ((x * 1.6) % 1 < 0.35 || (y * 1.6) % 1 < 0.35) ? shade(col, 0.75) : col;
+    if (L.noodles) return ((x * 2 + Math.sin(y * 3) * 0.8) % 1) < 0.4 ? shade(col, 0.8) : col;
+    if (L.grain) return hash(x * 4 | 0, y * 4 | 0) > 0.6 ? 0xf8f6f0 : 0xe8e4d8;
+    if (L.star && d < 0.85) { const a = Math.atan2(y - Hh / 2, x - W / 2); if (Math.abs(Math.sin(a * 2.5 + 0.3)) < 0.12) return shade(col, 0.72); }
+    if (L.dimples && hash(x | 0, y | 0) > 0.7 && (x % 1) < 0.4 && (y % 1) < 0.4) return shade(col, 0.72);
+    if (L.blister && hash(x * 1.5 | 0, y * 1.5 | 0) > 0.85) return shade(col, 0.55);
+    if (L.herbs && hash(x * 3 | 0, y * 3 | 0) > 0.86) return 0x4a8a3a;
     if (L.sesame && hash(x * 2.5 | 0, y * 2.5 | 0) > 0.86) return 0xf6ecd0;
+    if (L.poppy && hash(x * 3 | 0, y * 3 | 0) > 0.82) return 0x2a2a30;
     if (L.seeds && hash(x * 3 | 0, y * 3 | 0) > 0.85) return 0x6a4a2a;
     if (L.salt && hash(x * 3 | 0, y * 3 | 0) > 0.9) return 0xffffff;
     if (L.flour && hash(x * 1.5 | 0, y * 1.5 | 0) > 0.7) return shade(col, 1.15);
+    if (L.bao) return d < 0.3 ? shade(col, 1.03) : col;
     return d < 0.35 && L.gloss ? shade(col, 1.18) : col;
   };
 }
 function drawBunBottom(R, part, cu, cv, z0, r, id) {
   const L = part.look || {}, col = H(L.color), crust = H(L.crust || shade(col, 0.8)), h = layerHeight(part);
   if (L.lettuce) { disc(R, cu, cv, z0, z0 + h, r * 1.1, bunTex(part, L, col, crust, true), id, { wave: 0.14, waveN: 7, seed: 7 }); return; }
+  if (L.square) { slab(R, cu, cv, z0, z0 + h, r * 0.95, bunTex(part, L, col, crust, false), id); return; }
   disc(R, cu, cv, z0, z0 + h, r, bunTex(part, L, col, crust, false), id, { hole: L.hole ? 0.3 : 0 });
 }
 function drawBunTop(R, part, cu, cv, z0, r, id) {
   const L = part.look || {}, col = H(L.color), crust = H(L.crust || shade(col, 0.8)), tex = bunTex(part, L, col, crust, true);
   if (L.lettuce) { disc(R, cu, cv, z0, z0 + 0.5, r * 1.1, tex, id, { wave: 0.14, waveN: 7, seed: 8 }); return; }
   if (L.flat) { disc(R, cu, cv, z0, z0 + 0.5, r, tex, id); return; }
-  const total = bunTopHeight(part), steps = [[1, 0.36], [0.92, 0.26], [0.78, 0.2], [0.58, 0.12], [0.34, 0.06]];
+  if (L.square) { slab(R, cu, cv, z0, z0 + 0.5, r * 0.95, (f, x, y, W, Hh, d) => (f === 'top' ? (hash(x * 3 | 0, y * 3 | 0) > 0.85 ? shade(crust, 1.1) : d > 0.9 ? shade(crust, 0.9) : col) : crust), id); return; }
+  const total = bunTopHeight(part), steps = L.bao ? [[1, 0.3], [0.96, 0.25], [0.86, 0.2], [0.66, 0.15], [0.36, 0.1]] : [[1, 0.36], [0.92, 0.26], [0.78, 0.2], [0.58, 0.12], [0.34, 0.06]];
   let z = z0;
-  for (const [f, hf] of steps) { const h = total * hf; disc(R, cu, cv, z, z + h, r * f, (ff, x, y, W, Hh, d) => (ff === 'top' && f < 1 ? tex('top', x, y, W, Hh, d * f) : ff === 'top' ? tex('top', x, y, W, Hh, d) : crust), id, { hole: L.hole && f === 1 ? 0.3 : 0 }); z += h; }
+  for (const [f, hf] of steps) { const h = total * hf; disc(R, cu, cv, z, z + h, r * f, (ff, x, y, W, Hh, d) => (ff === 'top' && f < 1 ? tex('top', x, y, W, Hh, d * f) : ff === 'top' ? tex('top', x, y, W, Hh, d) : L.glaze ? H(L.glaze) : crust), id, { hole: L.hole && f === 1 ? 0.3 : 0 }); z += h; }
 }
 
 // ---------- Tillbehör, drycker, efterrätter ----------
 export function drawSide(R, part, o) {
   const L = part.look || {}, [cu, cv, z0] = o.at, id = o.id || 0, col = H(L.color || '#f0c050');
   const paper = 0xd9322a;
+  const pocket = () => R.box(cu - 2.2, cu + 2.2, cv - 1.4, cv + 1.4, z0, z0 + 2.0, (f, x, y, W, Hh) => (f === 'top' ? -1 : (Hh - y < 0.25 ? shade(paper, 0.7) : y < 0.3 ? shade(paper, 1.15) : hash(x * 4 | 0, y * 4 | 0) > 0.9 ? shade(paper, 1.1) : paper)), id, { noEdges: true });
+  const blobs = (cols, z) => { for (let i = 0; i < 8; i++) { const c = H(cols[i % cols.length]), x = cu - 1.6 + hash(i, 21) * 3.0, y = cv - 0.9 + hash(i, 22) * 1.6; disc(R, x, y, z, z + 0.25, 0.45 + hash(i, 23) * 0.3, (f) => (f === 'top' ? c : shade(c, 0.85)), id); } };
   if (L.shape === 'fries' || L.shape === 'nuggets') {
-    // röd pappersficka
-    R.box(cu - 2.2, cu + 2.2, cv - 1.4, cv + 1.4, z0, z0 + 2.0, (f, x, y, W, Hh) => (f === 'top' ? -1 : (Hh - y < 0.25 ? shade(paper, 0.7) : y < 0.3 ? shade(paper, 1.15) : hash(x * 4 | 0, y * 4 | 0) > 0.9 ? shade(paper, 1.1) : paper)), id, { noEdges: true });
+    pocket();
     if (L.shape === 'fries') {
-      const n = L.wedges ? 6 : 11, w = L.wedges ? 0.8 : 0.42;
-      for (let i = 0; i < n; i++) {
-        const x = cu - 1.7 + (i % 6) * 0.68 + hash(i, 1) * 0.2, y = cv - 0.8 + Math.floor(i / 6) * 0.9 + hash(i, 2) * 0.5, h = 2.6 + hash(i, 3) * 1.1;
-        R.box(x, x + w, y, y + w * 0.8, z0 + 0.6, z0 + h, (f, xx, yy) => (f === 'top' ? shade(col, 1.15) : (L.curly && (yy * 3 | 0) % 2 ? shade(col, 0.8) : hash(xx * 6 | 0, yy * 6 | 0) > 0.85 ? shade(col, 0.8) : col)), id, { noEdges: true });
+      if (L.waffle) {   // rutiga plattor
+        for (let i = 0; i < 6; i++) { const x = cu - 1.6 + (i % 3) * 1.1, y = cv - 0.9 + Math.floor(i / 3) * 1.0, zz = z0 + 1.2 + (i % 2) * 0.5; R.box(x, x + 1.0, y, y + 0.9, zz, zz + 0.25, (f, xx, yy) => (f === 'top' && ((xx * 3 | 0) % 2 === 0 && (yy * 3 | 0) % 2 === 0) ? -1 : hash(xx * 4 | 0, yy * 4 | 0) > 0.85 ? shade(col, 0.8) : col), id, { noEdges: true }); }
+      } else {
+        const n = L.wedges ? 6 : L.big ? 15 : 11, w = L.wedges ? 0.8 : L.thick ? 0.6 : 0.42, top = z0 + (L.big ? 3.6 : 2.6);
+        for (let i = 0; i < n; i++) {
+          const x = cu - 1.7 + (i % 6) * 0.68 + hash(i, 1) * 0.2, y = cv - 0.8 + Math.floor(i / 6) * 0.9 + hash(i, 2) * 0.5, h = top + hash(i, 3) * 1.1;
+          R.box(x, x + w, y, y + w * 0.8, z0 + 0.6, h, (f, xx, yy) => (f === 'top' ? shade(col, 1.15) : (L.curly && (yy * 3 | 0) % 2 ? shade(col, 0.8) : hash(xx * 6 | 0, yy * 6 | 0) > 0.85 ? shade(col, 0.8) : col)), id, { noEdges: true });
+        }
       }
       if (L.truffle) for (let i = 0; i < 6; i++) { const x = cu - 1.5 + hash(i, 7) * 3, y = cv - 1 + hash(i, 8) * 2; R.box(x, x + 0.25, y, y + 0.25, z0 + 3.2, z0 + 3.3, () => 0x3a2a1a, id, { noEdges: true }); }
+      if (L.topping) blobs(L.topping, z0 + 3.0);
+    } else if (L.tots) {
+      for (let i = 0; i < 7; i++) disc(R, cu - 1.4 + (i % 4) * 0.95, cv - 0.6 + Math.floor(i / 4) * 1.0, z0 + 1.2 + (i > 3 ? 0.4 : 0), z0 + 2.0 + (i > 3 ? 0.4 : 0), 0.5, (f, x, y) => (hash(x * 4 | 0, y * 4 | 0) > 0.8 ? shade(col, 0.82) : f === 'top' ? shade(col, 1.1) : col), id);
+    } else if (L.wings) {
+      for (let i = 0; i < 5; i++) { const x = cu - 1.7 + (i % 3) * 1.2, y = cv - 0.9 + Math.floor(i / 3) * 1.1; R.box(x, x + 1.4, y, y + 0.6, z0 + 1.2 + (i % 2) * 0.3, z0 + 2.0 + (i % 2) * 0.3, (f, xx, yy) => (hash(xx * 4 | 0, yy * 4 | 0) > 0.75 ? shade(col, 0.7) : f === 'top' ? shade(col, 1.1) : col), id, { noEdges: true }); }
+    } else if (L.flat) {
+      for (let i = 0; i < 3; i++) R.box(cu - 1.5, cu + 1.5, cv - 0.9 + i * 0.7, cv - 0.3 + i * 0.7, z0 + 1.2 + i * 0.35, z0 + 1.6 + i * 0.35, (f, x, y) => (hash(x * 4 | 0, y * 4 | 0) > 0.7 ? shade(col, 0.8) : f === 'top' ? shade(col, 1.1) : col), id, { noEdges: true });
     } else {
       const n = L.sticks ? 4 : L.small ? 7 : 5;
       for (let i = 0; i < n; i++) {
@@ -190,11 +250,40 @@ export function drawSide(R, part, o) {
     return;
   }
   if (L.shape === 'salad') {
-    disc(R, cu, cv, z0, z0 + 1.2, 2.2, (f, x, y, W, Hh, d) => (f === 'top' ? (d > 0.86 ? 0xf0ece0 : hash(x * 2 | 0, y * 2 | 0) > 0.7 ? shade(col, 0.75) : hash(x * 3 | 0, y * 3 | 0) > 0.9 ? 0xe0392e : col) : 0xf0ece0), id);
+    const bits = (L.bits || ['#e0392e']).map(H);
+    disc(R, cu, cv, z0, z0 + 1.2, 2.2, (f, x, y, W, Hh, d) => (f === 'top' ? (d > 0.86 ? 0xf0ece0 : hash(x * 2 | 0, y * 2 | 0) > 0.7 ? shade(col, 0.75) : hash(x * 3 | 0, y * 3 | 0) > 0.86 ? bits[(x * 7 + y * 3 | 0) % bits.length] : col) : 0xf0ece0), id);
     return;
   }
   if (L.shape === 'corn') {
     R.box(cu - 2.4, cu + 2.4, cv - 0.7, cv + 0.7, z0, z0 + 1.2, (f, x, y) => ((x * 4 | 0) % 2 === (y * 4 | 0) % 2 ? col : shade(col, 0.85)), id, { noEdges: true });
+    return;
+  }
+  if (L.shape === 'mash') {   // kulle av mos i skål med smörklick
+    disc(R, cu, cv, z0, z0 + 0.5, 2.2, (f, x, y, W, Hh, d) => (f === 'top' ? (d > 0.85 ? 0xf0ece0 : col) : 0xf0ece0), id);
+    for (let i = 0; i < 3; i++) disc(R, cu, cv, z0 + 0.5 + i * 0.4, z0 + 0.9 + i * 0.4, 1.8 - i * 0.5, (f, x, y) => (hash(x * 3 | 0, y * 3 | 0) > 0.85 ? shade(col, 0.92) : col), id, { wave: 0.08, waveN: 6, seed: i });
+    disc(R, cu, cv, z0 + 1.7, z0 + 1.95, 0.45, () => 0xf0c030, id);
+    return;
+  }
+  if (L.shape === 'bag') {   // chipspåse: stående med etikett
+    const label = H(L.label || '#c02020');
+    R.box(cu - 1.3, cu + 1.3, cv - 0.6, cv + 0.6, z0, z0 + 3.6, (f, x, y, W, Hh) => (f === 'top' ? shade(col, 0.8) : (y > 1.0 && y < 2.4 && x > 0.4 && x < W - 0.4 ? label : y < 0.3 || Hh - y < 0.3 ? shade(col, 0.8) : hash(x * 3 | 0, y * 3 | 0) > 0.9 ? shade(col, 1.1) : col)), id, { noEdges: true });
+    return;
+  }
+  if (L.shape === 'sticks') {   // grönsaksstavar i en mugg
+    const cols = (L.colors || ['#f08a2a']).map(H), cup = 0xf4f1ea;
+    disc(R, cu, cv, z0, z0 + 2.0, 1.3, (f, x, y, W, Hh, d) => (f === 'top' ? (d > 0.8 ? cup : 0xe8e0a0) : cup), id);
+    for (let i = 0; i < 6; i++) { const c = cols[i % cols.length], x = cu - 0.8 + hash(i, 31) * 1.4, y = cv - 0.8 + hash(i, 32) * 1.4; R.box(x, x + 0.3, y, y + 0.3, z0 + 1.5, z0 + 3.4 + hash(i, 33) * 0.8, () => c, id, { noEdges: true }); }
+    return;
+  }
+  if (L.shape === 'potato') {   // bakad potatis med smör
+    disc(R, cu, cv, z0, z0 + 1.4, 2.0, (f, x, y, W, Hh, d) => (f === 'top' ? (d < 0.55 ? (hash(x * 3 | 0, y * 3 | 0) > 0.8 ? 0xf0e8c8 : 0xfbf6e0) : hash(x * 3 | 0, y * 3 | 0) > 0.8 ? shade(col, 0.8) : col) : shade(col, 0.9)), id, { ry: 1.3 });
+    disc(R, cu, cv, z0 + 1.4, z0 + 1.65, 0.4, () => 0xf0c030, id);
+    return;
+  }
+  if (L.shape === 'nachos') {   // korg med chips och ostsås
+    R.box(cu - 2.3, cu + 2.3, cv - 1.6, cv + 1.6, z0, z0 + 0.4, () => 0xd8cfb8, id, { noEdges: true });
+    for (let i = 0; i < 9; i++) { const x = cu - 1.9 + (i % 3) * 1.3 + hash(i, 41) * 0.3, y = cv - 1.3 + Math.floor(i / 3) * 0.9, zz = z0 + 0.4 + (i % 3) * 0.3; R.box(x, x + 1.1, y, y + 0.8, zz, zz + 0.15, (f, xx, yy, W, Hh) => (f === 'top' && xx + yy > W ? -1 : hash(xx * 4 | 0, yy * 4 | 0) > 0.85 ? shade(col, 0.85) : col), id, { noEdges: true }); }
+    if (L.topping) blobs(L.topping, z0 + 1.3);
     return;
   }
   if (L.shape === 'cup') return drawCup(R, part, cu, cv, z0, id);
@@ -215,6 +304,21 @@ export function drawCup(R, part, cu, cv, z0, id) {
     R.box(cu + 1.3, cu + 2.0, cv - 0.3, cv + 0.3, z0 + 0.8, z0 + 2.0, () => cup, id, { noEdges: true });   // handtag
     return;
   }
+  if (L.glass) {   // genomskinligt glas: drycken syns, ljus kant upptill
+    disc(R, cu, cv, z0, z0 + 3.2, 1.2, (f, x, y, W, Hh, d) => (f === 'top' ? (d > 0.85 ? 0xdde6ee : shade(drink, 1.05)) : (y < 0.35 ? 0xdde6ee : x < 0.35 ? shade(drink, 1.25) : shade(drink, 0.95))), id);
+    return;
+  }
+  if (L.slush) {   // slushmugg med kupollock
+    disc(R, cu, cv, z0, z0 + 3.4, 1.4, (f, x, y, W, Hh, d) => (f === 'top' ? -1 : (y < 0.3 ? 0xdde6ee : y > 0.5 && y < 2.4 && x > 0.3 && x < W - 0.3 ? drink : cup)), id);
+    for (let i = 0; i < 3; i++) disc(R, cu, cv, z0 + 3.4 + i * 0.45, z0 + 3.85 + i * 0.45, 1.4 - i * 0.4, (f, x, y, W, Hh, d) => (f === 'top' ? shade(drink, 1.25 - d * 0.2) : shade(drink, 1.15)), id);
+    R.box(cu + 0.2, cu + 0.42, cv - 0.5, cv - 0.3, z0 + 4.5, z0 + 6.2, () => 0xe03a6a, id, { noEdges: true });
+    return;
+  }
+  if (L.pearls) {   // bubble tea: pärlor i botten, brett sugrör
+    disc(R, cu, cv, z0, z0 + 4.0, 1.4, (f, x, y, W, Hh, d) => (f === 'top' ? (d > 0.85 ? 0xdde6ee : shade(drink, 1.05)) : (y < 0.3 ? 0xdde6ee : Hh - y < 1.1 && hash(x * 3 | 0, y * 3 | 0) > 0.45 ? 0x2a1a14 : shade(drink, 0.98))), id);
+    R.box(cu - 0.2, cu + 0.3, cv - 0.4, cv - 0.1, z0 + 4.0, z0 + 6.0, () => 0xf0a0c0, id, { noEdges: true });
+    return;
+  }
   const hgt = L.shake ? 4.6 : 4.0;
   disc(R, cu, cv, z0, z0 + hgt * 0.35, 1.35, (f, x, y, W, Hh) => (f === 'top' ? -1 : (hash(x * 3 | 0, y * 3 | 0) > 0.9 ? shade(cup, 0.85) : cup)), id);
   disc(R, cu, cv, z0 + hgt * 0.35, z0 + hgt, 1.55, (f, x, y, W, Hh, d) => (f === 'top' ? (L.shake ? (d < 0.7 ? 0xfaf6ee : cup) : d > 0.9 ? cup : d < 0.12 ? 0xffffff : shade(cup, 0.95)) : (y < 0.25 ? shade(cup, 1.1) : hash(x * 3 | 0, y * 3 | 0) > 0.9 ? shade(cup, 0.85) : L.ice && y > 1 && y < 2 ? drink : cup)), id);
@@ -222,15 +326,25 @@ export function drawCup(R, part, cu, cv, z0, id) {
   R.box(cu + 0.4, cu + 0.62, cv - 0.6, cv - 0.4, z0 + hgt, z0 + hgt + 2.0, () => (L.shake ? 0xe0392e : 0xd8dce0), id, { noEdges: true });   // sugrör
 }
 export function drawDessert(R, part, cu, cv, z0, id) {
-  const L = part.look || {}, col = H(L.color || '#d8a050'), top = H(L.top || shade(col, 0.8));
-  switch (part.id) {
-    case 'mjukglass': disc(R, cu, cv, z0, z0 + 2.2, 0.9, (f) => (f === 'top' ? -1 : (f === 'left' ? shade(0xd8a050, 0.9) : 0xd8a050)), id); for (let i = 0; i < 4; i++) disc(R, cu, cv, z0 + 2.2 + i * 0.6, z0 + 2.8 + i * 0.6, 1.4 - i * 0.3, (f) => (f === 'top' ? col : shade(col, 0.92)), id); return;
-    case 'donut': disc(R, cu, cv, z0, z0 + 1.0, 2.0, (f, x, y, W, Hh, d) => (f === 'top' ? (d > 0.5 && hash(x * 3 | 0, y * 3 | 0) > 0.9 ? 0xffffff : top) : col), id, { hole: 0.4 }); return;
-    case 'brownie': R.box(cu - 1.8, cu + 1.8, cv - 1.4, cv + 1.4, z0, z0 + 1.1, (f, x, y) => (hash(x * 3 | 0, y * 3 | 0) > 0.85 ? top : col), id, { noEdges: true }); return;
-    case 'cookie': disc(R, cu, cv, z0, z0 + 0.5, 2.0, (f, x, y, W, Hh) => (hash(x * 2.5 | 0, y * 2.5 | 0) > 0.82 ? top : col), id); return;
-    case 'churros': for (let i = 0; i < 3; i++) R.box(cu - 2.5, cu + 2.5, cv - 1.2 + i * 0.9, cv - 0.6 + i * 0.9, z0 + i * 0.1, z0 + 0.6 + i * 0.1, (f, x, y) => ((x * 3 | 0) % 2 ? shade(col, 0.85) : col), id, { noEdges: true }); R.box(cu + 0.5, cu + 2.4, cv - 0.5, cv + 1.6, z0, z0 + 1.6, (f, x, y, W, Hh) => (f === 'top' ? top : 0xf4f1ea), id, { noEdges: true }); return;
-    case 'sundae': disc(R, cu, cv, z0, z0 + 1.6, 1.4, (f, x, y, W, Hh) => (f === 'top' ? -1 : 0xdfe4ea), id); disc(R, cu, cv, z0 + 1.4, z0 + 2.6, 1.5, (f, x, y, W, Hh, d) => (f === 'top' ? (d < 0.5 ? top : hash(x * 4 | 0, y * 4 | 0) > 0.85 ? 0xe0392e : col) : col), id); return;
-    case 'cheesecake': case 'applepaj': R.box(cu - 1.5, cu + 1.5, cv - 1.8, cv + 1.8, z0, z0 + 1.2, (f, x, y, W, Hh) => (f === 'top' ? (hash(x * 3 | 0, y * 3 | 0) > 0.75 ? top : col) : (y < 0.25 ? col : shade(col, 0.85))), id, { noEdges: true }); return;
+  const L = part.look || {}, col = H(L.color || '#d8a050'), top = H(L.top || shade(col, 0.8)), cream = 0xfaf6ee;
+  const swirl = (z, n, r0) => { for (let i = 0; i < n; i++) disc(R, cu, cv, z + i * 0.6, z + 0.6 + i * 0.6, r0 - i * 0.3, (f, x, y, W, Hh, d) => (f === 'top' ? (L.sprinkles && hash(x * 3 | 0, y * 3 | 0) > 0.8 ? [0xe04a8a, 0x3a8ae0, 0xf0c030][(x * 5 | 0) % 3] : L.dip && i >= n - 2 ? H(L.dip) : col) : (L.dip && i >= n - 2 ? H(L.dip) : shade(col, 0.92))), id); };
+  switch (L.form) {
+    case 'cone': disc(R, cu, cv, z0, z0 + 2.2, 0.9, (f) => (f === 'top' ? -1 : (f === 'left' ? shade(H(L.cone || '#d8a050'), 0.9) : H(L.cone || '#d8a050'))), id); swirl(z0 + 2.2, 4, 1.4); return;
+    case 'scoops': disc(R, cu, cv, z0, z0 + 2.2, 0.9, (f) => (f === 'top' ? -1 : (f === 'left' ? shade(0xd8a050, 0.9) : 0xd8a050)), id); disc(R, cu, cv, z0 + 2.2, z0 + 3.4, 1.3, (f, x, y) => (hash(x * 3 | 0, y * 3 | 0) > 0.85 ? shade(col, 0.9) : col), id); disc(R, cu, cv, z0 + 3.4, z0 + 4.5, 1.1, (f, x, y) => (hash(x * 3 | 0, y * 3 | 0) > 0.85 ? shade(top, 0.9) : top), id); return;
+    case 'ring': disc(R, cu, cv, z0, z0 + 1.0, 2.0, (f, x, y, W, Hh, d) => (f === 'top' ? (d > 0.5 && hash(x * 3 | 0, y * 3 | 0) > 0.9 ? 0xffffff : top) : col), id, { hole: 0.4 }); return;
+    case 'slab': R.box(cu - 1.8, cu + 1.8, cv - 1.4, cv + 1.4, z0, z0 + 1.1, (f, x, y) => (hash(x * 3 | 0, y * 3 | 0) > 0.85 ? top : col), id, { noEdges: true }); if (L.scoop) disc(R, cu + 0.4, cv - 0.2, z0 + 1.1, z0 + 2.2, 1.0, (f) => (f === 'top' ? top : shade(top, 0.9)), id); return;
+    case 'disc': disc(R, cu, cv, z0, z0 + 0.5, 2.0, (f, x, y, W, Hh) => (hash(x * 2.5 | 0, y * 2.5 | 0) > 0.82 ? top : col), id); return;
+    case 'sticks': for (let i = 0; i < 3; i++) R.box(cu - 2.5, cu + 2.5, cv - 1.2 + i * 0.9, cv - 0.6 + i * 0.9, z0 + i * 0.1, z0 + 0.6 + i * 0.1, (f, x, y) => ((x * 3 | 0) % 2 ? shade(col, 0.85) : col), id, { noEdges: true }); R.box(cu + 0.5, cu + 2.4, cv - 0.5, cv + 1.6, z0, z0 + 1.6, (f, x, y, W, Hh) => (f === 'top' ? top : 0xf4f1ea), id, { noEdges: true }); return;
+    case 'cup': disc(R, cu, cv, z0, z0 + 1.6, 1.4, (f, x, y, W, Hh) => (f === 'top' ? -1 : 0xdfe4ea), id); disc(R, cu, cv, z0 + 1.4, z0 + 2.6, 1.5, (f, x, y, W, Hh, d) => (f === 'top' ? (d < 0.5 ? top : hash(x * 4 | 0, y * 4 | 0) > 0.85 ? 0xe0392e : col) : col), id); return;
+    case 'wedge': R.box(cu - 1.5, cu + 1.5, cv - 1.8, cv + 1.8, z0, z0 + 1.2, (f, x, y, W, Hh) => (f === 'top' ? (x + y * 0.8 > W ? -1 : hash(x * 3 | 0, y * 3 | 0) > 0.75 ? top : col) : (y < 0.25 ? col : shade(col, 0.85))), id, { noEdges: true }); return;
+    case 'bun': disc(R, cu, cv, z0, z0 + 1.2, 1.9, (f, x, y, W, Hh, d) => (f === 'top' ? (((d * 6) % 2) < 0.7 ? top : hash(x * 3 | 0, y * 3 | 0) > 0.85 ? 0xffffff : col) : shade(col, 0.85)), id); return;
+    case 'ball': for (let i = 0; i < 3; i++) disc(R, cu, cv, z0 + i * 0.5, z0 + 0.5 + i * 0.5, 1.4 - i * 0.45, (f, x, y) => (hash(x * 3 | 0, y * 3 | 0) > 0.7 ? top : col), id); return;
+    case 'stick': R.box(cu - 0.2, cu + 0.2, cv - 0.15, cv + 0.15, z0, z0 + 1.6, () => 0xd8b880, id, { noEdges: true }); R.box(cu - 1.0, cu + 1.0, cv - 0.5, cv + 0.5, z0 + 1.4, z0 + 4.6, (f, x, y, W, Hh) => (L.inner && f !== 'top' && y > 2.0 && x > 0.5 && x < W - 0.5 ? H(L.inner) : hash(x * 3 | 0, y * 3 | 0) > 0.9 ? shade(col, 1.1) : col), id, { noEdges: true }); return;
+    case 'roll': R.box(cu - 2.2, cu + 2.2, cv - 0.7, cv + 0.7, z0, z0 + 1.3, (f, x, y, W) => (f !== 'top' && (x < 0.7 || x > W - 0.7) ? top : x < 0.7 || x > W - 0.7 ? top : hash(x * 3 | 0, y * 3 | 0) > 0.9 ? shade(col, 1.1) : col), id, { noEdges: true }); return;
+    case 'split': R.box(cu - 2.6, cu + 2.6, cv - 1.3, cv + 1.3, z0, z0 + 0.6, (f, x, y, W, Hh) => (f === 'top' ? (Math.min(x, W - x, y, Hh - y) < 0.3 ? 0xdfe4ea : 0xf0e060) : 0xdfe4ea), id, { noEdges: true }); for (let i = 0; i < 3; i++) disc(R, cu - 1.5 + i * 1.5, cv, z0 + 0.6, z0 + 1.7, 0.8, (f, x, y, W, Hh, d) => (f === 'top' && d < 0.4 ? top : [col, 0xf0a0c0, 0x5a3a2a][i]), id); return;
+    case 'waffle': R.box(cu - 2.2, cu + 2.2, cv - 1.6, cv + 1.6, z0, z0 + 0.5, (f, x, y) => (f === 'top' && ((x * 2.2 | 0) % 2 === 0 && (y * 2.2 | 0) % 2 === 0) ? shade(col, 0.7) : col), id, { noEdges: true }); disc(R, cu + 0.6, cv, z0 + 0.5, z0 + 1.6, 1.0, (f) => (f === 'top' ? top : shade(top, 0.9)), id); disc(R, cu - 1.2, cv + 0.4, z0 + 0.5, z0 + 0.75, 0.6, () => 0xc82a3a, id); return;
+    case 'muffin': R.box(cu - 1.2, cu + 1.2, cv - 1.2, cv + 1.2, z0, z0 + 1.4, (f, x) => (f === 'top' ? shade(col, 1.05) : ((x * 3 | 0) % 2 ? 0xf4f1ea : 0xe8e0d0)), id, { noEdges: true }); disc(R, cu, cv, z0 + 1.4, z0 + 2.4, 1.5, (f, x, y, W, Hh, d) => (f === 'top' ? (hash(x * 3 | 0, y * 3 | 0) > 0.8 ? shade(top, 0.9) : top) : shade(top, 0.9)), id); return;
+    case 'macaron': for (let i = 0; i < 3; i++) { const c = [col, top, 0xf0e060][i], x = cu - 1.4 + i * 1.4; disc(R, x, cv, z0, z0 + 0.35, 0.75, (f) => c, id); disc(R, x, cv, z0 + 0.35, z0 + 0.55, 0.65, () => cream, id); disc(R, x, cv, z0 + 0.55, z0 + 0.9, 0.75, (f) => c, id); } return;
   }
   disc(R, cu, cv, z0, z0 + 1, 1.8, () => col, id);
 }
