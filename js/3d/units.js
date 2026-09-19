@@ -107,7 +107,8 @@ export class Units {
     ys.forEach((y, i) => {
       slab(g, -W / 2 + 0.05, W / 2 - 0.05, y - 0.012, y, -D / 2 + 0.04, D / 2 - 0.03, shelfMat, { cast: false });
       if (glass || style === 'led') slab(g, -W / 2 + 0.08, W / 2 - 0.08, y - 0.03, y - 0.015, D / 2 - 0.06, D / 2 - 0.04, led, { cast: false, recv: false });
-      this.row(g, parts.slice(i * per, (i + 1) * per), y, W, { z: 0.02 });
+      const r = ys.length - 1 - i;   // fyll på uppifrån – de översta hyllorna syns bäst i ögonhöjd
+      this.row(g, parts.slice(r * per, (r + 1) * per), y, W, { z: 0.02 });
     });
     // glas runt om (fram och sidor) – bara i glas-/led-stil
     if (glass) {
@@ -192,7 +193,8 @@ export class Units {
       slab(g, -W / 2 + 0.03, W / 2 - 0.03, y - 0.03, y, -D / 2 + 0.02, D / 2 - 0.02, wood);
       slab(g, -W / 2 + 0.05, W / 2 - 0.05, y + 0.4, y + 0.415, D / 2 - 0.08, D / 2 - 0.06, ledStrip(), { cast: false, recv: false });
       const gg = new THREE.Group(); gg.position.z = 0.04; g.add(gg);
-      this.row(gg, games.slice(i * per, (i + 1) * per), y, W, { gap: 0.04, jitter: 0.08 });
+      const r = ys.length - 1 - i;   // uppifrån
+      this.row(gg, games.slice(r * per, (r + 1) * per), y, W, { gap: 0.04, jitter: 0.08 });
     });
     const s = signBoard('SPEL', Math.min(W - 0.1, 1.4), 0.24, { bg: '#3a78d8', sub: `${games.length} titlar` });
     s.position.set(0, 2.07, D / 2 - 0.05); g.add(s);

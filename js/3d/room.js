@@ -190,8 +190,12 @@ export function buildRoom(scene, ctx) {
   const cab = A.get('drawer_cabinet');
   if (cab) {
     const cw = A.modelSize(cab).x || 0.8, n = Math.max(1, Math.floor((bx0 - 0.15 - (cx0 + 0.1)) / cw));
-    for (let i = 0; i < n; i++) { const c = A.instance(cab); c.position.set(cx0 + 0.1 + cw * (i + 0.5), 0, A.modelSize(cab).z / 2 + 0.02); g.add(c); }
-    out.cabinetTop = { y: A.modelSize(cab).y, x0: cx0 + 0.1, x1: cx0 + 0.1 + cw * n, z: A.modelSize(cab).z / 2 + 0.02 };
+    let first = null;
+    for (let i = 0; i < n; i++) { const c = A.instance(cab); c.position.set(cx0 + 0.1 + cw * (i + 0.5), 0, A.modelSize(cab).z / 2 + 0.02); g.add(c); first ||= c; }
+    // modellens boundingbox är högre än själva skåpet (lösa lådor i filen) – mät ovansidan med en stråle
+    let topY = Math.min(1.1, A.modelSize(cab).y);
+    if (first) { first.updateMatrixWorld(true); const rc = new THREE.Raycaster(new THREE.Vector3(first.position.x, 1.6, first.position.z), new THREE.Vector3(0, -1, 0));   /* under den tunna topplattan: lådsektionens ovansida */ const hit = rc.intersectObject(first, true)[0]; if (hit && hit.point.y > 0.3 && hit.point.y < 1.6) topY = hit.point.y; }
+    out.cabinetTop = { y: topY, x0: cx0 + 0.1, x1: cx0 + 0.1 + cw * n, z: A.modelSize(cab).z / 2 + 0.02 };
   } else {
     slab(g, cx0 + 0.1, bx0 - 0.15, 0, 0.9, 0.02, 0.5, A.pbr('oak_veneer_01', { repeat: [2, 0.4] }));
     out.cabinetTop = { y: 0.9, x0: cx0 + 0.1, x1: bx0 - 0.15, z: 0.26 };
