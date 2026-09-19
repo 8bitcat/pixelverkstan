@@ -1,0 +1,148 @@
+{
+ "chars": [
+  {
+   "file": "ch03.glb",
+   "src": "Catwalk Walk Forward HighKnees (1).fbx",
+   "base": "Ch03",
+   "height": 166.4,
+   "bones": 65,
+   "prefix": "mixamorig",
+   "tris": 28106,
+   "mats": [
+    "Ch03_Body"
+   ],
+   "bytes": 1251608
+  },
+  {
+   "file": "ch22.glb",
+   "src": "Catwalk Walk Forward HighKnees (2).fbx",
+   "base": "Ch22",
+   "height": 175.2,
+   "bones": 111,
+   "prefix": "mixamorig2",
+   "tris": 54883,
+   "mats": [
+    "Ch22_body",
+    "Ch22_hair"
+   ],
+   "bytes": 3007340
+  },
+  {
+   "file": "ch31.glb",
+   "src": "Catwalk Walk Forward HighKnees (3).fbx",
+   "base": "Ch31",
+   "height": 178.2,
+   "bones": 128,
+   "prefix": "mixamorig9",
+   "tris": 50262,
+   "mats": [
+    "Ch31_body",
+    "Ch31_hair"
+   ],
+   "bytes": 2814672
+  },
+  {
+   "file": "ch08.glb",
+   "src": "Catwalk Walk Forward HighKnees (4).fbx",
+   "base": "Ch08",
+   "height": 178.1,
+   "bones": 126,
+   "prefix": "mixamorig7",
+   "tris": 56252,
+   "mats": [
+    "Ch08_body",
+    "Ch08_body1",
+    "Ch08_hair"
+   ],
+   "bytes": 3072980
+  },
+  {
+   "file": "ch13.glb",
+   "src": "Catwalk Walk Forward HighKnees (5).fbx",
+   "base": "Ch13",
+   "height": 176.2,
+   "bones": 121,
+   "prefix": "mixamorig",
+   "tris": 49792,
+   "mats": [
+    "Ch13_body",
+    "Ch13_hair"
+   ],
+   "bytes": 2564732
+  },
+  {
+   "file": "ch37.glb",
+   "src": "Catwalk Walk Forward HighKnees (6).fbx",
+   "base": "Ch37",
+   "height": 174.2,
+   "bones": 118,
+   "prefix": "mixamorig6",
+   "tris": 52118,
+   "mats": [
+    "Ch38_body",
+    "Ch37_hair"
+   ],
+   "bytes": 2624632
+  },
+  {
+   "file": "ch02.glb",
+   "src": "Catwalk Walk Forward HighKnees (7).fbx",
+   "base": "Ch02",
+   "height": 176.4,
+   "bones": 129,
+   "prefix": "mixamorig",
+   "tris": 53453,
+   "mats": [
+    "Ch02_body",
+    "Ch02_hair"
+   ],
+   "bytes": 2668756
+  },
+  {
+   "file": "ch42.glb",
+   "src": "Catwalk Walk Forward HighKnees (8).fbx",
+   "base": "Ch42",
+   "height": 180.1,
+   "bones": 109,
+   "prefix": "mixamorig",
+   "tris": 50182,
+   "mats": [
+    "Ch42_Body",
+    "Ch42_Hair"
+   ],
+   "bytes": 2732812
+  },
+  {
+   "file": "ch17.glb",
+   "src": "Catwalk Walk Forward HighKnees (9).fbx",
+   "base": "Ch17",
+   "height": 178.8,
+   "bones": 127,
+   "prefix": "mixamorig1",
+   "tris": 53733,
+   "mats": [
+    "Ch17_body",
+    "Ch17_hair"
+   ],
+   "bytes": 2973752
+  },
+  {
+   "file": "shoes.glb",
+   "src": "Catwalk Walk Forward HighKnees.fbx",
+   "base": "Shoes",
+   "height": 378.5,
+   "bones": 114,
+   "prefix": "mixamorig",
+   "tris": 35194,
+   "mats": [
+    "Shoesmat",
+    "Topmat",
+    "Bodymat",
+    "Bottommat",
+    "Hairmat",
+    "Eyelashmat"
+   ],
+   "bytes": 2157380
+  }
+ ]
+}

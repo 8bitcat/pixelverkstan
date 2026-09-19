@@ -36,6 +36,11 @@ ok(await page.evaluate(() => document.querySelector('#floor').classList.contains
 console.log('enheter', await page.evaluate(() => PV.floor.unitList.map((u) => u.i + ':' + (u.empty ? 'tom' : u.unit || u.cat) + (u.frame && PV.floor.partsFor ? '(' + PV.floor.partsFor(u).length + ')' : '')).join(' ')));
 console.log('modeller', JSON.stringify(info.models));
 ok(info.products > 3, `produktkartonger i montrarna: ${info.products}`);
+// Mixamo-figurerna laddas vid behov och ersätter Xbot-platshållarna
+await page.waitForFunction(() => [...PV.view3d.people.actors.values()].some((ac) => ac.char), null, { timeout: 120000 }).catch(() => {});
+await page.waitForTimeout(1500);
+const chars = await page.evaluate(() => [...PV.view3d.people.actors.values()].map((ac) => ac.char || (ac.wantChar ? 'väntar:' + ac.wantChar : 'xbot')));
+ok(chars.some((c) => /\.glb$/.test(c)), `Mixamo-figurer i butiken: ${chars.join(', ')} (${await page.evaluate(() => PV.view3d.people.chars.length)} i manifestet)`);
 const sz = await page.evaluate(async () => { const THREE = await import('three'); const v = PV.view3d; const hs = [...v.people.actors.values()].map((ac) => { const b = new THREE.Box3().setFromObject(ac.root, true); return +(b.max.y - b.min.y).toFixed(2); }); return { hs, height: +v.people.height.toFixed(2), canStand: v.canStand(v.pos.x, v.pos.z), fwd: v.canStand(v.pos.x + 0.3, v.pos.z), back: v.canStand(v.pos.x - 0.3, v.pos.z) }; });
 ok(sz.hs.length && sz.hs.every((h) => h > 1.1 && h < 1.95), `figurerna är människostora: ${sz.hs.join(', ')} m (rigg ${sz.height})`);
 ok(sz.canStand && sz.fwd && sz.back, `spelaren kan röra sig från startplatsen (${JSON.stringify(sz)})`);
@@ -75,11 +80,14 @@ const r = await page.evaluate(async () => {
   v.updateHover();
   const h = v.hover;
   let called = false; const orig = fl.onCustomerClick; fl.onCustomerClick = (x) => { called = true; return orig(x); };
+  const cl = document.querySelector('#modal').classList, oadd = cl.add.bind(cl), closes = [];
+  cl.add = (...a) => { if (a.includes('hidden')) closes.push(new Error().stack.split(String.fromCharCode(10)).slice(2, 5).map((l) => l.trim().replace(/^at /, '').replace(location.origin, '')).join(' | ')); return oadd(...a); };
   const toasts = []; const ot = v.hooks.toast; v.hooks.toast = (t, k) => { toasts.push(t); return ot(t, k); };
   v.interact();
   fl.onCustomerClick = orig; v.hooks.toast = ot;
   await new Promise((r) => setTimeout(r, 300));
-  return { hover: h ? h.type : null, dist: h ? +h.dist.toFixed(2) : null, called, toasts, name: c.name, clickable: fl.clickable(c), modal: !document.querySelector('#modal').classList.contains('hidden'), title: document.querySelector('#modal h2, #modal .dlg h2, #modal b')?.textContent || '' };
+  cl.add = oadd;
+  return { hover: h ? h.type : null, dist: h ? +h.dist.toFixed(2) : null, called, toasts, closes, at: [Math.round(c.x), Math.round(c.y), c.moving], name: c.name, clickable: fl.clickable(c), modal: !document.querySelector('#modal').classList.contains('hidden'), title: document.querySelector('#modal h2, #modal .dlg h2, #modal b')?.textContent || '' };
 });
 ok(r.hover === 'customer' && r.modal, `siktet träffar kunden och klicket öppnar beställningen (${JSON.stringify(r)})`);
 await page.screenshot({ path: OUT + '3d-kund.png', timeout: 120000 });

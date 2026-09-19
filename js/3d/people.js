@@ -1,9 +1,12 @@
 // Människor i 3D-butiken: riggade figurer med gå/stå-animation som följer simuleringen
-// (kunder, expedit, personal, kompisar i co-op, folk på trottoaren). Tills riktiga
-// Mixamo-figurer finns används three.js-mannekängen Xbot, färgad efter personens kläder.
+// (kunder, expedit, personal, kompisar i co-op, folk på trottoaren). Figurerna är Mixamo-
+// karaktärer (assets/3d/chars/*.glb, konverterade med tools/mixamo-convert.mjs) som laddas vid
+// behov; animationerna (idle/walk/run) kommer från three.js-mannekängen Xbot och läggs på
+// Mixamo-skeletten (samma bennamn). Tills en figur laddats – eller om inga finns – visas Xbot
+// färgad efter personens kläder.
 import * as THREE from 'three';
 import { clone as cloneRig } from 'three/addons/utils/SkeletonUtils.js';
-import { loadRig } from './assets.js';
+import { loadRig, BASE } from './assets.js';
 import { tag, marker } from './textures.js';
 
 
@@ -36,6 +39,17 @@ function clothMaterial(groups, cols, joints) {
   return m;
 }
 function findBone(root, re) { let b = null; root.traverse((o) => { if (!b && o.isBone && re.test(o.name)) b = o; }); return b; }
+// Xbots clip på en annan Mixamo-rigg: benen heter mixamorig<N>Hips osv. – byt prefix; höftens
+// lägesspår skalas efter riggens höftahöjd så att fötterna hamnar på golvet
+function retarget(clip, prefix, ratio) {
+  const c = clip.clone();
+  for (const t of c.tracks) {
+    t.name = t.name.replace(/^mixamorig\d*:?/, prefix);
+    if (ratio !== 1 && /\.position$/.test(t.name)) for (let i = 0; i < t.values.length; i++) t.values[i] *= ratio;
+  }
+  return c;
+}
+const hashStr = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return (h ^ (h >>> 13)) >>> 0; };
 function dressHead(head, look, cols) {
   const hair = new THREE.Color(look.hair || '#4a2f1d');
   const mat = (c, r = 0.85) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
@@ -67,6 +81,7 @@ export class People {
     this.group = new THREE.Group(); this.group.name = 'people';
     scene.add(this.group);
     this.rig = null; this.clips = {}; this.height = 1.8;
+    this.chars = []; this.charRigs = new Map();   // Mixamo-figurer ur chars/manifest.json, laddade vid behov
     this.actors = new Map();
     this.t = 0;
   }
@@ -83,12 +98,60 @@ export class People {
     let sk = null; this.rig.traverse((o) => { if (o.isSkinnedMesh && !sk) sk = o; });
     this.groups = new Float32Array(sk ? sk.skeleton.bones.length : 0);
     if (sk) sk.skeleton.bones.forEach((b, i) => { this.groups[i] = groupOf(b.name); });
+    try { const r = await fetch(BASE + 'chars/manifest.json'); if (r.ok) this.chars = ((await r.json()).chars || []).filter((c) => c.file && c.file !== 'Xbot.glb'); } catch { this.chars = []; }
+  }
+  // vilken figur en person får: bestäms av nyckeln (samma kund → samma figur)
+  charFor(a) {
+    if (!this.chars.length) return null;
+    return this.chars[hashStr(a.key + '|' + (a.look?.skin || '') + (a.look?.hair || '')) % this.chars.length];
+  }
+  // laddar figuren (en gång) och gör om Xbots clips för dess skelett
+  ensureChar(c) {
+    let e = this.charRigs.get(c.file);
+    if (e) return e;
+    e = { rig: null, clips: null, height: c.height || 170 };
+    this.charRigs.set(c.file, e);
+    loadRig('chars/' + c.file).then((g) => {
+      if (!g) return;
+      g.scene.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(g.scene, false);
+      e.height = Math.max(50, box.max.y - box.min.y);
+      e.footY = box.min.y;   // fötterna i bindposen (0 hos Mixamo)
+      const hips = findBone(g.scene, /Hips$/), xh = this.rig ? findBone(this.rig, /Hips$/) : null;
+      const ratio = hips && xh && xh.position.y ? hips.position.y / xh.position.y : 1;
+      const prefix = c.prefix || (hips ? hips.name.replace(/Hips$/, '') : 'mixamorig');
+      e.clips = {};
+      for (const [k, clip] of Object.entries(this.clips)) e.clips[k] = retarget(clip, prefix, ratio);
+      // fötterna: spela första bildrutan av idle på en testkopia och mät hur långt från golvet de hamnar
+      try {
+        const test = cloneRig(g.scene), mx = new THREE.AnimationMixer(test), clip = e.clips.idle || Object.values(e.clips)[0];
+        if (clip) { mx.clipAction(clip).play(); mx.update(0); }
+        test.updateMatrixWorld(true);
+        const bb = new THREE.Box3().setFromObject(test, true);
+        e.footFix = Number.isFinite(bb.min.y) ? -bb.min.y : 0;
+      } catch { e.footFix = 0; }
+      g.scene.traverse((o) => { if (o.isMesh || o.isSkinnedMesh) { o.castShadow = true; o.receiveShadow = false; o.frustumCulled = false; if (o.material) o.material.envMapIntensity = 0.6; } });
+      e.rig = g.scene;
+    });
+    return e;
   }
   // en ny figur
   make(a) {
     const g = new THREE.Group();
     let root, mixer = null, actions = null;
-    if (this.rig) {
+    const ch = this.charFor(a), ce = ch ? this.ensureChar(ch) : null;
+    if (ce?.rig) {
+      // riktig Mixamo-figur med egna kläder och hår
+      root = cloneRig(ce.rig);
+      root.traverse((o) => { if (o.isMesh || o.isSkinnedMesh) { o.castShadow = true; o.receiveShadow = false; o.frustumCulled = false; o.raycast = () => {}; } });
+      const s = (a.kid ? 1.25 : 1.76) / ce.height;
+      root.scale.setScalar(s);
+      root.position.y = (ce.footFix || 0) * s;
+      mixer = new THREE.AnimationMixer(root);
+      actions = {};
+      for (const k of ['idle', 'walk', 'run', 'agree', 'headShake']) if (ce.clips[k]) actions[k] = mixer.clipAction(ce.clips[k]);
+      if (actions.idle) actions.idle.play();
+    } else if (this.rig) {
       root = cloneRig(this.rig);
       const cols = clothColors(a.look || {}, a.color);
       root.traverse((o) => {
@@ -121,7 +184,7 @@ export class People {
     hit.position.y = hh / 2; hit.visible = false; hit.name = 'hitbox';
     g.add(hit);
     this.group.add(g);
-    const ac = { g, root, mixer, actions, cur: 'idle', yaw: a.yaw || 0, label: null, labelText: '', mark: null, seed: Math.random() * 10 };
+    const ac = { g, root, mixer, actions, cur: 'idle', yaw: a.yaw || 0, label: null, labelText: '', mark: null, seed: Math.random() * 10, char: ce?.rig ? ch.file : null, wantChar: ch && !ce?.rig ? ch.file : null };
     this.actors.set(a.key, ac);
     return ac;
   }
@@ -154,6 +217,8 @@ export class People {
     for (const a of list) {
       seen.add(a.key);
       let ac = this.actors.get(a.key);
+      // figuren blev klar: byt ut platshållaren
+      if (ac?.wantChar && this.charRigs.get(ac.wantChar)?.rig) { const yaw = ac.yaw; this.remove(a.key, ac); ac = this.make(a); ac.yaw = yaw; }
       if (!ac) ac = this.make(a);
       ac.h = a.kid ? 1.25 : 1.76;
       ac.g.position.set(a.x, a.y || 0, a.z);
@@ -174,13 +239,15 @@ export class People {
       this.setMark(ac, a.mark);
       if (ac.mark) ac.mark.position.y = ac.h + (ac.label ? 0.55 : 0.2) + Math.sin(this.t * 4 + ac.seed) * 0.05;
     }
-    for (const [k, ac] of this.actors) {
-      if (seen.has(k)) continue;
-      this.group.remove(ac.g);
-      ac.g.traverse((o) => { if (o.material && o !== ac.label && o !== ac.mark) { if (Array.isArray(o.material)) o.material.forEach((m) => m.dispose()); else o.material.dispose(); } });
-      if (ac.label) { ac.label.material.map.dispose(); ac.label.material.dispose(); }
-      this.actors.delete(k);
-    }
+    for (const [k, ac] of this.actors) if (!seen.has(k)) this.remove(k, ac);
+  }
+  remove(k, ac) {
+    this.group.remove(ac.g);
+    // Xbot-kopior har egna klädmaterial; Mixamo-figurerna delar material med riggen
+    if (!ac.char) ac.g.traverse((o) => { if (o.material && o !== ac.label && o !== ac.mark) { if (Array.isArray(o.material)) o.material.forEach((m) => m.dispose()); else o.material.dispose(); } });
+    if (ac.label) { ac.label.material.map.dispose(); ac.label.material.dispose(); }
+    if (ac.mark) ac.mark.material.dispose();
+    this.actors.delete(k);
   }
   // objektet (för raycast) → nyckel
   keyOf(obj) {

@@ -196,9 +196,15 @@ valet sparas (`pixelverkstan_3d`). 2D-läget finns kvar orört.
   siktet (kund, monter, låda, stjärnobjekt), Esc släpper musen, Q byter grafikkvalitet
   (hög/medel/låg; sänks automatiskt om bilden hackar). Pekskärm: dra för att titta, knappar
   för att gå. Kollision via 2D-gångnätet (`floor-walk.walkable`).
-- **Människor:** `people.js` – riggade figurer (three.js-mannekängen Xbot som platshållare,
-  färgad efter kläder) med gå/stå-animation, namnlapp och `!`-markör på kunden som står först.
-  Kunder, personal, kompisar i co-op och folk på trottoaren följer simuleringens positioner.
+- **Människor:** `people.js` – tio riktiga **Mixamo-figurer** (`assets/3d/chars/*.glb`, 1,7–6 MB,
+  laddas vid behov och byts in mot Xbot-platshållaren när de är klara; samma kund får alltid
+  samma figur) med gå/stå/spring-animation från three.js-mannekängen Xbot, som läggs på
+  Mixamo-skeletten (`retarget`: benprefix + höftens lägesspår skalas). Namnlapp och `!`-markör
+  på kunden som står först. Kunder, personal, kompisar i co-op och folk på trottoaren följer
+  simuleringens positioner. Nya figurer: exportera FBX från Mixamo (valfri animation, "with
+  skin") till `assets/3d/mixamo/`, kör `python tools/fbx-textures.py` (plockar ut de inbäddade
+  4096²-texturerna och skalar till 512) och `node tools/mixamo-convert.mjs` (FBX → glb utan
+  morph targets/animationer, indexerad geometri, PBR-material; skriver `manifest.json`).
 - **Byggläget i 3D (`js/3d/bench.js`):** datorn byggs på **arbetsbänken bakom disken** (under
   högra fönstret: bänk, antistatmatta, verktygstavla, bänklampa med spot). Klicka på bänken
   (eller 🔧 Bygg i listan) så låses kameran ovanför bänken i **exakt samma vinkel som
