@@ -207,10 +207,10 @@ valet sparas (`pixelverkstan_3d`). 2D-läget finns kvar orört.
   morph targets/animationer, indexerad geometri, PBR-material; skriver `manifest.json`).
 - **Byggläget i 3D (`js/3d/bench.js`):** datorn byggs på **arbetsbänken bakom disken** (under
   högra fönstret: bänk, antistatmatta, verktygstavla, bänklampa med spot). Klicka på bänken
-  (eller 🔧 Bygg i listan) så låses kameran ovanför bänken i **exakt samma vinkel som
-  2D-byggvyn**: en ortografisk kamera i 30° som matchar `P.proj` pixel för pixel (höjderna
-  trycks ihop med `hz/k ÷ 1,2247`), så byggvyns hela pekarlogik – platser, handgrepp, uttag,
-  kablar, zoom/panorering, kompisars pekare – fungerar oförändrad. Scenen ritas av samma kod
+  (eller 🔧 Bygg i listan) så låses kameran ovanför bänken i **samma vinkel som 2D-byggvyn**:
+  en perspektivkamera (32°) i 30° lutning med riktiga höjder. Byggvyns `P.proj` byts ut mot
+  projektion genom 3D-kameran medan bänken är aktiv, så hela pekarlogiken – platser,
+  handgrepp, uttag, kablar, zoom/panorering, kompisars pekare – fungerar oförändrad. Scenen ritas av samma kod
   som i 2D (`rig.drawScene`) men varje låda blir en riktig 3D-låda med pixelgrafiken som
   textur på de tre synliga sidorna, packad i en texturatlas (två draw calls), belyst av rummet,
   lampan och skuggor. `#board` ritar bara kablar och markeringar ovanpå; klick i scenen
