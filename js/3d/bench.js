@@ -5,9 +5,12 @@
 // 3D-kameran. Scenen ritas av samma kod som i 2D (rig.drawScene) – men varje "låda" blir en
 // riktig 3D-låda med pixelgrafiken som textur på de tre synliga sidorna, packad i en
 // texturatlas så att hela bygget blir ett par draw calls.
+// Finalen (datorn står på skrivbordet, desk.js) ritas på samma sätt på bänken i verklig skala:
+// skärmen och chassits sidofönster är levande texturer, sladdarna är 3D-rör.
 import * as THREE from 'three';
 
 export const U = 0.0175;                       // meter per byggenhet (chassit 26 enheter ≈ 45 cm)
+export const U_DESK = 0.046;                   // meter per skrivbordsenhet (skrivbordet 32 enheter ≈ 1,5 m)
 const ELEV = Math.PI / 6;                      // 30° – samma lutning som 2D-vyns (u+v)/2
 const FOV = 32;                                // perspektiv, men måttligt så att bänken inte förvrängs
 const PPU = 32;                                // texturpixlar per enhet (max)
@@ -18,7 +21,7 @@ const DIR_LOCAL = new THREE.Vector3(Math.cos(ELEV) / Math.SQRT2, Math.sin(ELEV),
 
 // Samlar in lådorna som rig.drawScene ritar – samma gränssnitt som core/raster.js
 class Recorder {
-  constructor() { this.boxes = []; this.k = 16; this.hz = 13; this.ox = 0; this.oy = 0; this.edges = false; this.defaultId = 0; this.w = 4096; this.h = 4096; }
+  constructor() { this.boxes = []; this.k = 16; this.hz = 13; this.ox = 0; this.oy = 0; this.edges = false; this.defaultId = 0; this.w = 4096; this.h = 4096; this.ids = null; }
   proj(u, v, z = 0) { return [this.ox + (u - v) * this.k, this.oy + (u + v) * this.k / 2 - z * this.hz]; }
   clear() { this.boxes.length = 0; }
   box(u0, u1, v0, v1, z0, z1, tex, id = this.defaultId || 0, opt = {}) {
@@ -46,8 +49,8 @@ function faceKey(b, face, W, H) {
   return `${face}|${b.u0},${b.u1},${b.v0},${b.v1},${b.z0},${b.z1}|${b.id}|${b.alpha}|${h}|${s}`;
 }
 // rastrera en sida med texturfunktionen → { data (RGBA), w, h, any, holes }
-function rasterFace(b, face, W, H) {
-  const ppu = Math.max(6, Math.min(PPU, Math.sqrt(MAX_FACE / Math.max(0.0001, W * H))));
+function rasterFace(b, face, W, H, ppuMax = PPU) {
+  const ppu = Math.max(6, Math.min(ppuMax, Math.sqrt(MAX_FACE / Math.max(0.0001, W * H))));
   const cw = Math.max(1, Math.ceil(W * ppu)), ch = Math.max(1, Math.ceil(H * ppu));
   const data = new Uint8ClampedArray(cw * ch * 4);
   const a = Math.round(b.alpha * 255);
@@ -64,6 +67,7 @@ function rasterFace(b, face, W, H) {
   }
   return { data, w: cw, h: ch, any, holes };
 }
+const cssHex = (s) => parseInt(String(s).replace('#', ''), 16);
 
 export class Bench3D {
   constructor(view3d) {
@@ -73,13 +77,14 @@ export class Bench3D {
     this.group.visible = false;
     view3d.scene.add(this.group);
     this.camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 30);
-    this.camSig = ''; this.origProj = null; this._v = new THREE.Vector3();
+    this.camSig = ''; this._v = new THREE.Vector3();
     this.dirWorld = DIR_LOCAL.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.group.rotation.y).normalize();
     this.rec = new Recorder();
     this.raycaster = new THREE.Raycaster();   // egen: butikens har kort räckvidd
     this.cache = new Map();          // sidans nyckel → raster
-    this.meshes = []; this.atlas = null; this.atlasData = null; this.faceIds = [];
-    this.view = null; this.center = new THREE.Vector3(); this.q = 1;
+    this.meshes = []; this.atlas = null; this.atlasData = null;
+    this.view = null; this.desk = null; this.origProj = null; this.center = new THREE.Vector3();
+    this.U = U; this.off = new THREE.Vector3(13, 0, 12); this.pSrc = null; this.filter = null; this.ppu = PPU;
     this.stats = { boxes: 0, faces: 0, atlas: [0, 0], ms: 0, cached: 0 };
     // byggljus: en mjuk "lampa" snett uppifrån vänster (som 2D-skuggningen antyder) – rummets
     // lampor och bänklampan ger resten
@@ -90,29 +95,63 @@ export class Bench3D {
       opaque: new THREE.MeshStandardMaterial({ roughness: 0.78, metalness: 0.02, alphaTest: 0.5, side: THREE.FrontSide }),
       glass: new THREE.MeshStandardMaterial({ roughness: 0.15, metalness: 0.1, transparent: true, depthWrite: false, side: THREE.FrontSide }),
     };
+    // finalen: levande texturer (skärm, sidofönster) och sladdar
+    this.quads = new Map(); this.cableGroup = new THREE.Group(); this.group.add(this.cableGroup);
   }
-  // bänkens plats i rummet: skiva-mitten (x, y, z) i meter – byggets mitt (chassit) hamnar där
+  // bänkens plats i rummet: skiva-mitten (x, y, z) i meter – scenens mitt hamnar där
   place(bench) {
     if (!bench) { this.group.visible = false; this.bench = null; return; }
     this.bench = bench;
     this.center.set(bench.x, bench.y, bench.z);
+    if (this.view || this.desk) this.layout();
   }
+  layout() {
+    this.group.scale.set(this.U, this.U, this.U);
+    const off = this.off.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.group.rotation.y).multiply(this.group.scale);
+    this.group.position.copy(this.center).sub(off);
+    this.group.visible = true;
+    this.camSig = '';
+  }
+  // ---------- Byggläget (chassit på bänken) ----------
   attach(view) {
+    this.detachDesk();
     this.view = view;
     view.gl = this;
     view.dirty = true;
-    this.q = 1;
-    this.group.scale.set(U, U, U);
+    this.U = U; this.off.set(13, 0, 12); this.filter = null; this.ppu = PPU;
+    this.pSrc = () => view.P;
     // byggvyns projektion går genom 3D-kameran (markeringar, uttag, kablar, pekare hamnar rätt)
     if (!this.origProj) this.origProj = view.P.proj;
     view.P.proj = (u, v, z = 0) => this.project(u, v, z);
-    const off = new THREE.Vector3(13, 0, 12).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.group.rotation.y).multiply(this.group.scale);
-    this.group.position.copy(this.center).sub(off);
-    this.group.visible = true;
+    this.layout();
+  }
+  // ---------- Finalen (datorn på skrivbordet – på bänken i verklig skala) ----------
+  attachDesk(desk) {
+    if (this.desk === desk) return;
+    this.detachDesk();
+    this.desk = desk;
+    const DV = desk.constructor.DV || { w: 840, h: 612, k: 18, hz: 14, ox: 256, oy: 200 };
+    this.U = U_DESK; this.off.set(16, 6, 6.5); this.ppu = 20;     // skrivbordets ovansida (z = 6) ligger på bänkskivan
+    this.filter = (b) => !(b.u0 === 0 && b.u1 === 32 && b.v0 === 0 && b.v1 === 13 && b.z0 === 0);   // själva skrivbordslådan är bänken
+    this.pSrc = () => ({ k: DV.k * desk.s, hz: DV.hz * desk.s, ox: desk.ox + DV.ox * desk.s, oy: desk.oy + DV.oy * desk.s });
+    desk.proj = (u, v, z = 0) => this.project(u, v, z);   // skuggar prototypens proj medan 3D är aktivt
+    desk.gl = this;
+    this.clearMeshes();
+    this.layout();
+  }
+  detachDesk() {
+    const d = this.desk; if (!d) return;
+    delete d.proj; d.gl = null; this.desk = null;
+    for (const q of this.quads.values()) { this.group.remove(q.mesh); q.mesh.geometry.dispose(); q.tex.dispose(); q.mesh.material.dispose(); }
+    this.quads.clear();
+    this.setCables([]);
+    this.clearMeshes();
+    if (this.view) { this.U = U; this.off.set(13, 0, 12); this.filter = null; this.ppu = PPU; this.pSrc = () => this.view.P; this.layout(); this.view.dirty = true; }
   }
   detach() {
+    this.detachDesk();
     if (this.view) { this.view.gl = null; this.view.dirty = true; if (this.origProj) this.view.P.proj = this.origProj; }
-    this.view = null;
+    this.view = null; this.pSrc = null;
     this.group.visible = false;
     this.clearMeshes();
     if (this.bench?.lamp) this.bench.lamp.shadow.needsUpdate = true;
@@ -123,18 +162,18 @@ export class Bench3D {
   // Punkten som 2D-formeln lägger mitt i fönstret blir kamerans mål; avståndet väljs så att skalan
   // i målplanet blir densamma som 2D-vyns (k√2 px per enhet).
   updateCamera(force = false) {
-    const view = this.view; if (!view) return;
-    const P = view.P, cv = this.v.canvas, board = view.canvas;
+    const view = this.view; if (!view || !this.pSrc) return;
+    const P = this.pSrc(), cv = this.v.canvas, board = view.canvas;
     const W = Math.max(2, cv.clientWidth), H = Math.max(2, cv.clientHeight);
     const r = board.getBoundingClientRect();
-    const sig = [P.k, P.ox, P.oy, W, H, r.left, r.top, this.group.position.x, this.group.position.z].map((n) => Math.round(n * 100)).join(',');
+    const sig = [P.k, P.ox, P.oy, W, H, r.left, r.top, this.group.position.x, this.group.position.z, this.U].map((n) => Math.round(n * 1000)).join(',');
     if (!force && sig === this.camSig) return;
     this.camSig = sig;
     const bx = W / 2 - r.left, by = H / 2 - r.top;
     const a = (bx - P.ox) / P.k, b2 = (by - P.oy) * 2 / P.k;
     const u = (a + b2) / 2, v = (b2 - a) / 2;
-    const target = this.group.localToWorld(new THREE.Vector3(u, 0, v));
-    const pxPerM = P.k * Math.SQRT2 / U;
+    const target = this.group.localToWorld(new THREE.Vector3(u, this.desk ? 6 : 0, v));
+    const pxPerM = P.k * Math.SQRT2 / this.U;
     const dist = Math.max(0.6, H / (2 * Math.tan(FOV * Math.PI / 360) * pxPerM));
     const cam = this.camera;
     cam.position.copy(target).addScaledVector(this.dirWorld, dist);
@@ -144,7 +183,7 @@ export class Bench3D {
     cam.updateMatrixWorld();
   }
   update(dt) { this.updateCamera(); }
-  // bänkens (u, v, z) → css-px på #board (byggvyns P.proj i 3D-läget)
+  // scenens (u, v, z) → css-px på #board (byggvyns P.proj / finalens proj i 3D-läget)
   project(u, v, z = 0) {
     this.updateCamera();
     const view = this.view, cv = this.v.canvas, r = view.canvas.getBoundingClientRect();
@@ -164,23 +203,24 @@ export class Bench3D {
     return [hit.x, hit.z];
   }
 
-  // ---------- Scenen: rig.drawScene → lådor → atlas + geometri ----------
+  // ---------- Scenen: lådor → atlas + geometri ----------
   clearMeshes() {
     for (const m of this.meshes) { this.group.remove(m); m.geometry.dispose(); }
     this.meshes = [];
-    this.faceIds = [];
   }
-  render(L, b, anim) {
+  render(L, b, anim) { this.renderWith((rec) => L.drawScene(rec, b, anim)); }
+  renderWith(drawFn) {
     const t0 = performance.now();
     const rec = this.rec;
-    rec.clear();
-    L.drawScene(rec, b, anim);
+    rec.clear(); rec.defaultId = 0;
+    drawFn(rec);
     this.clearMeshes();
     // sidor att visa: topp, vänster (v = v1) och höger (u = u1) – de tre kameran ser
     const faces = [];
     let cached = 0;
     const fresh = new Map();
     rec.boxes.forEach((box, i) => {
+      if (this.filter && !this.filter(box)) return;
       const thin = box.z1 - box.z0 < 0.02;
       for (const face of ['top', 'left', 'right']) {
         if (face !== 'top' && thin) continue;
@@ -189,7 +229,7 @@ export class Bench3D {
         const key = faceKey(box, face, W, H);
         let ras = this.cache.get(key) || fresh.get(key);
         if (ras) cached++;
-        else { ras = rasterFace(box, face, W, H); if (!ras.any) ras = null; fresh.set(key, ras); }
+        else { ras = rasterFace(box, face, W, H, this.ppu); if (!ras.any) ras = null; fresh.set(key, ras); }
         if (!ras) continue;
         faces.push({ box, face, W, H, ras, i, glass: box.alpha < 1 });
       }
@@ -248,7 +288,6 @@ export class Bench3D {
         for (let m = 0; m < 4; m++) nor.set(N, k * 12 + m * 3);
         uv.set([u0, v0, u1, v0, u1, v1, u0, v1], k * 8);
         const o = k * 4;
-        // medurs sett från normalens håll = framsida i three.js (se härledningen i commit-texten)
         if (f.face === 'right') idx.set([o, o + 1, o + 2, o, o + 2, o + 3], k * 6);
         else idx.set([o, o + 2, o + 1, o, o + 3, o + 2], k * 6);
         ids.push(b.id, b.id);
@@ -270,7 +309,56 @@ export class Bench3D {
     if (this.bench?.lamp) this.bench.lamp.shadow.needsUpdate = true;
   }
 
-  // kablarna ritas som i 2D – ovanpå bilden, i #board-canvasens upplösning
+  // ---------- Finalen: levande ytor (skärmen, sidofönstret) och sladdar ----------
+  // quad från tre hörn i scenens enheter: [övre vänster, övre höger, nedre vänster] – ytan ligger
+  // i ett v-plan (mot betraktaren) och skjuts ut en aning så den inte slåss med lådan bakom
+  setQuad(key, canvas, p00, p10, p01, { emissive = false } = {}) {
+    const mkTex = (cv) => { const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false; return tex; };
+    let q = this.quads.get(key);
+    if (!q) {
+      const tex = mkTex(canvas);
+      const mat = emissive ? new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }) : new THREE.MeshStandardMaterial({ map: tex, roughness: 0.4, metalness: 0.05 });
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12), 3));
+      g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]), 3));
+      g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 1, 1, 1, 1, 0, 0, 0]), 2));
+      g.setIndex([0, 2, 1, 0, 3, 2]);
+      const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false; mesh.renderOrder = 3;
+      this.group.add(mesh);
+      q = { mesh, tex, canvas, sig: '' };
+      this.quads.set(key, q);
+    }
+    if (q.canvas !== canvas) { q.tex.dispose(); q.tex = mkTex(canvas); q.mesh.material.map = q.tex; q.mesh.material.needsUpdate = true; q.canvas = canvas; }
+    const sig = [...p00, ...p10, ...p01].join(',');
+    if (sig !== q.sig) {
+      q.sig = sig;
+      const e = 0.04, A = [p00[0], p00[2], p00[1] + e], B = [p10[0], p10[2], p10[1] + e], D = [p01[0], p01[2], p01[1] + e], C = [B[0] + D[0] - A[0], B[1] + D[1] - A[1], B[2] + D[2] - A[2]];
+      q.mesh.geometry.attributes.position.set([...A, ...B, ...C, ...D]); q.mesh.geometry.attributes.position.needsUpdate = true;
+      q.mesh.geometry.computeBoundingSphere();
+    }
+    q.tex.needsUpdate = true;
+  }
+  // sladdar: [{ pts: [[u,v,z] …], color: '#rrggbb', r }] → rör; kontakter: [{ at: [u,v,z], color }]
+  setCables(list, plugs = []) {
+    for (const o of [...this.cableGroup.children]) { this.cableGroup.remove(o); o.geometry.dispose(); o.material.dispose(); }
+    for (const c of list) {
+      const pts = c.pts.map(([u, v, z]) => new THREE.Vector3(u, z, v));
+      if (pts.length < 2) continue;
+      const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.3);
+      const geo = new THREE.TubeGeometry(curve, Math.max(12, pts.length * 8), c.r || 0.09, 7, false);
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: cssHex(c.color || '#26262b'), roughness: 0.75, metalness: 0.05 }));
+      mesh.castShadow = true;
+      this.cableGroup.add(mesh);
+    }
+    for (const p of plugs) {
+      const [u, v, z] = p.at;
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.55, 0.7), new THREE.MeshStandardMaterial({ color: cssHex(p.color || '#26262b'), roughness: 0.6 }));
+      mesh.position.set(u, z + 0.28, v); mesh.castShadow = true;
+      this.cableGroup.add(mesh);
+    }
+  }
+
+  // kablarna i byggläget ritas som i 2D – ovanpå bilden, i #board-canvasens upplösning
   cables(view) {
     const dpr = view.dpr || 1, cw = Math.max(2, Math.round(view.cw * dpr)), ch = Math.max(2, Math.round(view.ch * dpr));
     if (view.cableCanvas.width !== cw || view.cableCanvas.height !== ch) { view.cableCanvas.width = cw; view.cableCanvas.height = ch; }
@@ -308,7 +396,7 @@ export class Bench3D {
     return [(p.x + 1) / 2 * cv.clientWidth, (1 - p.y) / 2 * cv.clientHeight];
   }
   // 2D-formelns punkt (så som rastern hade lagt den) – för tester: hur mycket perspektivet avviker
-  isoOf(u, v, z = 0) { const P = this.view.P; return [P.ox + (u - v) * P.k, P.oy + (u + v) * P.k / 2 - z * P.hz]; }
-  info() { return { ...this.stats, active: this.active, cache: this.cache.size }; }
+  isoOf(u, v, z = 0) { const P = this.pSrc(); return [P.ox + (u - v) * P.k, P.oy + (u + v) * P.k / 2 - z * P.hz]; }
+  info() { return { ...this.stats, active: this.active, desk: !!this.desk, quads: this.quads.size, cables: this.cableGroup.children.length, cache: this.cache.size }; }
   dispose() { this.detach(); this.atlas?.dispose(); this.v.scene.remove(this.group); }
 }

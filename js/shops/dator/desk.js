@@ -16,6 +16,7 @@ const ID_CASE = 7, ID_MONITOR = 8;   // i klickbufferten: sladdar göms bakom da
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 export class Desk {
+  static DV = DV; static CASE_AT = CASE_AT;
   constructor(view) {
     this.view = view;
     this.R = new Raster(DV.w, DV.h); Object.assign(this.R, DV, { edges: true });
@@ -51,7 +52,9 @@ export class Desk {
     this.state = { powered: false, lit: {}, screen: 'off', mouse: false, t: 0 };
     this.d.success = false;
     this.fx.clear();
+    this.key3 = null; this.cableKey3 = null;
     const v = this.view;
+    v.gl?.attachDesk?.(this);   // 3D-läget: skrivbordet står på arbetsbänken
     if (v.order?.repair) v.say(`<b>${esc(v.order.name)} lämnade in datorn:</b> «${esc(v.order.msg || '')}» Koppla in den på baksidan, starta – och se vad som händer. Sedan öppnar du lådan och letar.`, 'info');
     else v.say(v.help
       ? `Datorn står på skrivbordet! Koppla in kablarna på <b>datorns baksida</b> (${window.innerWidth <= 760 ? 'knappen 🔌 Baksidan' : 'till vänster'}), slå på nätagget och tryck på startknappen.`
@@ -323,43 +326,59 @@ export class Desk {
       const sel = v.selected && v.trayEntries().find((e) => e.key === v.selected);
       if (sel?.plug) this.showRear = this.PLUGS[sel.plug].target === 'rear';
     }
-    // bakgrund: vägg + golv
-    ctx.fillStyle = '#e9e1d2'; ctx.fillRect(0, 0, cw, ch);
-    ctx.fillStyle = '#d9cdb7'; ctx.fillRect(0, ch * 0.72, cw, ch);
-    // scenen i två lager: statiskt (bord, skärm, mugg) och rörligt (dator, tangentbord, mus)
+    const gl = this.gl;   // 3D-läget (js/3d/bench.js): scenen står på arbetsbänken, hit ritas bara det som ligger ovanpå
     const staticKey = `${!!d.plugs.mon_power}|${st.powered}|${this.era?.monitor}|${this.dims.W}`;
-    if (!this.Rs || this.staticKey !== staticKey) {
-      this.Rs ||= Object.assign(new Raster(DV.w, DV.h), DV, { edges: true });
-      this.Rs.clear(); this.drawStatic(this.Rs); this.Rs.flush();
-      this.staticKey = staticKey;
-    }
     const dynKey = `${st.powered}|${Object.keys(d.plugs).length}|${JSON.stringify(st.lit)}`;
-    this.redraw -= 1 / 60;
-    if (this.dynKey !== dynKey || (st.powered && this.redraw <= 0)) {
-      const R = this.R;
-      R.clear();
-      const o = { id: ID_CASE, t, spin: st.powered ? t * 14 : 0.3, powered: st.powered, lit: { ...st.lit, power: st.powered } };
-      this.drawDynamic(R);
-      drawCaseStanding(R, b.placed.case, o, CASE_AT);
-      R.flush();
-      this.dynKey = dynKey; this.redraw = 1 / 15;
+    const S = this.dims, win = b.placed.case.look?.window ?? (b.placed.case.id !== 'pop-mini-silent');
+    if (gl) {
+      ctx.clearRect(0, 0, cw, ch);
+      // hela scenen byggs om när något ändras (fläkten står stilla – en texturatlas per bildruta är för dyrt)
+      const key3 = staticKey + '#' + dynKey;
+      if (this.key3 !== key3) {
+        const o = { id: ID_CASE, t, spin: 0.3, powered: st.powered, lit: { ...st.lit, power: st.powered } };
+        gl.renderWith((R) => { this.drawStatic(R); this.drawDynamic(R); drawCaseStanding(R, b.placed.case, o, CASE_AT); });
+        this.key3 = key3;
+      }
+    } else {
+      // bakgrund: vägg + golv
+      ctx.fillStyle = '#e9e1d2'; ctx.fillRect(0, 0, cw, ch);
+      ctx.fillStyle = '#d9cdb7'; ctx.fillRect(0, ch * 0.72, cw, ch);
+      // scenen i två lager: statiskt (bord, skärm, mugg) och rörligt (dator, tangentbord, mus)
+      if (!this.Rs || this.staticKey !== staticKey) {
+        this.Rs ||= Object.assign(new Raster(DV.w, DV.h), DV, { edges: true });
+        this.Rs.clear(); this.drawStatic(this.Rs); this.Rs.flush();
+        this.staticKey = staticKey;
+      }
+      this.redraw -= 1 / 60;
+      if (this.dynKey !== dynKey || (st.powered && this.redraw <= 0)) {
+        const R = this.R;
+        R.clear();
+        const o = { id: ID_CASE, t, spin: st.powered ? t * 14 : 0.3, powered: st.powered, lit: { ...st.lit, power: st.powered } };
+        this.drawDynamic(R);
+        drawCaseStanding(R, b.placed.case, o, CASE_AT);
+        R.flush();
+        this.dynKey = dynKey; this.redraw = 1 / 15;
+      }
+      ctx.imageSmoothingEnabled = this.s * v.dpr < 1;
+      ctx.drawImage(this.Rs.canvas, this.ox, this.oy, DV.w * this.s, DV.h * this.s);
+      ctx.drawImage(this.R.canvas, this.ox, this.oy, DV.w * this.s, DV.h * this.s);
     }
-    ctx.imageSmoothingEnabled = this.s * v.dpr < 1;
-    ctx.drawImage(this.Rs.canvas, this.ox, this.oy, DV.w * this.s, DV.h * this.s);
-    ctx.drawImage(this.R.canvas, this.ox, this.oy, DV.w * this.s, DV.h * this.s);
     // glassida med insidan
     const sctx = this.side.getContext('2d');
-    const S = this.dims, win = b.placed.case.look?.window ?? (b.placed.case.id !== 'pop-mini-silent');
+    const sideFace = [[CASE_AT[0] + 0.25, CASE_AT[1] + S.W, CASE_AT[2] + S.H - 0.25], [CASE_AT[0] + S.D - 0.25, CASE_AT[1] + S.W, CASE_AT[2] + S.H - 0.25], [CASE_AT[0] + 0.25, CASE_AT[1] + S.W, CASE_AT[2] + 0.6]];
     if (win) {
       drawInternals(sctx, b, st, t);
-      this.mapFace(ctx, this.side, [CASE_AT[0] + 0.25, CASE_AT[1] + S.W, CASE_AT[2] + S.H - 0.25], [CASE_AT[0] + S.D - 0.25, CASE_AT[1] + S.W, CASE_AT[2] + S.H - 0.25], [CASE_AT[0] + 0.25, CASE_AT[1] + S.W, CASE_AT[2] + 0.6]);
+      if (gl) gl.setQuad('side', this.side, ...sideFace); else this.mapFace(ctx, this.side, ...sideFace);
     }
     // skärmen
     const scr = this.screen.getContext('2d');
     drawScreen(scr, st, this.info(), t);
-    this.mapFace(ctx, this.screen, ...monitorFace(this.era));
+    if (gl) gl.setQuad('screen', this.screen, ...monitorFace(this.era), { emissive: true }); else this.mapFace(ctx, this.screen, ...monitorFace(this.era));
     // sladdar på bordet
-    this.drawDeskCables(ctx);
+    if (gl) {
+      const key = JSON.stringify([d.plugs, this.era?.monitor, this.era?.keyboard, this.era?.videoType, this.dims]);
+      if (this.cableKey3 !== key) { this.cableKey3 = key; const c = this.cablePaths(); gl.setCables(c.cables, c.plugs); }
+    } else this.drawDeskCables(ctx);
     this.drawFx(ctx);
     // startknapp (tryckt)
     const [bx, by] = this.powerButton();
@@ -494,6 +513,26 @@ export class Desk {
   }
   // uttag nr i på grenuttaget (0–3) i världskoordinater
   stripSocket(i) { const [su, sv] = this.STRIP; return [su - 4 + 1.9 + i * 1.7, sv - 0.5 + 0.55, 6.4]; }
+  // sladdarna i 3D: samma start- och slutpunkter som i 2D, men som kurvor i världen som ligger på
+  // bordet emellan. { cables: [{ pts, color, r }], plugs: [{ at, color }] }
+  cablePaths() {
+    const d = this.d, era = this.era || {}, S = this.dims;
+    const face = monitorFace(era), crt = !String(era.monitor).startsWith('lcd');
+    const mu = (face[0][0] + face[1][0]) / 2, mvBack = face[0][1] - (crt ? 5.2 : 0.7), mz = face[2][2];
+    const caseIn = (dv, dz) => [CASE_AT[0] + 0.5, CASE_AT[1] + S.W * dv, CASE_AT[2] + dz];
+    const retro = ['pc-83', 'model-m', 'beige-104'].includes(era.keyboard);
+    const COL = { black: '#26262b', beige: '#d8d0b6', white: '#e6e4de' };
+    const periph = retro ? COL.beige : COL.black;
+    const cables = [], plugs = [];
+    const onDesk = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, 6.08];
+    const cable = (a, b, color, r) => cables.push({ pts: [a, onDesk(a, b, 0.3), onDesk(a, b, 0.5), onDesk(a, b, 0.72), b], color, r });
+    if (d.plugs.kb) cable([8.5, 6.05, 6.35], caseIn(0.35, 1.2), periph, 0.07);
+    if (d.plugs.mouse) cable([16.9, 7.15, 6.45], caseIn(0.55, 1.1), periph, 0.06);
+    if (d.plugs.video) cable([mu - 1, mvBack, mz + 0.6], caseIn(0.45, 2.2), era.year < 2005 ? COL.beige : COL.black, 0.1);
+    if (d.plugs.mon_power) { const s = this.stripSocket(1); plugs.push({ at: s, color: crt ? COL.beige : COL.white }); cable([mu + 1.2, mvBack, mz + 0.4], [s[0], s[1], s[2] + 0.5], crt ? COL.beige : COL.white, 0.1); }
+    if (d.plugs.pc_power) { const s = this.stripSocket(2); plugs.push({ at: s, color: COL.black }); cable(caseIn(0.7, 1.4), [s[0], s[1], s[2] + 0.5], COL.black, 0.1); }
+    return { cables, plugs };
+  }
   renderCables() {
     if (!this.cableCv) { this.cableCv = document.createElement('canvas'); this.cableCv.width = DV.w; this.cableCv.height = DV.h; }
     const x = this.cableCv.getContext('2d');

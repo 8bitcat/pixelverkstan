@@ -579,7 +579,7 @@ function loop(now) {
       if (hudDirty) { UI.renderHud(game, hudHandlers, coop ? { code: net.code, count: (coop instanceof CoopHost ? coop.players.size + 1 : coop.list.length) } : null); hudDirty = false; }
       if (ordersTimer <= 0) { UI.renderOrders(game, openBuild, floor.players); ordersTimer = 0.5; }
     }
-    if (screen === 'build') { build.frame(dt); if (is3d() && view3d.mode === 'bench' && build.order && build.phase !== 'desk') view3d.renderBench(dt); }
+    if (screen === 'build') { build.frame(dt); if (is3d() && view3d.mode === 'bench' && build.order) view3d.renderBench(dt); }
     if (screen === 'play') { try { play.frame(dt); } catch (e) { console.error(e); } }
     if (screen === 'arcade' && arcade) { arcade.update(dt); arcade.draw(); }
     friendsTimer -= dt;

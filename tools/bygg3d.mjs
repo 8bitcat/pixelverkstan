@@ -97,6 +97,22 @@ const projZ = await page.evaluate(() => { const v = PV.build, r = v.canvas.getBo
 ok(projZ < 1.5, `zoomad kamera matchar (${projZ} px)`);
 await shot('3-zoom');
 await page.evaluate(() => PV.build.zoomFit());
+// finalen: datorn på skrivbordet – på bänken i 3D (tvingas fram utan att bygget är klart)
+await page.evaluate(() => { const v = PV.build; v.op({ t: 'phase', v: 'desk' }); v.selected = null; v.msg = null; v.finale.enter(); v.refresh(); });
+await waitFrames(3); await page.waitForTimeout(400);
+const dk = await page.evaluate(() => { const v = PV.build, f = v.finale, i = v.gl.info(); const [bx, by] = f.powerButton(); const [gx, gy] = v.gl.project(...[f.constructor.CASE_AT[0] + f.dims.D - 0.55, f.constructor.CASE_AT[1] + 1.0, f.constructor.CASE_AT[2] + f.dims.H]); return { phase: v.phase, desk: i.desk, faces: i.faces, quads: i.quads, projOverride: Object.prototype.hasOwnProperty.call(f, 'proj'), d: +Math.hypot(bx - gx, by - gy).toFixed(2) }; });
+ok(dk.phase === 'desk' && dk.desk && dk.faces > 30 && dk.quads >= 1 && dk.projOverride && dk.d < 0.5, `finalen i 3D: ${JSON.stringify(dk)}`);
+await shot('5-skrivbord');
+// koppla in strömkabeln → en sladd i 3D; tillbaka till bygget → chassit igen
+const cb = await page.evaluate(async () => { const v = PV.build, f = v.finale; const port = f.ports().find((p) => p.type === f.PLUGS.pc_power.type); if (port) v.op({ t: 'plug', id: 'pc_power', key: port.key }); v.op({ t: 'plug', id: 'mon_power', key: 'STRIP' }); v.refresh(); await new Promise((r) => setTimeout(r, 300)); return { port: !!port }; });
+await waitFrames(2);
+const cb2 = await page.evaluate(() => PV.build.gl.info());
+ok(cb2.cables >= 2, `sladdar i 3D efter inkoppling: ${cb2.cables} (${JSON.stringify(cb)})`);
+await shot('6-sladdar');
+await page.evaluate(() => PV.build.backToBuild());
+await waitFrames(2);
+const bk = await page.evaluate(() => { const i = PV.build.gl.info(); return { phase: PV.build.phase, desk: i.desk, faces: i.faces, quads: i.quads, cables: i.cables }; });
+ok(bk.phase === 'build' && !bk.desk && bk.faces > 30 && bk.quads === 0 && bk.cables === 0, `tillbaka till chassit på bänken (${JSON.stringify(bk)})`);
 // ut ur bygget: tillbaka i butiken, vid bänken
 await page.click('#build-back');
 await page.waitForTimeout(400);

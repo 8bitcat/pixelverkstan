@@ -70,7 +70,7 @@ export class BuildView {
     if (o.t === 'phase') {
       this.selected = null;
       if (o.v === 'desk') this.finale?.enter();
-      else this.say('Datorn ligger på bänken igen – leta efter felet!', 'info');
+      else { this.say('Datorn ligger på bänken igen – leta efter felet!', 'info'); this.gl?.attach(this); }
     }
     if (o.t === 'power' && this.phase === 'desk') this.finale?.pressPower(true);
     if (o.t === 'act') { const a = this.L.ACTION[o.id]; if (a) this.toolAnim = { pt: a.points[o.i], t: 0, icon: a.icon }; }
@@ -300,6 +300,7 @@ export class BuildView {
   }
   backToBuild() {
     this.op({ t: 'phase', v: 'build' });
+    this.gl?.attach(this);   // 3D: bänken visar chassit igen
     this.dirty = true; this.cablesDirty = true;
     this.say('Datorn ligger på bänken igen – leta efter felet!', 'info');
     this.refresh();
