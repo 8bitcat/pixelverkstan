@@ -9,6 +9,21 @@ import { applyBuildOp, newBuild } from './build-ops.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = U.esc;
+export const DEFAULT_TEXT = {
+  thing: 'dator', place: 'verkstaden',
+  titleFor: (order, gen, esc) => (order.repair ? `<span class="r">🔧 ${esc(order.title)}</span> – ${esc(gen)} dator` : `<span class="r">${esc(order.title)}</span> åt ${esc(order.name)}`),
+  welcome: (name) => `Välkommen till verkstaden! Nu bygger vi ${name}s dator steg för steg. Följ de gula markeringarna.`,
+  build: (name) => `Bygg datorn åt ${name}. Dra delar och kablar från lådan till rätt plats.`,
+  pro: 'Proffsläge! Inga markeringar – du vet vad som ska göras. Lycka till!',
+  standBtn: '🖥️ Ställ upp datorn', openBtn: '🔧 Öppna datorn', standStep: '🖥️ Ställ upp datorn på skrivbordet', testHead: 'Testa datorn',
+  builtHint: 'Allt sitter i! Tryck på 🖥️ Ställ upp datorn.', doneHint: 'Allt är klart! Tryck på <b>🖥️ Ställ upp datorn</b> och testa den.',
+  finaleEmpty: 'Allt är inkopplat! Tryck på startknappen på datorn.', notAllIn: 'Alla delar sitter inte i än.', checklistFirst: 'Gör klart checklistan först (skruvar och kablar).',
+  backMsg: 'Datorn ligger på bänken igen – leta efter felet!', emptyTray: 'Lådan är tom.',
+  resultTitle: '🎉 Datorn fungerar!', pickup: (name) => `${name} kommer och hämtar datorn vid utlämningen.`,
+  doneToast: (name) => `📦 Datorn är klar – ${name} hämtar den vid utlämningen!`,
+  noBuilds: 'Inga datorer att bygga just nu – ta emot en kund vid disken först.', whichBuild: 'Vilken dator vill du bygga?',
+  buildBtn: '🔧 Bygg', repairBtn: '🔍 Laga', acceptedToast: 'Beställningen är mottagen – tryck på 🔧 Bygg när du är redo.',
+};
 
 export class BuildView {
   constructor(game, hooks) {
@@ -54,6 +69,8 @@ export class BuildView {
   // ---------- Öppna ----------
   // Byggreglerna för just den här beställningen (butiken kan ge en rigg per order)
   get L() { return this.rig || this.shop.layout; }
+  // texter som skiljer sig mellan verksamheter (datorbutikens är standard)
+  get T() { return { ...DEFAULT_TEXT, ...(this.shop.text || {}) }; }
 
   // Alla ändringar av bygget går via op(): körs här och delas med kompisar (hooks.onOp)
   op(o) { applyBuildOp(this.shop, this.order, o); this.hooks.onOp?.(this.order, o); }
@@ -70,7 +87,7 @@ export class BuildView {
     if (o.t === 'phase') {
       this.selected = null;
       if (o.v === 'desk') this.finale?.enter();
-      else { this.say('Datorn ligger på bänken igen – leta efter felet!', 'info'); this.gl?.attach(this); }
+      else { this.say(this.T.backMsg, 'info'); this.gl?.attach(this); }
     }
     if (o.t === 'power' && this.phase === 'desk') this.finale?.pressPower(true);
     if (o.t === 'act') { const a = this.L.ACTION[o.id]; if (a) this.toolAnim = { pt: a.points[o.i], t: 0, icon: a.icon }; }
@@ -84,7 +101,7 @@ export class BuildView {
     order.build.seen ||= new Set();
     this.selected = null; this.msg = null; this.guideKey = null; this.dirty = true; this.cablesDirty = true; this.userCam = false;
     const gen = /[sxz]$/i.test(order.name) ? order.name : order.name + 's';
-    $('#build-title').innerHTML = order.repair ? `<span class="r">🔧 ${esc(order.title)}</span> – ${esc(gen)} dator` : `<span class="r">${esc(order.title)}</span> åt ${esc(order.name)}`;
+    $('#build-title').innerHTML = this.T.titleFor(order, gen, esc);
     if (order.build.help === null) {
       if (order.guided) this.op({ t: 'mode', help: true });
       else { this.refresh(); this.choosingMode = true; U.chooseMode(this, (help) => { this.choosingMode = false; this.op({ t: 'mode', help }); this.start(); }); return; }
@@ -95,10 +112,8 @@ export class BuildView {
     const b = this.b;
     if (b.phase === 'desk') this.finale?.enter();
     else if (!Object.keys(b.placed).length) {
-      this.say(this.order.guided
-        ? `Välkommen till verkstaden! Nu bygger vi ${esc(this.order.name)}s dator steg för steg. Följ de gula markeringarna.`
-        : b.help ? `Bygg datorn åt ${esc(this.order.name)}. Dra delar och kablar från lådan till rätt plats.`
-          : `Proffsläge! Inga markeringar – du vet vad som ska göras. Lycka till!`, 'info');
+      const T = this.T;
+      this.say(this.order.guided ? T.welcome(esc(this.order.name)) : b.help ? T.build(esc(this.order.name)) : T.pro, 'info');
     }
     this.refresh();
     this.resize();
@@ -156,8 +171,8 @@ export class BuildView {
     return e.icon(W, H);
   }
   trayEmptyText() {
-    if (this.phase === 'desk') return this.finale?.emptyText?.() || 'Allt är inkopplat! Tryck på startknappen på datorn.';
-    return this.isBuilt() ? 'Allt sitter i! Tryck på 🖥️ Ställ upp datorn.' : 'Lådan är tom.';
+    if (this.phase === 'desk') return this.finale?.emptyText?.() || this.T.finaleEmpty;
+    return this.isBuilt() ? this.T.builtHint : this.T.emptyTray;
   }
 
   // ---------- Status ----------
@@ -222,7 +237,7 @@ export class BuildView {
     if (s.kind === 'slot') return `Dra <b>${esc(s.label)}</b> till <b>${esc(this.L.SLOT[s.id].name.toLowerCase())}</b> (gul markering).`;
     if (s.kind === 'act') { const a = this.L.ACTION[s.id]; return `Tryck på ${a.icon} för att <b>${esc(a.name.toLowerCase())}</b>.`; }
     if (s.kind === 'cable') { const c = this.L.CABLE[s.id]; return `Dra kabeln <b>${esc(c.name)}</b> till uttaget <b>${esc(c.wants.map(this.L.portLabel).join(' / '))}</b>.`; }
-    return 'Allt är klart! Tryck på <b>🖥️ Ställ upp datorn</b> och testa den.';
+    return this.T.doneHint;
   }
 
   // ---------- Handlingar ----------
@@ -289,8 +304,8 @@ export class BuildView {
   topAction() {
     if (!this.order) return;
     if (this.phase === 'desk') return this.backToBuild();
-    if (!this.isBuilt()) return this.say('Alla delar sitter inte i än.', 'err');
-    if (this.help && this.steps().some((s) => !s.done)) return this.say('Gör klart checklistan först (skruvar och kablar).', 'err');
+    if (!this.isBuilt()) return this.say(this.T.notAllIn, 'err');
+    if (this.help && this.steps().some((s) => !s.done)) return this.say(this.T.checklistFirst, 'err');
     const probs = this.L.standCheck(this.b);
     if (probs.length) return this.fail(probs.map((p) => p.msg + (this.help ? ' ' + p.hint : '')).join(' '));
     this.op({ t: 'phase', v: 'desk' });
@@ -302,7 +317,7 @@ export class BuildView {
     this.op({ t: 'phase', v: 'build' });
     this.gl?.attach(this);   // 3D: bänken visar chassit igen
     this.dirty = true; this.cablesDirty = true;
-    this.say('Datorn ligger på bänken igen – leta efter felet!', 'info');
+    this.say(this.T.backMsg, 'info');
     this.refresh();
   }
   finish(result) {
@@ -446,9 +461,9 @@ export class BuildView {
     if (!this.order) return;
     U.renderTray(this); U.renderSheet(this); U.renderGuide(this);
     const btn = $('#build-boot');
-    if (this.phase === 'desk') { btn.textContent = '🔧 Öppna datorn'; btn.disabled = false; btn.classList.remove('btn-go'); }
+    if (this.phase === 'desk') { btn.textContent = this.T.openBtn; btn.disabled = false; btn.classList.remove('btn-go'); }
     else {
-      btn.textContent = '🖥️ Ställ upp datorn'; btn.classList.add('btn-go');
+      btn.textContent = this.T.standBtn; btn.classList.add('btn-go');
       btn.disabled = !this.isBuilt() || this.b.help === null;
     }
   }
@@ -562,7 +577,7 @@ export class BuildView {
     let data;
     if (this.phase === 'desk') {
       const f = this.finale;
-      const rear = (!f.compact || f.showRear) && x >= f.insetX && x <= f.insetX + 90 * f.si && y >= f.insetY && y <= f.insetY + 160 * f.si;
+      const rear = f.insetX !== undefined && (!f.compact || f.showRear) && x >= f.insetX && x <= f.insetX + 90 * f.si && y >= f.insetY && y <= f.insetY + 160 * f.si;
       data = rear ? { s: 'rear', x: (x - f.insetX) / f.si, y: (y - f.insetY) / f.si } : { s: 'desk', x: (x - f.ox) / f.s, y: (y - f.oy) / f.s };
     } else if (this.gl) {
       const uv = this.gl.unproject(x, y, 1);
@@ -592,7 +607,7 @@ export class BuildView {
       else if (this.phase !== 'desk') continue;
       else {
         const f = this.finale;
-        if (c.s === 'rear') { if (f.compact && !f.showRear) continue; x = f.insetX + c.x * f.si; y = f.insetY + c.y * f.si; }
+        if (c.s === 'rear') { if (f.insetX === undefined || (f.compact && !f.showRear)) continue; x = f.insetX + c.x * f.si; y = f.insetY + c.y * f.si; }
         else { if (f.compact && f.showRear) continue; x = f.ox + c.x * f.s; y = f.oy + c.y * f.s; }
       }
       x = Math.round(x); y = Math.round(y);

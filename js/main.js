@@ -243,8 +243,8 @@ function setupGame(shopModule, opts) {
       build.order = null;
       leaveWorkshop();
       show('shop');
-      if (payout) UI.showResult(order, payout, result);
-      else if (coop instanceof CoopClient) UI.toast(`📦 Datorn är klar – ${order.name} hämtar den vid utlämningen!`, 'good');
+      if (payout) UI.showResult(order, payout, result, undefined, game);
+      else if (coop instanceof CoopClient) UI.toast(game.shop.text?.doneToast ? game.shop.text.doneToast(order.name) : `📦 Datorn är klar – ${order.name} hämtar den vid utlämningen!`, 'good');
     },
   });
   game.on((type, data) => {
@@ -290,7 +290,7 @@ function setupGame(shopModule, opts) {
         if (!o) return;
         if (o.tutorial !== undefined) { openBuild(o); }
         else if (o.repair) UI.toast('Datorn står på bänken i verkstaden – tryck på 🔍 Laga.', 'good');
-        else UI.toast('Beställningen är mottagen – tryck på 🔧 Bygg när du är redo.', 'good');
+        else UI.toast(game.shop.text?.acceptedToast || 'Beställningen är mottagen – tryck på 🔧 Bygg när du är redo.', 'good');
       },
       onDecline: (cust) => act('decline', { customerId: cust.id }),
       onShop: (cat, back) => UI.openShop(game, cat, back),
@@ -358,9 +358,9 @@ function leaveWorkshop() {
 function benchMenu() {
   if (!game || UI.modalOpen()) return;
   const list = game.orders.filter((o) => !o.service);
-  if (!list.length) return UI.toast('Inga datorer att bygga just nu – ta emot en kund vid disken först.', '');
+  if (!list.length) return UI.toast(game.shop.text?.noBuilds || 'Inga datorer att bygga just nu – ta emot en kund vid disken först.', '');
   if (list.length === 1) return openBuild(list[0]);
-  const body = `<p style="font-size:19px;margin-top:0">Vilken dator vill du bygga?</p><div class="plist">${list.map((o) => `<button class="shop-opt" data-order="${o.id}"><b>${o.repair ? '🔧 ' : ''}${esc(o.title)}</b><small>åt ${esc(o.name)}${o.repair ? ' · reparation' : ''}</small></button>`).join('')}</div>`;
+  const body = `<p style="font-size:19px;margin-top:0">${esc(game.shop.text?.whichBuild || 'Vilken dator vill du bygga?')}</p><div class="plist">${list.map((o) => `<button class="shop-opt" data-order="${o.id}"><b>${o.repair ? '🔧 ' : ''}${esc(o.title)}</b><small>åt ${esc(o.name)}${o.repair ? ' · reparation' : ''}</small></button>`).join('')}</div>`;
   const dlg = UI.openModal('🔧 Arbetsbänken', body, [{ label: 'Stäng', onClick: UI.closeModal }]);
   dlg.querySelectorAll('[data-order]').forEach((b) => (b.onclick = () => { UI.closeModal(); const o = game.orders.find((x) => String(x.id) === b.dataset.order); if (o) openBuild(o); }));
 }

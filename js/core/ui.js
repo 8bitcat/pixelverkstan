@@ -135,7 +135,7 @@ export function renderOrders(game, onBuild, players = []) {
     const who2 = st ? ` · ${o.repair ? '🔍' : '🔧'} ${esc(st.name.split(' ')[0])} ${Math.round((st.progress || 0) * 100)} %` : '';
     cards.push({ o, c, html: `<div><b>${esc(o.title)}</b><small>${esc(o.name)} · ${n}/${o.items.length} delar${who}${who2}</small>
       <div class="pbar ${f < 0.35 ? 'low' : ''}"><i style="width:${Math.round(f * 100)}%"></i></div></div>
-      <button class="btn btn-go btn-small" ${o.service && o.serviceT != null ? 'disabled' : ''}>${o.service ? (o.serviceT != null ? `⏳ ${Math.round(o.serviceT / (game.serviceOf(o)?.time || 1) * 100)} %` : st ? '👀 Ta över' : '🛠️ Utför') : st ? '👀 Ta över' : o.repair ? '🔍 Laga' : '🔧 Bygg'}</button>` });
+      <button class="btn btn-go btn-small" ${o.service && o.serviceT != null ? 'disabled' : ''}>${o.service ? (o.serviceT != null ? `⏳ ${Math.round(o.serviceT / (game.serviceOf(o)?.time || 1) * 100)} %` : st ? '👀 Ta över' : '🛠️ Utför') : st ? '👀 Ta över' : o.repair ? (game.shop.text?.repairBtn || '🔍 Laga') : (game.shop.text?.buildBtn || '🔧 Bygg')}</button>` });
   }
   const front = game.queue()[0];
   const gd = game.guide ? game.guide() : null;
@@ -414,10 +414,10 @@ export function openShop(game, tab = null, onClose = null) {
 }
 
 // ---------- Resultat ----------
-export function showResult(order, payout, result, onClose) {
+export function showResult(order, payout, result, onClose, game = null) {
   const stars = '⭐'.repeat(payout.stars) + '<span style="opacity:.25">' + '⭐'.repeat(3 - payout.stars) + '</span>';
   const body = `<div style="text-align:center;font-size:44px;letter-spacing:4px">${stars}</div>
-    <p style="text-align:center;font-size:18px;margin:6px 0 14px">${esc(order.name)} kommer och hämtar datorn vid utlämningen.</p>
+    <p style="text-align:center;font-size:18px;margin:6px 0 14px">${esc(game?.shop.text?.pickup ? game.shop.text.pickup(order.name) : `${order.name} kommer och hämtar datorn vid utlämningen.`)}</p>
     <div class="plist">
       <div class="prow" style="grid-template-columns:1fr auto"><span>Delar + montering</span><b>${fmt(payout.price)} kr</b></div>
       <div class="prow" style="grid-template-columns:1fr auto"><span>Dricks ${payout.stars >= 3 ? '(snabbt och felfritt!)' : payout.stars === 2 ? '(bra jobbat)' : ''}</span><b>${fmt(payout.tip)} kr</b></div>
@@ -426,7 +426,7 @@ export function showResult(order, payout, result, onClose) {
     </div>
     ${result.warnings?.length ? `<p class="sp" style="color:var(--red2);margin-top:10px">⚠️ ${result.warnings.map(esc).join(' ')}</p>` : ''}
     <p class="sp" style="color:var(--muted);margin-top:10px">Byggtid ${Math.round(result.time)} s · ${result.errors} misstag · ${result.help ? 'med hjälp' : 'utan hjälp'}</p>`;
-  openModal('🎉 Datorn fungerar!', body, [{ label: 'Till butiken', cls: 'btn-go', onClick: () => { closeModal(); onClose?.(); } }]);
+  openModal(game?.shop.text?.resultTitle || '🎉 Datorn fungerar!', body, [{ label: 'Till butiken', cls: 'btn-go', onClick: () => { closeModal(); onClose?.(); } }]);
 }
 
 export function showLevelUp(game, info) {

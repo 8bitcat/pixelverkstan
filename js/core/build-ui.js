@@ -77,12 +77,12 @@ export function renderSheet(view) {
     const acts = steps.filter((s) => s.kind === 'act'), cables = steps.filter((s) => s.kind === 'cable');
     if (acts.length) { h += `<div class="sheet-h">Montering</div>`; for (const s of acts) h += step(s.done, next && next.key === s.key, esc(s.label)); }
     if (cables.length) { h += `<div class="sheet-h">Kablar</div>`; for (const s of cables) h += step(s.done, next && next.key === s.key, '🔌 ' + esc(s.label)); }
-    h += `<div class="sheet-h">Testa datorn</div>`;
-    h += step(b.phase === 'desk', next?.kind === 'stand', '🖥️ Ställ upp datorn på skrivbordet');
+    h += `<div class="sheet-h">${esc(view.T.testHead)}</div>`;
+    h += step(b.phase === 'desk', next?.kind === 'stand', esc(view.T.standStep));
     if (view.finale) for (const s of view.finale.steps()) h += step(s.done, s.now, esc(s.label));
   } else {
-    h += `<div class="sheet-h">Testa datorn</div>`;
-    h += step(b.phase === 'desk', false, '🖥️ Ställ upp datorn');
+    h += `<div class="sheet-h">${esc(view.T.testHead)}</div>`;
+    h += step(b.phase === 'desk', false, esc(view.T.standBtn));
     h += step(false, false, '⏻ Starta och kontrollera');
   }
   h += `<div class="sheet-h">Betalning</div><div class="step"><span>Kunden betalar${o.items.some((i) => i.choice) ? ' ca' : ''}</span><b style="margin-left:auto">${fmt(view.shop.priceFor(o, o.chosen))} kr</b></div>`;
