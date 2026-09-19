@@ -186,7 +186,7 @@ export function buildRoom(scene, ctx) {
   chainSign(g, 'UTLÄMNING', px, 2.25, cz1 + 0.15, 1.3, 0.3, '#2c6fb7');
   // skåpen längs väggen bakom disken (lådhurtsar) + hylla ovanpå
   // arbetsbänken (byggläget i 3D) står mot framväggen under högra fönstret, till höger om skåpen
-  const bw = 1.5, bd = 0.85, bh = 0.96, bx1 = Math.min(X1 - 0.35, cx1 - 0.05), bx0 = bx1 - bw, bz0 = 0.03, bz1 = bz0 + bd;
+  const bw = 1.75, bd = 0.95, bh = 0.96, bx1 = Math.min(X1 - 0.3, cx1 - 0.05), bx0 = bx1 - bw, bz0 = 0.03, bz1 = bz0 + bd;   // skrivbordet i finalen (1,5 × 0,6 m) ska få plats
   const cab = A.get('drawer_cabinet');
   if (cab) {
     const cw = A.modelSize(cab).x || 0.8, n = Math.max(1, Math.floor((bx0 - 0.15 - (cx0 + 0.1)) / cw));

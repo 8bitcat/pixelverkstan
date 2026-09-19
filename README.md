@@ -215,10 +215,12 @@ valet sparas (`pixelverkstan_3d`). 2D-läget finns kvar orört.
   textur på de tre synliga sidorna, packad i en texturatlas (två draw calls), belyst av rummet,
   lampan och skuggor. `#board` ritar bara kablar och markeringar ovanpå; klick i scenen
   raycastas mot lådorna (genomskinliga pixlar räknas inte). **Finalen** (datorn står på
-  skrivbordet) ritas på samma sätt: skrivbordsscenen står på bänken i verklig skala
-  (skrivbordslådan filtreras bort – bänken är bordet), skärmen och chassits sidofönster är
-  levande texturer, sladdarna 3D-rör som ligger på bordet; baksidespanelen är kvar som 2D-panel
-  till vänster. Efter bygget står du kvar vid bänken.
+  skrivbordet) ritas på samma sätt: skrivbordsscenen ligger rakt längs bänken i verklig skala
+  (kameran vrids till 2D-vinkeln i stället; skrivbordslådan filtreras bort – bänken är bordet),
+  skärmen, chassits sidofönster och **datorns baksida** är levande texturer på chassit, sladdarna
+  3D-rör som ligger på bordet. Knappen **🔌 Baksidan** (eller att man tar en kontakt som hör
+  dit) flyttar kameran bakom datorn, där uttagen träffas via projektion; en gul ring och texten
+  "börja här" visar var man börjar. Efter bygget står du kvar vid bänken.
 - **Tillgångar:** `assets/3d/` (modeller, texturer, HDRI, Xbot), hämtade med
   `python tools/ph-fetch.py`; licenser i `assets/3d/LICENSES.md`.
 

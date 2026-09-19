@@ -23,7 +23,7 @@ export class Desk {
     this.redraw = 0;
     this.side = document.createElement('canvas'); this.side.width = 200; this.side.height = 214;
     this.screen = document.createElement('canvas'); this.screen.width = 160; this.screen.height = 90;
-    this.rear = document.createElement('canvas'); this.rear.width = 90; this.rear.height = 160;
+    this.rear = document.createElement('canvas'); this.rear.width = 270; this.rear.height = 480;   // 3× – den sitter som textur på datorns baksida i 3D
     this.t = 0;
     this.fx = new Fx();
   }
@@ -55,10 +55,12 @@ export class Desk {
     this.key3 = null; this.cableKey3 = null;
     const v = this.view;
     v.gl?.attachDesk?.(this);   // 3D-läget: skrivbordet står på arbetsbänken
-    if (v.order?.repair) v.say(`<b>${esc(v.order.name)} lämnade in datorn:</b> «${esc(v.order.msg || '')}» Koppla in den på baksidan, starta – och se vad som händer. Sedan öppnar du lådan och letar.`, 'info');
+    this.showRear = false;
+    const rearHow = this.gl ? 'tryck på <b>🔌 Baksidan</b> så flyttas kameran bakom datorn' : window.innerWidth <= 760 ? 'knappen 🔌 Baksidan' : 'till vänster';
+    if (v.order?.repair) v.say(`<b>${esc(v.order.name)} lämnade in datorn:</b> «${esc(v.order.msg || '')}» Koppla in den på baksidan (${rearHow}), starta – och se vad som händer. Sedan öppnar du lådan och letar.`, 'info');
     else v.say(v.help
-      ? `Datorn står på skrivbordet! Koppla in kablarna på <b>datorns baksida</b> (${window.innerWidth <= 760 ? 'knappen 🔌 Baksidan' : 'till vänster'}), slå på nätagget och tryck på startknappen.`
-      : 'Datorn står på skrivbordet. Koppla in allt och starta den!', 'info');
+      ? `Datorn står på skrivbordet! Börja på <b>datorns baksida</b>: ${rearHow}. Koppla in kablarna, slå på nätagget och tryck på startknappen.`
+      : `Datorn står på skrivbordet. Koppla in allt${this.gl ? ' (🔌 Baksidan tar dig bakom datorn)' : ''} och starta den!`, 'info');
     this.resize(v.cw, v.ch, window.innerWidth <= 760);
   }
 
@@ -94,8 +96,9 @@ export class Desk {
   hintText() {
     const s = this.nextStep();
     if (!s) return '';
-    if (s.kind === 'plug') return `Dra <b>${esc(this.PLUGS[s.id].name)}</b> till ${this.PLUGS[s.id].target === 'strip' ? 'grenuttaget på bordet' : 'rätt uttag på baksidan'} (gul markering).`;
-    if (s.kind === 'switch') return this.era?.at ? 'Slå på den <b>röda strömbrytaren</b> på nätagget – på AT-datorer startar datorn direkt!' : 'Slå på nätaggets strömbrytare på baksidan – tryck så den visar <b>I</b>.';
+    const goRear = this.gl && !this.showRear ? ' Tryck på <b>🔌 Baksidan</b> för att titta bakom datorn.' : '';
+    if (s.kind === 'plug') return `Dra <b>${esc(this.PLUGS[s.id].name)}</b> till ${this.PLUGS[s.id].target === 'strip' ? 'grenuttaget på bordet' : 'rätt uttag på baksidan'} (gul markering).${this.PLUGS[s.id].target === 'strip' ? '' : goRear}`;
+    if (s.kind === 'switch') return (this.era?.at ? 'Slå på den <b>röda strömbrytaren</b> på nätagget – på AT-datorer startar datorn direkt!' : 'Slå på nätaggets strömbrytare på baksidan – tryck så den visar <b>I</b>.') + goRear;
     return 'Tryck på <b>startknappen</b> uppe på datorns front!';
   }
 
@@ -121,9 +124,20 @@ export class Desk {
     this.s = s >= 2 ? Math.floor(s * 4) / 4 : s;
     this.ox = Math.round(left + (cw - left - DV.w * this.s) / 2);
     this.oy = Math.round((narrow ? 60 : 8) + (ch - (narrow ? 70 : 80) - DV.h * this.s) / 2);
+    if (this.gl) this.toggleBtn = [12, 12, 200, 40];   // 3D: kameragenväg bakom datorn
+  }
+  // ---------- 3D: datorns baksida som yta på chassit ----------
+  // tre hörn av baksidan (sedd bakifrån: övre vänster, övre höger, nedre vänster) i scenens enheter
+  rearFace() { const S = this.dims, [u, v, z] = CASE_AT; return [[u, v, z + S.H], [u, v + S.W, z + S.H], [u, v, z]]; }
+  // ruta i baksidesbildens px (90×160) → fyra hörn på baksidan
+  rearBox3(x, y, w, h) { const S = this.dims, [u, v, z] = CASE_AT; const X = (px) => v + px / 90 * S.W, Z = (py) => z + S.H - py / 160 * S.H; return [[u, X(x), Z(y)], [u, X(x + w), Z(y)], [u, X(x + w), Z(y + h)], [u, X(x), Z(y + h)]]; }
+  // samma ruta som skärmrektangel [x, y, w, h] (2D: panelen till vänster, 3D: projicerad på chassit)
+  rearPx(x, y, w, h) {
+    if (this.gl) { const pts = this.rearBox3(x, y, w, h).map((p) => this.proj(...p)); const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]); const x0 = Math.min(...xs), y0 = Math.min(...ys); return [x0, y0, Math.max(...xs) - x0, Math.max(...ys) - y0]; }
+    const si = this.si; return [this.insetX + x * si, this.insetY + y * si, w * si, h * si];
   }
   proj(u, v, z) { const [x, y] = this.R.proj(u, v, z); return [this.ox + x * this.s, this.oy + y * this.s]; }
-  rearRect(port) { const si = this.si; return [this.insetX + port.x * si, this.insetY + port.y * si, port.w * si, port.h * si]; }
+  rearRect(port) { return this.rearPx(port.x, port.y, port.w, port.h); }
   powerButton() { const S = this.dims; return this.proj(CASE_AT[0] + S.D - 0.55, CASE_AT[1] + 1.0, CASE_AT[2] + S.H); }
 
   // ---------- Input ----------
@@ -166,11 +180,11 @@ export class Desk {
     const v = this.view, d = this.d, si = this.si;
     const inRect = (r) => pt[0] >= r[0] && pt[0] <= r[0] + r[2] && pt[1] >= r[1] && pt[1] <= r[1] + r[3];
     if (this.toggleBtn && inRect(this.toggleBtn)) { this.showRear = !this.showRear; return; }
-    const rearVisible = !this.compact || this.showRear, deskVisible = !this.compact || !this.showRear;
+    const rearVisible = this.gl ? this.showRear : (!this.compact || this.showRear), deskVisible = this.gl ? !this.showRear : (!this.compact || !this.showRear);
     if (rearVisible) {
       // strömbrytare
-      const SW = this.SWITCH;
-      if (inRect([this.insetX + SW.x * si - 4, this.insetY + SW.y * si - 4, SW.w * si + 8, SW.h * si + 8])) {
+      const SW = this.SWITCH, swr = this.rearPx(SW.x, SW.y, SW.w, SW.h);
+      if (inRect([swr[0] - 4, swr[1] - 4, swr[2] + 8, swr[3] + 8])) {
         v.op({ t: 'psu', on: !d.psuOn }); this.run = null; this.state.powered = false;
         if (this.era?.at && d.psuOn) { v.refresh(); return this.pressPower(); }
         v.say(d.psuOn ? 'Nätagget är påslaget (I).' : 'Nätagget är avslaget (O).', 'info');
@@ -322,7 +336,8 @@ export class Desk {
   draw(ctx) {
     const v = this.view, b = this.b, d = this.d, st = this.state, t = this.t;
     const cw = v.cw, ch = v.ch;
-    if (this.compact) {
+    if (this.compact || this.gl) {
+      // vald/dragen kontakt bestämmer vyn: bakom datorn för uttagen där, skrivbordet för grenuttaget
       const sel = v.selected && v.trayEntries().find((e) => e.key === v.selected);
       if (sel?.plug) this.showRear = this.PLUGS[sel.plug].target === 'rear';
     }
@@ -378,14 +393,18 @@ export class Desk {
     if (gl) {
       const key = JSON.stringify([d.plugs, this.era?.monitor, this.era?.keyboard, this.era?.videoType, this.dims]);
       if (this.cableKey3 !== key) { this.cableKey3 = key; const c = this.cablePaths(); gl.setCables(c.cables, c.plugs); }
+      // baksidan sitter på chassit
+      const rc = this.rear.getContext('2d');
+      drawRear(rc, b, { ...st, psuOn: d.psuOn }, t, Object.fromEntries(Object.entries(d.plugs).filter(([, k]) => k !== 'STRIP')), { ports: this.ports(), plugs: this.PLUGS, era: this.era, rig: this.L });
+      gl.setQuad('rear', this.rear, ...this.rearFace());
     } else this.drawDeskCables(ctx);
     this.drawFx(ctx);
     // startknapp (tryckt)
     const [bx, by] = this.powerButton();
     if (this.pressAnim > 0) { ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.beginPath(); ctx.arc(bx, by, 10, 0, Math.PI * 2); ctx.fill(); }
     // baksidan (på smal skärm: egen vy)
-    if (this.compact && this.showRear) { ctx.fillStyle = 'rgba(233,225,210,.96)'; ctx.fillRect(0, 0, cw, ch); }
-    if (!this.compact || this.showRear) this.drawInset(ctx);
+    if (this.compact && this.showRear && !gl) { ctx.fillStyle = 'rgba(233,225,210,.96)'; ctx.fillRect(0, 0, cw, ch); }
+    if (!gl && (!this.compact || this.showRear)) this.drawInset(ctx);
     // hjälpmarkeringar
     if (v.help) this.drawHelp(ctx);
     if (this.toggleBtn) {
@@ -397,6 +416,12 @@ export class Desk {
       ctx.font = '20px "Jersey 10", monospace'; ctx.fillStyle = '#17151a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(this.showRear ? '🖥️ Skrivbordet' : '🔌 Baksidan', tx + tw / 2, ty + th / 2 + 1);
       ctx.restore();
+      // hint: nästa steg är bakom datorn men vi tittar på skrivbordet (eller tvärtom)
+      const nx = this.nextStep(), wantRear = nx && (nx.kind === 'switch' || (nx.kind === 'plug' && this.PLUGS[nx.id]?.target === 'rear')), wantDesk = nx && (nx.kind === 'power' || (nx.kind === 'plug' && this.PLUGS[nx.id]?.target === 'strip'));
+      if (v.help && this.gl && ((wantRear && !this.showRear) || (wantDesk && this.showRear))) {
+        ctx.save(); ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3; ctx.setLineDash([6, 4]); ctx.lineDashOffset = -this.t * 30; ctx.strokeRect(tx - 5 - Math.sin(this.t * 5) * 2, ty - 5 - Math.sin(this.t * 5) * 2, tw + 10 + Math.sin(this.t * 5) * 4, th + 10 + Math.sin(this.t * 5) * 4); ctx.restore();
+        ctx.save(); ctx.font = '18px "Jersey 10", monospace'; ctx.fillStyle = '#17151a'; ctx.textBaseline = 'middle'; ctx.fillText(wantRear ? '← börja här: kablarna sitter bakom datorn' : '← tillbaka till skrivbordet', tx + tw + 12, ty + th / 2 + 1); ctx.restore();
+      }
     }
   }
 
@@ -608,7 +633,7 @@ export class Desk {
     const ring = (x, y, w, h) => { ctx.save(); ctx.strokeStyle = '#f5c542'; ctx.lineWidth = 3; ctx.setLineDash([6, 4]); ctx.lineDashOffset = -t * 30; ctx.strokeRect(x - 4, y - 4, w + 8, h + 8); ctx.restore(); };
     const sel = v.selected && v.trayEntries().find((e) => e.key === v.selected);
     const plugId = sel?.plug || (s?.kind === 'plug' ? s.id : null);
-    const rearVisible = !this.compact || this.showRear, deskVisible = !this.compact || !this.showRear;
+    const rearVisible = this.gl ? this.showRear : (!this.compact || this.showRear), deskVisible = this.gl ? !this.showRear : (!this.compact || !this.showRear);
     if (plugId) {
       const plug = this.PLUGS[plugId];
       if (plug.target === 'strip') { if (!deskVisible) return; const [x, y] = this.proj(...this.STRIP); ring(x - 30, y - 12, 60, 24); }
@@ -618,7 +643,7 @@ export class Desk {
         ring(...this.rearRect(port));
       }
     }
-    if (!sel && s?.kind === 'switch' && rearVisible) { const si = this.si, SW = this.SWITCH; ring(this.insetX + SW.x * si, this.insetY + SW.y * si, SW.w * si, SW.h * si); }
+    if (!sel && s?.kind === 'switch' && rearVisible) { const SW = this.SWITCH; ring(...this.rearPx(SW.x, SW.y, SW.w, SW.h)); }
     if (!sel && s?.kind === 'power' && deskVisible && !(this.run && !this.run.done)) {
       const [x, y] = this.powerButton();
       ctx.save(); ctx.fillStyle = 'rgba(245,197,66,.45)'; ctx.beginPath(); ctx.arc(x, y, 14 + Math.sin(t * 6) * 3, 0, Math.PI * 2); ctx.fill();

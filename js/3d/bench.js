@@ -73,7 +73,8 @@ export class Bench3D {
   constructor(view3d) {
     this.v = view3d;
     this.group = new THREE.Group(); this.group.name = 'bench';
-    this.group.rotation.y = -Math.PI / 4;      // u-axeln pekar snett höger-mot-kameran, v snett vänster
+    this.rotY = -Math.PI / 4;                  // byggläget: chassit diagonalt på bänken (u snett höger-mot-kameran, v snett vänster)
+    this.group.rotation.y = this.rotY;
     this.group.visible = false;
     view3d.scene.add(this.group);
     this.camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 30);
@@ -106,6 +107,8 @@ export class Bench3D {
     if (this.view || this.desk) this.layout();
   }
   layout() {
+    this.group.rotation.y = this.rotY;
+    this.dirWorld = DIR_LOCAL.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.rotY).normalize();
     this.group.scale.set(this.U, this.U, this.U);
     const off = this.off.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.group.rotation.y).multiply(this.group.scale);
     this.group.position.copy(this.center).sub(off);
@@ -118,7 +121,7 @@ export class Bench3D {
     this.view = view;
     view.gl = this;
     view.dirty = true;
-    this.U = U; this.off.set(13, 0, 12); this.filter = null; this.ppu = PPU;
+    this.U = U; this.off.set(13, 0, 12); this.filter = null; this.ppu = PPU; this.rotY = -Math.PI / 4;
     this.pSrc = () => view.P;
     // byggvyns projektion går genom 3D-kameran (markeringar, uttag, kablar, pekare hamnar rätt)
     if (!this.origProj) this.origProj = view.P.proj;
@@ -131,7 +134,9 @@ export class Bench3D {
     this.detachDesk();
     this.desk = desk;
     const DV = desk.constructor.DV || { w: 840, h: 612, k: 18, hz: 14, ox: 256, oy: 200 };
-    this.U = U_DESK; this.off.set(16, 6, 6.5); this.ppu = 20;     // skrivbordets ovansida (z = 6) ligger på bänkskivan
+    // skrivbordet läggs rakt längs bänken (u längs väggen, v ut i rummet) – kameran vrids i stället, så att
+    // bordet (1,5 × 0,6 m) får plats; skrivbordets ovansida (z = 6) ligger på bänkskivan
+    this.U = U_DESK; this.off.set(16, 6, 6.5); this.ppu = 20; this.rotY = 0;
     this.filter = (b) => !(b.u0 === 0 && b.u1 === 32 && b.v0 === 0 && b.v1 === 13 && b.z0 === 0);   // själva skrivbordslådan är bänken
     this.pSrc = () => ({ k: DV.k * desk.s, hz: DV.hz * desk.s, ox: desk.ox + DV.ox * desk.s, oy: desk.oy + DV.oy * desk.s });
     desk.proj = (u, v, z = 0) => this.project(u, v, z);   // skuggar prototypens proj medan 3D är aktivt
@@ -146,7 +151,7 @@ export class Bench3D {
     this.quads.clear();
     this.setCables([]);
     this.clearMeshes();
-    if (this.view) { this.U = U; this.off.set(13, 0, 12); this.filter = null; this.ppu = PPU; this.pSrc = () => this.view.P; this.layout(); this.view.dirty = true; }
+    if (this.view) { this.U = U; this.off.set(13, 0, 12); this.filter = null; this.ppu = PPU; this.rotY = -Math.PI / 4; this.pSrc = () => this.view.P; this.layout(); this.view.dirty = true; }
   }
   detach() {
     this.detachDesk();
@@ -166,16 +171,30 @@ export class Bench3D {
     const P = this.pSrc(), cv = this.v.canvas, board = view.canvas;
     const W = Math.max(2, cv.clientWidth), H = Math.max(2, cv.clientHeight);
     const r = board.getBoundingClientRect();
-    const sig = [P.k, P.ox, P.oy, W, H, r.left, r.top, this.group.position.x, this.group.position.z, this.U].map((n) => Math.round(n * 1000)).join(',');
+    const rear = !!(this.desk?.showRear && this.desk.rearFace);
+    const sig = [P.k, P.ox, P.oy, W, H, r.left, r.top, this.group.position.x, this.group.position.z, this.U, rear ? 1 : 0].map((n) => Math.round(n * 1000)).join(',');
     if (!force && sig === this.camSig) return;
     this.camSig = sig;
+    const cam = this.camera;
+    if (rear) {
+      // bakom datorn: kameran tittar rakt på baksidan (−u), lite uppifrån vänster, så nära att baksidan fyller bilden
+      const [A, B, D] = this.desk.rearFace();
+      const mid = new THREE.Vector3((A[0] + B[0] + D[0] + (B[0] + D[0] - A[0])) / 4, (A[2] + D[2]) / 2, (A[1] + B[1]) / 2);
+      const target = this.group.localToWorld(mid.clone());
+      const faceH = (A[2] - D[2]) * this.U, dist = Math.max(0.4, faceH / 0.62 / (2 * Math.tan(FOV * Math.PI / 360)));
+      const dir = new THREE.Vector3(-1, 0.42, 0.3).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.rotY);
+      cam.position.copy(target).addScaledVector(dir, dist);
+      cam.up.set(0, 1, 0); cam.lookAt(target);
+      cam.aspect = W / H; cam.near = 0.05; cam.far = dist + 16;
+      cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+      return;
+    }
     const bx = W / 2 - r.left, by = H / 2 - r.top;
     const a = (bx - P.ox) / P.k, b2 = (by - P.oy) * 2 / P.k;
     const u = (a + b2) / 2, v = (b2 - a) / 2;
     const target = this.group.localToWorld(new THREE.Vector3(u, this.desk ? 6 : 0, v));
     const pxPerM = P.k * Math.SQRT2 / this.U;
     const dist = Math.max(0.6, H / (2 * Math.tan(FOV * Math.PI / 360) * pxPerM));
-    const cam = this.camera;
     cam.position.copy(target).addScaledVector(this.dirWorld, dist);
     cam.up.set(0, 1, 0); cam.lookAt(target);
     cam.aspect = W / H; cam.near = Math.max(0.05, dist - 1.2); cam.far = dist + 16;
@@ -332,8 +351,11 @@ export class Bench3D {
     const sig = [...p00, ...p10, ...p01].join(',');
     if (sig !== q.sig) {
       q.sig = sig;
-      const e = 0.04, A = [p00[0], p00[2], p00[1] + e], B = [p10[0], p10[2], p10[1] + e], D = [p01[0], p01[2], p01[1] + e], C = [B[0] + D[0] - A[0], B[1] + D[1] - A[1], B[2] + D[2] - A[2]];
-      q.mesh.geometry.attributes.position.set([...A, ...B, ...C, ...D]); q.mesh.geometry.attributes.position.needsUpdate = true;
+      const A0 = new THREE.Vector3(p00[0], p00[2], p00[1]), B0 = new THREE.Vector3(p10[0], p10[2], p10[1]), D0 = new THREE.Vector3(p01[0], p01[2], p01[1]);
+      const n = new THREE.Vector3().subVectors(D0, A0).cross(new THREE.Vector3().subVectors(B0, A0)).normalize();
+      const e = 0.04, A = A0.addScaledVector(n, e), B = B0.addScaledVector(n, e), D = D0.addScaledVector(n, e), C = new THREE.Vector3().addVectors(B, D).sub(A);
+      q.mesh.geometry.attributes.position.set([...A.toArray(), ...B.toArray(), ...C.toArray(), ...D.toArray()]); q.mesh.geometry.attributes.position.needsUpdate = true;
+      const na = q.mesh.geometry.attributes.normal; for (let i = 0; i < 4; i++) na.setXYZ(i, n.x, n.y, n.z); na.needsUpdate = true;
       q.mesh.geometry.computeBoundingSphere();
     }
     q.tex.needsUpdate = true;

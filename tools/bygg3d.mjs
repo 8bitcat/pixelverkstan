@@ -103,8 +103,21 @@ await waitFrames(3); await page.waitForTimeout(400);
 const dk = await page.evaluate(() => { const v = PV.build, f = v.finale, i = v.gl.info(); const [bx, by] = f.powerButton(); const [gx, gy] = v.gl.project(...[f.constructor.CASE_AT[0] + f.dims.D - 0.55, f.constructor.CASE_AT[1] + 1.0, f.constructor.CASE_AT[2] + f.dims.H]); return { phase: v.phase, desk: i.desk, faces: i.faces, quads: i.quads, projOverride: Object.prototype.hasOwnProperty.call(f, 'proj'), d: +Math.hypot(bx - gx, by - gy).toFixed(2) }; });
 ok(dk.phase === 'desk' && dk.desk && dk.faces > 30 && dk.quads >= 1 && dk.projOverride && dk.d < 0.5, `finalen i 3D: ${JSON.stringify(dk)}`);
 await shot('5-skrivbord');
+// bakom datorn: knappen flyttar kameran, uttagen ligger på chassits baksida och går att träffa
+const rr = await page.evaluate(async () => {
+  const v = PV.build, f = v.finale; f.onPointerDown([f.toggleBtn[0] + 5, f.toggleBtn[1] + 5]);
+  await new Promise((r) => setTimeout(r, 200));
+  const port = f.ports().find((p) => p.type === f.PLUGS.pc_power.type), rect = port && f.rearRect(port);
+  let plugged = false;
+  if (rect) { f.onDrop({ kind: 'plug', plug: 'pc_power' }, [rect[0] + rect[2] / 2, rect[1] + rect[3] / 2]); plugged = !!f.d.plugs.pc_power; }
+  return { showRear: f.showRear, rect: rect && rect.map((n) => Math.round(n)), inside: rect && rect[0] > 0 && rect[1] > 0 && rect[2] > 4 && rect[3] > 4 && rect[0] + rect[2] < v.cw && rect[1] + rect[3] < v.ch, plugged, quads: v.gl.info().quads };
+});
+ok(rr.showRear && rr.inside && rr.plugged && rr.quads >= 2, `bakom datorn: ${JSON.stringify(rr)}`);
+await waitFrames(3); await page.waitForTimeout(300);
+await shot('5b-baksida');
+await page.evaluate(() => { const f = PV.build.finale; f.onPointerDown([f.toggleBtn[0] + 5, f.toggleBtn[1] + 5]); });
 // koppla in strömkabeln → en sladd i 3D; tillbaka till bygget → chassit igen
-const cb = await page.evaluate(async () => { const v = PV.build, f = v.finale; const port = f.ports().find((p) => p.type === f.PLUGS.pc_power.type); if (port) v.op({ t: 'plug', id: 'pc_power', key: port.key }); v.op({ t: 'plug', id: 'mon_power', key: 'STRIP' }); v.refresh(); await new Promise((r) => setTimeout(r, 300)); return { port: !!port }; });
+const cb = await page.evaluate(async () => { const v = PV.build, f = v.finale; v.op({ t: 'plug', id: 'mon_power', key: 'STRIP' }); v.refresh(); await new Promise((r) => setTimeout(r, 300)); return { port: !!f.d.plugs.pc_power }; });
 await waitFrames(2);
 const cb2 = await page.evaluate(() => PV.build.gl.info());
 ok(cb2.cables >= 2, `sladdar i 3D efter inkoppling: ${cb2.cables} (${JSON.stringify(cb)})`);
