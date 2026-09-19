@@ -117,7 +117,8 @@ export function paintRoom(theme, opts = {}) {
   paintFloor(P, flA, flB, lokal, items, opts.openSlots ?? 3);
   paintWalls(P, wall, wallDk, lokal);
   paintStorefront(P, wall, items, opts.sign, lokal);
-  paintWallDecor(P, wall, wallDk, theme, items, lokal);
+  if (opts.art?.paintWallDecor) opts.art.paintWallDecor(P, { wall, wallDk, theme, items, lokal, menuLines: opts.menuLines || [], WALL, SHELF, POSTER, CLOCK, TV, NEON_BOX });
+  else paintWallDecor(P, wall, wallDk, theme, items, lokal);
   if (lokal === 1) { paintWorn(P, wall); paintShabby(P); }
   if (opts.plan?.partition) paintPartition(P, opts.plan);
   if (lokal === 2) paintPlain(P, wall);
@@ -342,74 +343,99 @@ export function plantSmall(P, x, y) {
   for (const [dx, dy, c] of leaves) { P.rect(x + dx, y + dy, 3, 5, c); P.px(x + dx, y + dy, mix(c, 0xffffff, 0.3)); }
 }
 
-function paintWallDecor(P, wall, wallDk, theme, items = {}, lokal = 2) {
-  // neonskyltens bakplatta
-  const [nx0, ny0, nx1, ny1] = NEON_BOX;
-  for (let y = ny0; y < ny1; y++) for (let x = nx0; x < nx1; x++) P.px(x, y, mul(0x1e2029, 0.9 + ((x * 7) % 5) * 0.03));
-  P.box(nx0, ny0, nx1 - nx0, ny1 - ny0, 0x3a3d4a); P.hl(nx0 + 1, ny1, nx1 - nx0 - 1, 0x10111a, 0.6);
-  for (const [bx, by] of [[nx0 + 3, ny0 + 3], [nx1 - 5, ny0 + 3], [nx0 + 3, ny1 - 5], [nx1 - 5, ny1 - 5]]) { P.rect(bx, by, 2, 2, 0x8a8f9c); P.px(bx, by, 0xd0d4dc); }
+// Väggdekorens byggstenar – datorbutiken använder alla, andra verksamheter (shop.floorArt)
+// plockar det de vill ha och ritar resten själva.
+export const WALL = {
+  neonPlate(P) {
+    const [nx0, ny0, nx1, ny1] = NEON_BOX;
+    for (let y = ny0; y < ny1; y++) for (let x = nx0; x < nx1; x++) P.px(x, y, mul(0x1e2029, 0.9 + ((x * 7) % 5) * 0.03));
+    P.box(nx0, ny0, nx1 - nx0, ny1 - ny0, 0x3a3d4a); P.hl(nx0 + 1, ny1, nx1 - nx0 - 1, 0x10111a, 0.6);
+    for (const [bx, by] of [[nx0 + 3, ny0 + 3], [nx1 - 5, ny0 + 3], [nx0 + 3, ny1 - 5], [nx1 - 5, ny1 - 5]]) { P.rect(bx, by, 2, 2, 0x8a8f9c); P.px(bx, by, 0xd0d4dc); }
+  },
   // vägghylla (lådor ritas dynamiskt efter lagret) – grövre ställning med större lager
-  const S = SHELF;
-  const lager = items.lager4 ? 4 : items.lager3 ? 3 : items.lager2 ? 2 : 1;
-  P.rect(S.x0 + 2, 28, 2, 52, 0x2f323b); P.rect(S.x1 - 4, 28, 2, 52, 0x2f323b); P.vl(S.x0 + 2, 28, 52, 0x5a5f6e); P.vl(S.x1 - 4, 28, 52, 0x5a5f6e);
-  if (lager >= 2) { P.rect(S.x0 + 2, 30, 2, 2, 0xe8b230); P.rect(S.x1 - 4, 30, 2, 2, 0xe8b230); }
-  if (lager >= 3) { P.rect(S.x0 + 1, 28, 1, 52, 0xe8b230); P.rect(S.x1 - 2, 28, 1, 52, 0xe8b230); }
-  if (lager >= 4) { P.rect(S.x0 - 2, 26, 4, 56, 0xd8b24a); P.rect(S.x1 - 2, 26, 4, 56, 0xd8b24a); }
-  for (const by of S.boards) {
-    P.rect(S.x0, by, S.x1 - S.x0, 2, 0xd9b98a); P.rect(S.x0, by + 2, S.x1 - S.x0, 2, 0x8a6446); P.hl(S.x0, by + 4, S.x1 - S.x0, 0x1a1426, 0.35);
-    for (let x = S.x0; x < S.x1; x++) if (hash(x, by, 12) > 0.8) P.px(x, by + 1, 0xc4a276);
-  }
-  const lagerTxt = ['', 'LAGER', 'LAGER 2', 'LAGER 3', 'PROFFSLAGER'][lager], lagerW = textW(SMALL, lagerTxt) + 6;
-  P.rect(S.x0 + 1, 21, lagerW, 7, 0x1b1f2a); P.box(S.x0 + 1, 21, lagerW, 7, 0x3a3f4d); text(P, SMALL, lagerTxt, S.x0 + 4, 22, 0xe8b230);
-  // luftkonditionering på väggen
-  if (items.ac) { P.rect(256, 9, 32, 9, 0xe8e4da); P.hl(256, 9, 32, 0xffffff); P.hl(256, 17, 32, 0xb8b4aa); for (let x = 258; x < 286; x += 2) P.px(x, 14, 0x9aa0aa); P.px(284, 11, 0x45e06a); }
+  shelf(P, items, label = ['', 'LAGER', 'LAGER 2', 'LAGER 3', 'PROFFSLAGER']) {
+    const S = SHELF;
+    const lager = items.lager4 ? 4 : items.lager3 ? 3 : items.lager2 ? 2 : 1;
+    P.rect(S.x0 + 2, 28, 2, 52, 0x2f323b); P.rect(S.x1 - 4, 28, 2, 52, 0x2f323b); P.vl(S.x0 + 2, 28, 52, 0x5a5f6e); P.vl(S.x1 - 4, 28, 52, 0x5a5f6e);
+    if (lager >= 2) { P.rect(S.x0 + 2, 30, 2, 2, 0xe8b230); P.rect(S.x1 - 4, 30, 2, 2, 0xe8b230); }
+    if (lager >= 3) { P.rect(S.x0 + 1, 28, 1, 52, 0xe8b230); P.rect(S.x1 - 2, 28, 1, 52, 0xe8b230); }
+    if (lager >= 4) { P.rect(S.x0 - 2, 26, 4, 56, 0xd8b24a); P.rect(S.x1 - 2, 26, 4, 56, 0xd8b24a); }
+    for (const by of S.boards) {
+      P.rect(S.x0, by, S.x1 - S.x0, 2, 0xd9b98a); P.rect(S.x0, by + 2, S.x1 - S.x0, 2, 0x8a6446); P.hl(S.x0, by + 4, S.x1 - S.x0, 0x1a1426, 0.35);
+      for (let x = S.x0; x < S.x1; x++) if (hash(x, by, 12) > 0.8) P.px(x, by + 1, 0xc4a276);
+    }
+    const lagerTxt = label[lager], lagerW = textW(SMALL, lagerTxt) + 6;
+    P.rect(S.x0 + 1, 21, lagerW, 7, 0x1b1f2a); P.box(S.x0 + 1, 21, lagerW, 7, 0x3a3f4d); text(P, SMALL, lagerTxt, S.x0 + 4, 22, 0xe8b230);
+    return lager;
+  },
+  ac(P, items) {
+    if (items.ac) { P.rect(256, 9, 32, 9, 0xe8e4da); P.hl(256, 9, 32, 0xffffff); P.hl(256, 17, 32, 0xb8b4aa); for (let x = 258; x < 286; x += 2) P.px(x, 14, 0x9aa0aa); P.px(284, 11, 0x45e06a); }
+  },
   // affisch med stjärnobjektet (ikonen läggs på av floor.js)
-  const [px0, py0, px1, py1] = POSTER;
-  P.rect(px0 - 1, py0 - 1, px1 - px0 + 2, py1 - py0 + 2, 0x15151a);
-  for (let y = py0; y < py1; y++) for (let x = px0; x < px1; x++) P.px(x, y, mix(0x151b3a, 0x4a1f4a, (y - py0) / (py1 - py0) + (bayer(x, y) - 0.5) * 0.15));
-  for (let i = 0; i < 20; i++) P.px(px0 + ((i * 11) % 26) + 1, py0 + ((i * 7) % 14) + 1, 0xffffff, 0.5);
-  P.rect(px0, py1 - 9, px1 - px0, 9, 0x76b900); text(P, SMALL, 'NYHET', px0 + 4, py1 - 7, 0x10140a);
-  P.hl(px0 - 1, py1 + 1, px1 - px0 + 2, 0x0e0a14, 0.35);
-  // klocka
-  const [cx, cy, r] = CLOCK;
-  for (let y = -r - 1; y <= r + 1; y++) for (let x = -r - 1; x <= r + 1; x++) {
-    const dd = Math.hypot(x, y);
-    if (dd < r + 0.5) P.px(cx + x, cy + y, dd > r - 1.2 ? 0x2a2d36 : (x + y < -4 ? 0xffffff : 0xf1ece2));
-    else if (dd < r + 1.5 && x + y > 0) P.px(cx + x, cy + y, 0x0e0a14, 0.3);
-  }
-  for (const [dx, dy] of [[0, -6], [6, 0], [0, 6], [-6, 0]]) P.px(cx + dx, cy + dy, 0x2a2d36);
-  // tv-skärm på väggarm
-  const [tx0, ty0, tx1, ty1] = TV;
-  P.rect(((tx0 + tx1) >> 1) - 3, ty1, 6, 3, 0x2a2d36);
-  P.rect(tx0 - 2, ty0 - 2, tx1 - tx0 + 4, ty1 - ty0 + 4, 0x15161b); P.hl(tx0 - 2, ty0 - 2, tx1 - tx0 + 4, 0x3a3d48);
-  P.hl(tx0 - 1, ty1 + 2, tx1 - tx0 + 2, 0x0e0a14, 0.35); P.px(tx1, ty1 + 1, 0x45e06a);
-  // brandsläckare
-  P.rect(446, 60, 5, 15, 0xc9323a); P.vl(447, 61, 13, 0xe86a70); P.rect(447, 57, 3, 3, 0x2a2d36); P.rect(445, 66, 7, 2, 0x2a2d36);
-  // verkstadsdörren
-  const dx0 = 456, dx1 = 500, dy0 = 38;
-  P.rect(dx0 - 3, dy0 - 3, dx1 - dx0 + 6, WALL_Y - dy0 + 3, 0x2b2f38); P.hl(dx0 - 3, dy0 - 3, dx1 - dx0 + 6, 0x4a5060);
-  for (let y = dy0; y < WALL_Y; y++) for (let x = dx0; x < dx1; x++) {
-    let c = mul(0x5c6b7a, 0.95 + hash(x, y >> 2, 13) * 0.08);
-    if (x === dx0) c = 0x7d8c9b; if (x === dx1 - 1) c = 0x46525e;
-    P.px(x, y, c);
-  }
-  P.rect(469, 44, 18, 15, 0x23262f); // fönster med varmt ljus
-  for (let y = 45; y < 58; y++) for (let x = 470; x < 486; x++) P.px(x, y, mix(0xffd27a, 0xe0873a, (y - 45) / 13 + (bayer(x, y) - 0.5) * 0.2));
-  P.hl(470, 50, 16, 0x7a4a26); P.hl(470, 55, 16, 0x7a4a26); P.rect(472, 47, 3, 3, 0x5a3d2b); P.rect(479, 52, 4, 3, 0x2c6fb7);
-  P.px(470, 45, 0xfff4d0); P.px(471, 45, 0xfff4d0);
-  P.rect(490, 60, 4, 10, 0xc8ccd2); P.vl(490, 60, 10, 0xeef0f3);
-  for (let y = 77; y < WALL_Y; y++) for (let x = dx0; x < dx1; x++) P.px(x, y, ((x + y) >> 2) % 2 ? 0xe8b230 : 0x23232a);
-  P.rect(452, 24, 52, 10, 0x1b1f2a); P.box(452, 24, 52, 10, 0xe8b230, 0.8);
-  const wsign = theme?.workshopSign || 'VERKSTAD';
-  text(P, SMALL, wsign, 478 - (textW(SMALL, wsign) >> 1), 27, 0xe8b230);
-  // eluttag
-  P.rect(268, 68, 6, 6, 0xe8e4da); P.px(270, 70, 0x555555); P.px(272, 70, 0x555555);
-  // stereo på bänken bakom disken
-  if (items.stereo) {
+  poster(P, label = 'NYHET') {
+    const [px0, py0, px1, py1] = POSTER;
+    P.rect(px0 - 1, py0 - 1, px1 - px0 + 2, py1 - py0 + 2, 0x15151a);
+    for (let y = py0; y < py1; y++) for (let x = px0; x < px1; x++) P.px(x, y, mix(0x151b3a, 0x4a1f4a, (y - py0) / (py1 - py0) + (bayer(x, y) - 0.5) * 0.15));
+    for (let i = 0; i < 20; i++) P.px(px0 + ((i * 11) % 26) + 1, py0 + ((i * 7) % 14) + 1, 0xffffff, 0.5);
+    P.rect(px0, py1 - 9, px1 - px0, 9, 0x76b900); text(P, SMALL, label, px0 + 4, py1 - 7, 0x10140a);
+    P.hl(px0 - 1, py1 + 1, px1 - px0 + 2, 0x0e0a14, 0.35);
+  },
+  clock(P) {
+    const [cx, cy, r] = CLOCK;
+    for (let y = -r - 1; y <= r + 1; y++) for (let x = -r - 1; x <= r + 1; x++) {
+      const dd = Math.hypot(x, y);
+      if (dd < r + 0.5) P.px(cx + x, cy + y, dd > r - 1.2 ? 0x2a2d36 : (x + y < -4 ? 0xffffff : 0xf1ece2));
+      else if (dd < r + 1.5 && x + y > 0) P.px(cx + x, cy + y, 0x0e0a14, 0.3);
+    }
+    for (const [dx, dy] of [[0, -6], [6, 0], [0, 6], [-6, 0]]) P.px(cx + dx, cy + dy, 0x2a2d36);
+  },
+  // tv-skärm på väggarm (bilden ritas dynamiskt av floor.js)
+  tv(P) {
+    const [tx0, ty0, tx1, ty1] = TV;
+    P.rect(((tx0 + tx1) >> 1) - 3, ty1, 6, 3, 0x2a2d36);
+    P.rect(tx0 - 2, ty0 - 2, tx1 - tx0 + 4, ty1 - ty0 + 4, 0x15161b); P.hl(tx0 - 2, ty0 - 2, tx1 - tx0 + 4, 0x3a3d48);
+    P.hl(tx0 - 1, ty1 + 2, tx1 - tx0 + 2, 0x0e0a14, 0.35); P.px(tx1, ty1 + 1, 0x45e06a);
+  },
+  extinguisher(P) { P.rect(446, 60, 5, 15, 0xc9323a); P.vl(447, 61, 13, 0xe86a70); P.rect(447, 57, 3, 3, 0x2a2d36); P.rect(445, 66, 7, 2, 0x2a2d36); },
+  // dörren till verkstaden/köket med fönster, varningsrand och skylt
+  door(P, sign = 'VERKSTAD') {
+    const dx0 = 456, dx1 = 500, dy0 = 38;
+    P.rect(dx0 - 3, dy0 - 3, dx1 - dx0 + 6, WALL_Y - dy0 + 3, 0x2b2f38); P.hl(dx0 - 3, dy0 - 3, dx1 - dx0 + 6, 0x4a5060);
+    for (let y = dy0; y < WALL_Y; y++) for (let x = dx0; x < dx1; x++) {
+      let c = mul(0x5c6b7a, 0.95 + hash(x, y >> 2, 13) * 0.08);
+      if (x === dx0) c = 0x7d8c9b; if (x === dx1 - 1) c = 0x46525e;
+      P.px(x, y, c);
+    }
+    P.rect(469, 44, 18, 15, 0x23262f); // fönster med varmt ljus
+    for (let y = 45; y < 58; y++) for (let x = 470; x < 486; x++) P.px(x, y, mix(0xffd27a, 0xe0873a, (y - 45) / 13 + (bayer(x, y) - 0.5) * 0.2));
+    P.hl(470, 50, 16, 0x7a4a26); P.hl(470, 55, 16, 0x7a4a26); P.rect(472, 47, 3, 3, 0x5a3d2b); P.rect(479, 52, 4, 3, 0x2c6fb7);
+    P.px(470, 45, 0xfff4d0); P.px(471, 45, 0xfff4d0);
+    P.rect(490, 60, 4, 10, 0xc8ccd2); P.vl(490, 60, 10, 0xeef0f3);
+    for (let y = 77; y < WALL_Y; y++) for (let x = dx0; x < dx1; x++) P.px(x, y, ((x + y) >> 2) % 2 ? 0xe8b230 : 0x23232a);
+    P.rect(452, 24, 52, 10, 0x1b1f2a); P.box(452, 24, 52, 10, 0xe8b230, 0.8);
+    text(P, SMALL, sign, 478 - (textW(SMALL, sign) >> 1), 27, 0xe8b230);
+  },
+  socket(P) { P.rect(268, 68, 6, 6, 0xe8e4da); P.px(270, 70, 0x555555); P.px(272, 70, 0x555555); },
+  // stereo/radio på bänken bakom disken
+  radio(P, items) {
+    if (!items.stereo) return;
     P.rect(334, 64, 22, 12, 0x2a2d33); P.hl(334, 64, 22, 0x5a5f6a); P.rect(336, 66, 6, 6, 0x0b0c10); P.rect(348, 66, 6, 6, 0x0b0c10);
     P.px(338, 68, 0x3a78d8); P.px(350, 68, 0x3a78d8); P.rect(343, 67, 4, 2, 0x45e06a); P.rect(343, 70, 4, 1, 0xe8b230); P.rect(343, 72, 4, 1, 0xe23b5a);
     P.rect(340, 62, 1, 2, 0x8a8f9c); P.rect(354, 60, 1, 4, 0x8a8f9c);
-  }
+  },
+};
+
+function paintWallDecor(P, wall, wallDk, theme, items = {}, lokal = 2) {
+  WALL.neonPlate(P);
+  WALL.shelf(P, items);
+  WALL.ac(P, items);
+  WALL.poster(P);
+  WALL.clock(P);
+  WALL.tv(P);
+  WALL.extinguisher(P);
+  WALL.door(P, theme?.workshopSign || 'VERKSTAD');
+  WALL.socket(P);
+  WALL.radio(P, items);
 }
 
 // Sliten lokal, del två: plywood för ett fönster, spindelväv i hörnen, flagnande tapet och

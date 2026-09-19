@@ -7,6 +7,7 @@ import * as upgrades from './upgrades.js';
 import * as products from './products.js';
 import { iconCanvas } from './art.js';
 import { Serving } from './serve.js';
+import * as floorArt from './floor-art.js';
 
 export default {
   id: 'restaurang',
@@ -18,7 +19,9 @@ export default {
   // läskkylen står framme från start; dessertdisken köps
   showcases: [{ cat: 'dryck', title: 'Läskkyl' }],
   hero: null,
-  heroFor: () => null,
+  // stjärnobjektet i montern och på affischen: årets finaste biff
+  heroFor: (game) => [...menu.onSale(game.year).filter((p) => p.cat === 'biff')].sort((a, b) => b.cost - a.cost)[0] || null,
+  floorArt,
   fit: upgrades,
   products,
   isProduct: products.isProduct,
@@ -68,7 +71,7 @@ export default {
   optsFor: orders.optsFor,
   // texter i den generiska byggvyn och dialogerna
   text: {
-    signSale: 'MENY', signTag: 'ALLTID NYGRILLAT', resultParts: 'Mat + tillagning', resultTime: 'Tillagning',
+    signSale: 'MENY', signTag: 'ALLTID NYGRILLAT', resultParts: 'Mat + tillagning', resultTime: 'Tillagning', emptyUnit: 'TOMT',
     thing: 'burgare', things: 'burgare', place: 'köket',
     titleFor: (order, gen) => `${order.title} åt ${order.name}`,
     welcome: (name) => `Välkommen till köket! Nu bygger vi ${name}s burgare lager för lager. Följ de gula markeringarna.`,

@@ -90,19 +90,20 @@ export class Floor {
     if (LY.HERO) { this.ropeBack = PR.makeRope(LY.ROPE.back, [LY.ROPE.x0, LY.ROPE.x1]); this.ropeFront = PR.makeRope(LY.ROPE.front, [LY.ROPE.x0, LY.HERO.cx, LY.ROPE.x1], true); }
     else this.ropeBack = this.ropeFront = null;
     // rummet
-    const room = SC.paintRoom(th, { lokal, items, sign: shop.sign, openSlots: open, plan: LY.PLAN });
+    const art = this.art = shop.floorArt || null;
+    const room = SC.paintRoom(th, { lokal, items, sign: shop.sign, openSlots: open, plan: LY.PLAN, art, menuLines: art?.menuLines ? art.menuLines(g) : [] });
     const neon = hex(th.neon, 0x7ee8fa);
     this.room = room.flush();
     const rc = this.room.getContext('2d');
     rc.imageSmoothingEnabled = false;
-    if (this.heroPart) {
+    if (this.heroPart && !art?.noPoster) {
       const [x0, y0, x1] = SC.POSTER, ic = this.icon(this.heroPart, 26, 20);
       rc.drawImage(ic, Math.round((x0 + x1 - 26) / 2), y0 + 5);
     }
     this.neon = neonSign(shop.sign || '', neon, 2, 4);
     this.open = neonSign('ÖPPET', 0xff4d6d, 1, 3);
-    this.counter = PR.makeCounter(th);
-    this.back = PR.makeBackCabinet();
+    this.counter = PR.makeCounter(th, art, g.year, items);
+    this.back = art?.makeBackCabinet ? art.makeBackCabinet(items, g.year) : PR.makeBackCabinet();
     this.furniture = [this.back, ...(LY.SOFA ? [PR.makeSofa()] : []), ...(LY.ARMCHAIR ? [PR.makeArmchair()] : []), ...(LY.TABLE ? [PR.makeTable()] : []), ...(LY.BENCH ? [PR.makeBench(LY.BENCH)] : []),
       ...LY.PLANTS.map(([x, y]) => PR.makePlant(x, y)), ...LY.GATES.map((x) => PR.makeGate(x)), ...(LY.PLAN.props || []).map((pr) => PR.makeProp(pr))];
     if (items.vaxter) this.furniture.push(...LY.EXTRA_PLANTS.map(([x, y]) => PR.makePlant(x, y)));
@@ -125,14 +126,15 @@ export class Floor {
         if (def.unit === 'spelhylla') { const frame = PR.makeGameShelf(W); return { i, slot, def, frame, unit: 'spelhylla', img: null, x: slot.x0, y: slot.base - frame.H + 1, sort: slot.base }; }
         if (def.unit === 'spelbord') { const frame = PR.makeGameDesk(W, g.year); return { i, slot, def, frame, unit: 'spelbord', img: null, x: slot.x0, y: slot.base - frame.H + 1, sort: slot.base }; }
         if (def.unit === 'arkad') { const prod = shop.part[def.product]; return { i, slot, def, unit: 'arkad', prod, img: null, x: Math.round(slot.x0 + (W - CAB_BOX.w) / 2), y: slot.base - CAB_BOX.h + 1, sort: slot.base }; }
-        const img = PR.makeVendor(def.unit); return { i, slot, def, img, x: Math.round(slot.x0 + (W - img.width) / 2), y: slot.base - img.height + 1, sort: slot.base };
+        const img = this.art?.makeUnit?.(def.unit, W, g.year) || PR.makeVendor(def.unit); return { i, slot, def, img, x: Math.round(slot.x0 + (W - img.width) / 2), y: slot.base - img.height + 1, sort: slot.base };
       }
       const cat = shop.cats?.[def.cat], brand = def.kind === 'brand' && F ? F.brandInfo(def.cat, def.brand) : null;
       const velvet = mix(mul(hex(brand?.color || cat?.color, 0x7a2e3e), 0.5), 0x1a1030, 0.35);
       const catName = (F?.CAT_NAME?.[def.cat] || cat?.name || def.cat).toUpperCase();
       const look = { style: LY.PLAN.style, plate: cat?.color };
-      const frame = slot.size === 'small' ? PR.makeTower(catName, velvet, brand, def.level, look) : PR.makeVitrine(W, catName, velvet, brand, def.level, look);
-      const x = slot.size === 'small' ? Math.round(slot.x0 + (W - frame.W) / 2) : slot.x0;
+      const own = def.kind !== 'brand' ? this.art?.makeShowcase?.(def, W, slot.size, look, catName) : null;
+      const frame = own || (slot.size === 'small' ? PR.makeTower(catName, velvet, brand, def.level, look) : PR.makeVitrine(W, catName, velvet, brand, def.level, look));
+      const x = frame.W < W ? Math.round(slot.x0 + (W - frame.W) / 2) : slot.x0;
       return { i, slot, def, frame, brand, cat: def.cat, img: null, x, y: slot.base - frame.H + 1, sort: slot.base };
     });
     // units[i] = enheten på kanoniskt platsindex i (glest), unitList = alla i ritordning
@@ -613,9 +615,9 @@ export class Floor {
       else if (u.unit === 'spelhylla') u.img = this.renderGameShelf(u);
       else if (u.unit === 'spelbord') u.img = this.renderDesk(u);
       else if (u.unit === 'arkad') u.img = u.prod ? cabinetSprite(u.prod, this.RES) : null;
-      else if (u.frame) u.img = u.frame.tower ? this.renderTower(u) : this.renderVitrine(u);
+      else if (u.frame) u.img = u.frame.grid ? this.renderGrid(u) : u.frame.tower ? this.renderTower(u) : this.renderVitrine(u);
     }
-    this.shelfImg = this.renderShelf();
+    this.shelfImg = this.art?.noShelf ? null : this.renderShelf();
   }
 
   // produkter som står framme, hetast först
@@ -716,6 +718,25 @@ export class Floor {
     return c;
   }
 
+  renderGrid(u) {
+    const { frame } = u, g = this.game, RES = this.RES, W = frame.W, H = frame.H, G = frame.grid;
+    const c = document.createElement('canvas'); c.width = W * RES; c.height = H * RES;
+    const x = c.getContext('2d'); x.setTransform(RES, 0, 0, RES, 0, 0); x.imageSmoothingEnabled = false;
+    x.drawImage(frame.under, 0, 0);
+    const parts = this.partsFor(u).slice(0, G.cols * G.rows);
+    parts.forEach((p, k) => {
+      const col = k % G.cols, row = Math.floor(k / G.cols);
+      const cx = G.x0 + G.cellW * (col + 0.5), bottom = G.top + (row + 1) * G.shelfH - 2, iw = Math.round(G.iw), ih = Math.round(G.ih);
+      x.fillStyle = 'rgba(8,4,14,.35)'; x.fillRect(Math.round(cx - iw * 0.3), bottom - 1, Math.round(iw * 0.6), 1);
+      x.drawImage(this.icon(p, iw * RES, ih * RES), Math.round(cx - iw / 2), bottom - ih, iw, ih);
+      const label = '×' + g.shownFree(p.id), tw = textW(SMALL, label) + 3;
+      x.fillStyle = '#17151a'; x.fillRect(Math.round(cx + iw / 2) - tw - 1, bottom - 7, tw + 2, 8); x.fillStyle = '#f4efe2'; x.fillRect(Math.round(cx + iw / 2) - tw, bottom - 6, tw, 6);
+      ctxText(x, SMALL, label, Math.round(cx + iw / 2) - tw + 1, bottom - 6, '#17151a');
+    });
+    if (!parts.length) { const t = this.shop.text?.emptyUnit || 'TOM MONTER', tw = textW(SMALL, t) + 8, tx = Math.round((W - tw) / 2), ty = G.top + Math.round(G.shelfH / 2); x.fillStyle = 'rgba(8,4,14,.35)'; x.fillRect(tx + 2, ty + 2, tw, 11); x.fillStyle = '#f4efe2'; x.fillRect(tx, ty, tw, 11); x.fillStyle = '#c9323a'; x.fillRect(tx, ty, tw, 1); x.fillRect(tx, ty + 10, tw, 1); ctxText(x, SMALL, t, tx + 4, ty + 3, '#9e1b22'); }
+    x.drawImage(frame.over, 0, 0);
+    return c;
+  }
   renderVitrine(u) {
     const { frame, slot: v } = u, g = this.game, W = frame.W, { GH, D } = PR.VIT, H = frame.H, HH = frame.HH || 0;
     const RES = this.RES;
@@ -747,7 +768,7 @@ export class Floor {
       ctxText(x, SMALL, label, tx + 2, ty + 1, '#17151a');
     }
     if (!parts.length) {
-      const label = 'TOM MONTER', tw = textW(SMALL, label) + 8, tx = Math.round((W - tw) / 2), ty = GH + 12;
+      const label = this.shop.text?.emptyUnit || 'TOM MONTER', tw = textW(SMALL, label) + 8, tx = Math.round((W - tw) / 2), ty = GH + 12;
       x.fillStyle = 'rgba(8,4,14,.45)'; x.fillRect(tx + 2, ty + 2, tw, 11);
       x.fillStyle = '#f4efe2'; x.fillRect(tx, ty, tw, 11);
       x.fillStyle = '#c9323a'; x.fillRect(tx, ty, tw, 1); x.fillRect(tx, ty + 10, tw, 1);
@@ -925,7 +946,7 @@ export class Floor {
     const c = this.counter, t = this.t;
     ctx.drawImage(c.img, c.x, c.y);
     // demodatorns rgb-fläktar
-    for (const [fx, fy, ph] of [[386, 101, 0], [386, 114, 120]]) {
+    for (const [fx, fy, ph] of this.art?.noDemoPc ? [] : [[386, 101, 0], [386, 114, 120]]) {
       for (let a = 0; a < 8; a++) {
         const ang = a / 8 * Math.PI * 2;
         ctx.fillStyle = css(hsl(t * 120 + ph + a * 45, 0.95, 0.6));
@@ -935,7 +956,7 @@ export class Floor {
       const sp = t * 12;
       ctx.fillStyle = '#5a5f6a'; ctx.fillRect(Math.round(fx + Math.cos(sp) * 2), Math.round(fy + Math.sin(sp) * 2), 1, 1);
     }
-    ctx.fillStyle = css(hsl(t * 120, 0.9, 0.55)); ctx.fillRect(381, 94, 1, 26);
+    if (!this.art?.noDemoPc) { ctx.fillStyle = css(hsl(t * 120, 0.9, 0.55)); ctx.fillRect(381, 94, 1, 26); }
     // extra kassa (prylen "extra kassadisk")
     if (this.game.fit?.items?.kassa2) {
       ctx.fillStyle = '#23262b'; ctx.fillRect(337, 104, 18, 13); ctx.fillStyle = '#3c78d8'; ctx.fillRect(338, 105, 16, 10); ctx.fillStyle = '#7fb0f0'; ctx.fillRect(338, 105, 16, 1);
@@ -945,6 +966,7 @@ export class Floor {
     const ready = this.game.customers.filter((x) => x.phase === 'ready').length;
     for (let i = 0; i < Math.min(3, ready); i++) {
       const bx = 428 + i * 22, by = 98;
+      if (this.art?.readyItem) { this.art.readyItem(ctx, i, bx, by); continue; }
       ctx.fillStyle = '#17151a'; ctx.fillRect(bx - 1, by - 1, 20, 25);
       ctx.fillStyle = '#c9a36b'; ctx.fillRect(bx, by + 4, 18, 19);
       ctx.fillStyle = '#e0c08a'; ctx.fillRect(bx, by, 18, 4);

@@ -65,9 +65,11 @@ export class Units {
     return mesh;
   }
   // rad med lådor centrerad på en hylla (lokala koordinater i enheten)
-  row(g, parts, y, W, { z = 0, gap = 0.05, jitter = 0.06, front = false } = {}) {
+  row(g, parts, y, W, { z = 0, gap = 0.05, jitter = 0.06, front = false, maxH = Infinity } = {}) {
     if (!parts.length) return;
     const meshes = parts.map((p) => this.boxMesh(p));
+    // för höga lådor krymps så att de får plats under hyllplanet ovanför (annars står de "i" hyllan)
+    for (const m of meshes) { const s = Math.min(1, maxH / m.userData.dims[1]); if (s < 1) { m.scale.setScalar(s); m.userData.dims = m.userData.dims.map((d) => d * s); } }
     const total = meshes.reduce((s, m) => s + m.userData.dims[0], 0) + gap * (meshes.length - 1);
     let x = -Math.min(total, W - 0.08) / 2;
     const k = total > W - 0.08 ? (W - 0.08) / total : 1;
@@ -108,7 +110,7 @@ export class Units {
       slab(g, -W / 2 + 0.05, W / 2 - 0.05, y - 0.012, y, -D / 2 + 0.04, D / 2 - 0.03, shelfMat, { cast: false });
       if (glass || style === 'led') slab(g, -W / 2 + 0.08, W / 2 - 0.08, y - 0.03, y - 0.015, D / 2 - 0.06, D / 2 - 0.04, led, { cast: false, recv: false });
       const r = ys.length - 1 - i;   // fyll på uppifrån – de översta hyllorna syns bäst i ögonhöjd
-      this.row(g, parts.slice(r * per, (r + 1) * per), y, W, { z: 0.02 });
+      this.row(g, parts.slice(r * per, (r + 1) * per), y, W, { z: 0.02, maxH: (ys[1] - ys[0]) - 0.1 });
     });
     // glas runt om (fram och sidor) – bara i glas-/led-stil
     if (glass) {

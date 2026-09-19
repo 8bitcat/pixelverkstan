@@ -425,7 +425,7 @@ export function makeRope(y, posts, withSides = false) {
 }
 
 // ---------- Beställnings- och utlämningsdisk ----------
-export function makeCounter(theme) {
+export function makeCounter(theme, art = null, year = 1990, items = {}) {
   const OX = 280, OY = 60, P = new Pix(232, 92, OX, OY);
   const red = hex(theme && theme.counter, 0x9e1b22), { x0, x1, top, front, base } = COUNTER;
   // bänkskiva (kvarts)
@@ -459,7 +459,9 @@ export function makeCounter(theme) {
   };
   plate('BESTÄLL', 360);
   plate('UTLÄMNING', (sp + x1) / 2);
-  // saker på disken
+  // saker på disken – verksamhetens egna, annars datorbutikens
+  if (art?.counterItems) art.counterItems(P, COUNTER, year, items);
+  else {
   // kassaskärm mot kunden
   P.rect(304, 122, 12, 3, 0x2a2d33); P.rect(309, 116, 2, 6, 0x3a3d44);
   P.rect(301, 104, 18, 13, 0x23262b); P.rect(302, 105, 16, 10, 0x3c78d8); P.hl(302, 105, 16, 0x7fb0f0);
@@ -471,11 +473,12 @@ export function makeCounter(theme) {
   // demodator (glassida med fläktar – ljus läggs på dynamiskt)
   P.rect(378, 92, 16, 32, 0x17181c); P.box(378, 92, 16, 32, 0x3a3d44); P.rect(380, 94, 12, 28, 0x0b0c10);
   P.hl(378, 92, 16, 0x6a6f7a);
-  // ringklocka
-  P.rect(410, 121, 10, 2, 0x5a4a2a); P.rect(411, 116, 8, 5, 0xd8b24a); P.hl(412, 115, 6, 0xd8b24a); P.px(413, 116, 0xfff4c0); P.px(415, 113, 0xd8b24a); P.px(415, 114, 0x8a6a24);
   // succulent
   P.rect(492, 118, 9, 6, 0xe8e4da); P.hl(492, 118, 9, 0xffffff);
   for (const [dx, dy] of [[0, -4], [3, -6], [6, -4], [2, -3], [5, -2]]) { P.rect(492 + dx, 118 + dy, 3, 4, 0x5aa36a); P.px(492 + dx, 118 + dy, 0x8fd49a); }
+  }
+  // ringklocka
+  P.rect(410, 121, 10, 2, 0x5a4a2a); P.rect(411, 116, 8, 5, 0xd8b24a); P.hl(412, 115, 6, 0xd8b24a); P.px(413, 116, 0xfff4c0); P.px(415, 113, 0xd8b24a); P.px(415, 114, 0x8a6a24);
   return { img: P.flush(), x: OX, y: OY };
 }
 

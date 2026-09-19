@@ -497,16 +497,16 @@ export function layerHeight(p) {
   switch (L.shape) {
     case 'bun': return L.flat || L.lettuce || L.square ? 0.5 : L.mini ? 0.7 : 1.0;
     case 'patty': return L.h || 0.7;
-    case 'cheese': return 0.15;
+    case 'cheese': return 0.22;
     case 'strips': return L.h || 0.3;
     case 'egg': return 0.45;
     case 'rings': return L.h || 0.5;
     case 'avocado': return 0.35;
-    case 'leaf': return 0.45;
-    case 'slice': return L.small ? 0.2 : 0.3;
-    case 'onion': return L.soft ? 0.25 : 0.3;
-    case 'pickles': return 0.22;
-    case 'sauce': return 0.14;
+    case 'leaf': return 0.55;
+    case 'slice': return L.small ? 0.3 : 0.4;
+    case 'onion': return L.soft ? 0.3 : 0.4;
+    case 'pickles': return 0.35;
+    case 'sauce': return 0.2;
     case 'chunky': return 0.45;
     case 'square': return L.h || 0.4;
     case 'herb': return 0.12;

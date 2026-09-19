@@ -8,20 +8,38 @@ const hash = (x, y) => { const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
 const H = (c) => (typeof c === 'number' ? c : hex(c));
 
 // ---------- Byggnadsblock ----------
-// rund låda: toppen är en cirkel (radie r kring mitten), sidorna skuggas mot kanterna
+// Rund låda som voxelcylinder: cirkeln delas i rader (steg G enheter) längs u, varje rad blir en
+// låda med egna sidor – så blir kanten trappstegsrund både på golvet och på 3D-bänken, i stället
+// för en fyrkantig kloss med runt lock. Raderna ritas bakifrån (stigande v) så att de täcker rätt.
+// tex(face, x, y, W, H, d): x/y i hela skivans koordinater, d = avstånd från mitten (0..1) för
+// toppen; sidorna skuggas efter var runt cylindern de sitter (ljusast rakt mot betraktaren).
+export const G = 0.25;
 export function disc(R, cu, cv, z0, z1, r, tex, id = 0, opt = {}) {
-  const hole = opt.hole || 0, ry = opt.ry || r;
-  R.box(cu - r, cu + r, cv - ry, cv + ry, z0, z1, (f, x, y, W, Hh) => {
-    if (f === 'top') {
-      const dx = (x - r) / r, dy = (y - ry) / ry, d = Math.hypot(dx, dy);
-      const edge = opt.wave ? 1 + opt.wave * Math.sin(Math.atan2(dy, dx) * (opt.waveN || 6) + (opt.seed || 0)) : 1;
-      if (d > edge || (hole && d < hole)) return -1;
-      return tex('top', x, y, W, Hh, d);
+  const hole = opt.hole || 0, ry = opt.ry || r, wave = opt.wave || 0, waveN = opt.waveN || 6, seed = opt.seed || 0;
+  const inside = (u, v) => {
+    const dx = (u - cu) / r, dy = (v - cv) / ry, d = Math.hypot(dx, dy);
+    const edge = wave ? 1 + wave * Math.sin(Math.atan2(dy, dx) * waveN + seed) : 1;
+    return d <= edge && !(hole && d < hole);
+  };
+  const W = 2 * r, Hh = 2 * ry, gu0 = cu - r, gv0 = cv - ry;
+  const shadeAt = (u, v, f) => { const a = Math.atan2((v - cv) / ry, (u - cu) / r); const t = Math.min(1, Math.abs(a - Math.PI / 4) / (Math.PI / 2)); return (f === 'left' ? 0.9 : 0.78) * (1 - t * t * 0.4); };
+  const wrap = (ua, ub, va, vb) => (f, x, y, w, h) => {
+    if (f === 'top') { const u = ua + x, v = va + y; return tex('top', u - gu0, v - gv0, W, Hh, Math.hypot((u - cu) / r, (v - cv) / ry)); }
+    if (f === 'left') { const u = ua + x, c = tex('left', u - gu0, y, W, h, 0); return c < 0 ? c : shade(c, shadeAt(u, vb, f)); }
+    const v = va + x, c = tex('right', v - gv0, y, Hh, h, 0); return c < 0 ? c : shade(c, shadeAt(ub, v, f));
+  };
+  const v0 = Math.floor((cv - ry) / G) * G, v1 = Math.ceil((cv + ry) / G) * G;
+  const u0 = Math.floor((cu - r) / G) * G, u1 = Math.ceil((cu + r) / G) * G;
+  const bo = { noEdges: true, flat: true, ...opt.box };
+  for (let va = v0; va < v1 - 1e-9; va += G) {
+    const vm = va + G / 2;
+    let run = null;
+    for (let ua = u0; ua <= u1 + 1e-9; ua += G) {
+      const on = ua < u1 - 1e-9 && inside(ua + G / 2, vm);
+      if (on && run === null) run = ua;
+      else if (!on && run !== null) { R.box(run, ua, va, va + G, z0, z1, wrap(run, ua, va, va + G), id, bo); run = null; }
     }
-    const t = Math.abs(x - W / 2) / (W / 2);
-    const c = tex(f, x, y, W, Hh, t);
-    return c < 0 ? c : shade(c, 1 - t * t * 0.35);
-  }, id, { noEdges: true, ...opt.box });
+  }
 }
 // fyrkantig platta med samma textursignatur (d = avstånd från mitten 0..1)
 function slab(R, cu, cv, z0, z1, s, tex, id = 0) {
@@ -58,7 +76,7 @@ export function drawLayer(R, part, o) {
       return;
     }
     case 'cheese': {
-      const s = L.round ? r * 0.7 : r * 1.06, h = layerHeight(part);
+      const s = L.round ? r * 0.7 : r * 0.82, h = layerHeight(part);
       const spots = L.spots ? H(L.spots) : null, rind = L.rind ? H(L.rind) : null;
       if (L.crumbled) {   // smulad ost: många små kuber
         for (let i = 0; i < 9; i++) { const x = cu - r * 0.7 + (i % 3) * r * 0.7 + hash(i, 1) * 0.5, y = cv - r * 0.7 + Math.floor(i / 3) * r * 0.7 + hash(i, 2) * 0.5, s2 = 0.35 + hash(i, 3) * 0.3; R.box(x, x + s2, y, y + s2, z0, z0 + 0.35, (f) => (f === 'top' ? col : shade(col, 0.88)), id, { noEdges: true }); }
@@ -141,7 +159,7 @@ export function drawLayer(R, part, o) {
     }
     case 'sauce': {
       const spots = L.spots ? H(L.spots) : null, h = layerHeight(part);
-      disc(R, cu, cv, z0, z0 + h, r * 0.9, (f, x, y, W, Hh, d) => (spots && hash(x * 3 | 0, y * 3 | 0) > 0.9 ? spots : f === 'top' ? (d < 0.3 ? shade(col, 1.12) : col) : shade(col, 0.85)), id, { wave: L.drops ? 0.15 : 0.06, waveN: 5, seed: 5 });
+      disc(R, cu, cv, z0, z0 + h, r * 1.0, (f, x, y, W, Hh, d) => (spots && hash(x * 3 | 0, y * 3 | 0) > 0.9 ? spots : f === 'top' ? (d < 0.3 ? shade(col, 1.12) : col) : shade(col, 0.85)), id, { wave: L.drops ? 0.12 : 0.05, waveN: 5, seed: 5 });
       return;
     }
     case 'drizzle': {   // ringlad sås: sicksack-linjer
@@ -204,9 +222,9 @@ function drawBunTop(R, part, cu, cv, z0, r, id) {
   if (L.lettuce) { disc(R, cu, cv, z0, z0 + 0.5, r * 1.1, tex, id, { wave: 0.14, waveN: 7, seed: 8 }); return; }
   if (L.flat) { disc(R, cu, cv, z0, z0 + 0.5, r, tex, id); return; }
   if (L.square) { slab(R, cu, cv, z0, z0 + 0.5, r * 0.95, (f, x, y, W, Hh, d) => (f === 'top' ? (hash(x * 3 | 0, y * 3 | 0) > 0.85 ? shade(crust, 1.1) : d > 0.9 ? shade(crust, 0.9) : col) : crust), id); return; }
-  const total = bunTopHeight(part), steps = L.bao ? [[1, 0.3], [0.96, 0.25], [0.86, 0.2], [0.66, 0.15], [0.36, 0.1]] : [[1, 0.36], [0.92, 0.26], [0.78, 0.2], [0.58, 0.12], [0.34, 0.06]];
+  const total = bunTopHeight(part), steps = L.bao ? [[1, 0.3], [0.96, 0.25], [0.86, 0.2], [0.66, 0.15], [0.36, 0.1]] : [[1, 0.3], [0.95, 0.2], [0.87, 0.16], [0.75, 0.12], [0.6, 0.1], [0.42, 0.07], [0.2, 0.05]];
   let z = z0;
-  for (const [f, hf] of steps) { const h = total * hf; disc(R, cu, cv, z, z + h, r * f, (ff, x, y, W, Hh, d) => (ff === 'top' && f < 1 ? tex('top', x, y, W, Hh, d * f) : ff === 'top' ? tex('top', x, y, W, Hh, d) : L.glaze ? H(L.glaze) : crust), id, { hole: L.hole && f === 1 ? 0.3 : 0 }); z += h; }
+  for (const [f, hf] of steps) { const h = total * hf; if (L.hole && 0.3 / f >= 0.95) break; disc(R, cu, cv, z, z + h, r * f, (ff, x, y, W, Hh, d) => (ff === 'top' && f < 1 ? tex('top', x, y, W, Hh, d * f) : ff === 'top' ? tex('top', x, y, W, Hh, d) : L.glaze ? H(L.glaze) : crust), id, { hole: L.hole ? 0.3 / f : 0 }); z += h; }
 }
 
 // ---------- Tillbehör, drycker, efterrätter ----------
