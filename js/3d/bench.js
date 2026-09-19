@@ -1,14 +1,15 @@
-// Byggläget i 3D: datorn byggs på arbetsbänken bakom disken. Kameran är ortografisk och låst i
-// exakt samma vinkel som 2D-byggvyn (u−v åt höger, (u+v)/2 nedåt, z uppåt), så att byggvyns
-// hela pekarlogik (platser, handgrepp, uttag, kablar, kompisars pekare, zoom) fungerar
-// oförändrad ovanpå 3D-bilden. Scenen ritas av samma kod som i 2D (rig.drawScene) – men varje
-// "låda" blir en riktig 3D-låda med pixelgrafiken som textur på de tre synliga sidorna, packad
-// i en texturatlas så att hela bygget blir ett par draw calls.
+// Byggläget i 3D: datorn byggs på arbetsbänken bakom disken. Kameran är låst i samma vinkel som
+// 2D-byggvyn (snett uppifrån, u−v åt höger, u+v nedåt, z uppåt) men är en perspektivkamera med
+// riktiga höjder, så att djupet syns. Byggvyns hela pekarlogik (platser, handgrepp, uttag,
+// kablar, kompisars pekare, zoom) fungerar oförändrad: dess P.proj byts ut mot projektion genom
+// 3D-kameran. Scenen ritas av samma kod som i 2D (rig.drawScene) – men varje "låda" blir en
+// riktig 3D-låda med pixelgrafiken som textur på de tre synliga sidorna, packad i en
+// texturatlas så att hela bygget blir ett par draw calls.
 import * as THREE from 'three';
 
 export const U = 0.0175;                       // meter per byggenhet (chassit 26 enheter ≈ 45 cm)
-const ELEV = Math.PI / 6;                      // 30° – vinkeln där (u+v)/2-projektionen blir exakt
-const ISO_Z = Math.SQRT2 * Math.cos(ELEV);     // 1.2247: så många k-pixlar en enhet i höjd får i äkta 30°-vy
+const ELEV = Math.PI / 6;                      // 30° – samma lutning som 2D-vyns (u+v)/2
+const FOV = 32;                                // perspektiv, men måttligt så att bänken inte förvrängs
 const PPU = 32;                                // texturpixlar per enhet (max)
 const MAX_FACE = 560 * 560;                    // pixlar per sida (stora ytor får lägre upplösning)
 const ATLAS_W = 2048;
@@ -71,7 +72,8 @@ export class Bench3D {
     this.group.rotation.y = -Math.PI / 4;      // u-axeln pekar snett höger-mot-kameran, v snett vänster
     this.group.visible = false;
     view3d.scene.add(this.group);
-    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 30);
+    this.camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 30);
+    this.camSig = ''; this.origProj = null; this._v = new THREE.Vector3();
     this.dirWorld = DIR_LOCAL.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.group.rotation.y).normalize();
     this.rec = new Recorder();
     this.raycaster = new THREE.Raycaster();   // egen: butikens har kort räckvidd
@@ -99,14 +101,17 @@ export class Bench3D {
     this.view = view;
     view.gl = this;
     view.dirty = true;
-    this.q = (view.hzRatio || 0.8125) / ISO_Z;          // höjder trycks ihop så att z-projektionen blir pixelexakt
-    this.group.scale.set(U, U * this.q, U);
+    this.q = 1;
+    this.group.scale.set(U, U, U);
+    // byggvyns projektion går genom 3D-kameran (markeringar, uttag, kablar, pekare hamnar rätt)
+    if (!this.origProj) this.origProj = view.P.proj;
+    view.P.proj = (u, v, z = 0) => this.project(u, v, z);
     const off = new THREE.Vector3(13, 0, 12).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.group.rotation.y).multiply(this.group.scale);
     this.group.position.copy(this.center).sub(off);
     this.group.visible = true;
   }
   detach() {
-    if (this.view) { this.view.gl = null; this.view.dirty = true; }
+    if (this.view) { this.view.gl = null; this.view.dirty = true; if (this.origProj) this.view.P.proj = this.origProj; }
     this.view = null;
     this.group.visible = false;
     this.clearMeshes();
@@ -114,29 +119,50 @@ export class Bench3D {
   }
   get active() { return !!this.view; }
 
-  // ---------- Kameran följer byggvyns projektion P (k, hz, ox, oy i css-px på #board) ----------
-  updateCamera() {
+  // ---------- Kameran följer byggvyns kamera (P.k = zoom, P.ox/oy = panorering, i css-px på #board) ----------
+  // Punkten som 2D-formeln lägger mitt i fönstret blir kamerans mål; avståndet väljs så att skalan
+  // i målplanet blir densamma som 2D-vyns (k√2 px per enhet).
+  updateCamera(force = false) {
     const view = this.view; if (!view) return;
     const P = view.P, cv = this.v.canvas, board = view.canvas;
     const W = Math.max(2, cv.clientWidth), H = Math.max(2, cv.clientHeight);
     const r = board.getBoundingClientRect();
-    // fönstrets mitt i bänkens enheter (z = 0)
+    const sig = [P.k, P.ox, P.oy, W, H, r.left, r.top, this.group.position.x, this.group.position.z].map((n) => Math.round(n * 100)).join(',');
+    if (!force && sig === this.camSig) return;
+    this.camSig = sig;
     const bx = W / 2 - r.left, by = H / 2 - r.top;
     const a = (bx - P.ox) / P.k, b2 = (by - P.oy) * 2 / P.k;
     const u = (a + b2) / 2, v = (b2 - a) / 2;
     const target = this.group.localToWorld(new THREE.Vector3(u, 0, v));
-    const dist = 6;
+    const pxPerM = P.k * Math.SQRT2 / U;
+    const dist = Math.max(0.6, H / (2 * Math.tan(FOV * Math.PI / 360) * pxPerM));
     const cam = this.camera;
     cam.position.copy(target).addScaledVector(this.dirWorld, dist);
     cam.up.set(0, 1, 0); cam.lookAt(target);
-    const pxPerM = P.k * Math.SQRT2 / U;
-    const hw = W / 2 / pxPerM, hh = H / 2 / pxPerM;
-    cam.left = -hw; cam.right = hw; cam.top = hh; cam.bottom = -hh;
-    cam.near = dist - 0.9; cam.far = dist + 14;
+    cam.aspect = W / H; cam.near = Math.max(0.05, dist - 1.2); cam.far = dist + 16;
     cam.updateProjectionMatrix();
     cam.updateMatrixWorld();
   }
   update(dt) { this.updateCamera(); }
+  // bänkens (u, v, z) → css-px på #board (byggvyns P.proj i 3D-läget)
+  project(u, v, z = 0) {
+    this.updateCamera();
+    const view = this.view, cv = this.v.canvas, r = view.canvas.getBoundingClientRect();
+    const p = this._v.set(u, z, v); this.group.localToWorld(p); p.project(this.camera);
+    return [(p.x + 1) / 2 * cv.clientWidth - r.left, (1 - p.y) / 2 * cv.clientHeight - r.top];
+  }
+  // css-px på #board → (u, v) i planet z (för kompisars pekare)
+  unproject(x, y, z = 1) {
+    this.updateCamera();
+    const view = this.view, cv = this.v.canvas, r = view.canvas.getBoundingClientRect();
+    const nx = ((r.left + x) / cv.clientWidth) * 2 - 1, ny = -((r.top + y) / cv.clientHeight) * 2 + 1;
+    this.raycaster.setFromCamera(new THREE.Vector2(nx, ny), this.camera);
+    const o = this.group.localToWorld(new THREE.Vector3(0, z, 0)), n = new THREE.Vector3(0, 1, 0);
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(n, o), hit = new THREE.Vector3();
+    if (!this.raycaster.ray.intersectPlane(plane, hit)) return null;
+    this.group.worldToLocal(hit);
+    return [hit.x, hit.z];
+  }
 
   // ---------- Scenen: rig.drawScene → lådor → atlas + geometri ----------
   clearMeshes() {
@@ -281,6 +307,8 @@ export class Bench3D {
     const p = this.worldOf(u, v, z).project(this.camera), cv = this.v.canvas;
     return [(p.x + 1) / 2 * cv.clientWidth, (1 - p.y) / 2 * cv.clientHeight];
   }
+  // 2D-formelns punkt (så som rastern hade lagt den) – för tester: hur mycket perspektivet avviker
+  isoOf(u, v, z = 0) { const P = this.view.P; return [P.ox + (u - v) * P.k, P.oy + (u + v) * P.k / 2 - z * P.hz]; }
   info() { return { ...this.stats, active: this.active, cache: this.cache.size }; }
   dispose() { this.detach(); this.atlas?.dispose(); this.v.scene.remove(this.group); }
 }

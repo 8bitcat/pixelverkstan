@@ -563,6 +563,10 @@ export class BuildView {
       const f = this.finale;
       const rear = (!f.compact || f.showRear) && x >= f.insetX && x <= f.insetX + 90 * f.si && y >= f.insetY && y <= f.insetY + 160 * f.si;
       data = rear ? { s: 'rear', x: (x - f.insetX) / f.si, y: (y - f.insetY) / f.si } : { s: 'desk', x: (x - f.ox) / f.s, y: (y - f.oy) / f.s };
+    } else if (this.gl) {
+      const uv = this.gl.unproject(x, y, 1);
+      if (!uv) return;
+      data = { s: 'board', x: uv[0], y: uv[1] };
     } else {
       const P = this.P, a = (x - P.ox) / P.k, b2 = (y - P.oy + P.hz) * 2 / P.k;
       data = { s: 'board', x: (a + b2) / 2, y: (b2 - a) / 2 };
