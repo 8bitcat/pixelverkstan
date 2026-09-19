@@ -380,11 +380,11 @@ export function openShop(game, tab = null, onClose = null) {
     const kit = shop.starterKit ? shop.starterKit(game) : [];
     const kitCost = kit.reduce((s, [id, n]) => s + game.costOf(shop.part[id]) * n, 0);
     const kitBox = kit.length && game.tutorialStep < (shop.tutorialCount || 0)
-      ? `<div class="kit"><div><b>📦 Startpaket</b><small>${kit.reduce((s, [, n]) => s + n, 0)} delar till dina första kunders datorer – allt i en låda.</small></div><button class="btn btn-gold" data-kit ${kitCost > game.money ? 'disabled' : ''}>Köp ${fmt(kitCost)} kr</button></div>` : '';
+      ? `<div class="kit"><div><b>📦 Startpaket</b><small>${kit.reduce((s, [, n]) => s + n, 0)} ${esc(game.shop.text?.kitDesc || 'delar till dina första kunders datorer – allt i en låda.')}</small></div><button class="btn btn-gold" data-kit ${kitCost > game.money ? 'disabled' : ''}>Köp ${fmt(kitCost)} kr</button></div>` : '';
     const pending = game.deliveries.filter((d) => d.state === 'coming');
     const body = `${kitBox}${pending.length ? `<div class="sp" style="margin:0 0 8px">🚚 ${pending.reduce((s, d) => s + Object.values(d.items).reduce((a, n) => a + n, 0), 0)} delar på väg – de kommer i en låda till butiken.</div>` : ''}<div class="tabs">${tabs}</div>
       <div class="shopbar">
-        <input id="shop-q" type="search" placeholder="Sök märke, modell, sockel …" value="${esc(st.q)}">
+        <input id="shop-q" type="search" placeholder="${esc(game.shop.text?.searchHint || 'Sök märke, modell, sockel …')}" value="${esc(st.q)}">
         ${chip('sale', `Till salu ${y} (${counts.sale})`)}${chip('soon', `Kommande (${counts.soon})`)}${chip('own', `I lager (${counts.own})`)}${chip('all', 'Alla')}
         <select id="shop-sort"><option value="new">Nyast</option><option value="cheap">Billigast</option><option value="dear">Dyrast</option><option value="name">Namn</option></select>
         ${shop.suppliers ? `<button class="btn btn-small" data-avtal title="Grossist och märkesprogram">🤝 ${esc(game.supplierInfo.name)}${game.partners?.length ? ` +${game.partners.length}` : ''}</button>` : ''}
