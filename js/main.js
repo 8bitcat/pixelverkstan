@@ -14,6 +14,8 @@ import { ArcadeRoom } from './core/arcade-room.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = UI.esc;
+// högerklick på butiksgolvet ska inte öppna webbläsarens meny
+$('#floor').addEventListener('contextmenu', (e) => e.preventDefault());
 let game = null, floor = null, build = null, arcade = null, screen = 'menu', hudDirty = true;
 // 3D-läget (js/3d/shop3d.js) laddas först när man slår på det
 let view3d = null, want3d = false;

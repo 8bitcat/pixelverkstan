@@ -39,8 +39,51 @@ function clothMaterial(groups, cols, joints) {
   return m;
 }
 function findBone(root, re) { let b = null; root.traverse((o) => { if (!b && o.isBone && re.test(o.name)) b = o; }); return b; }
-// Xbots clip på en annan Mixamo-rigg: benen heter mixamorig<N>Hips osv. – byt prefix; höftens
-// lägesspår skalas efter riggens höftahöjd så att fötterna hamnar på golvet
+// benens världsrotationer i riggens laddade viloläge (T-pose = bindpose hos Mixamo)
+function restRotations(root) {
+  root.updateMatrixWorld(true);
+  const out = new Map(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+  root.traverse((o) => { if (o.isBone) { o.matrixWorld.decompose(p, q, sc); out.set(o.name, q.clone()); } });
+  return out;
+}
+const srcName = (n) => n.replace(/^mixamorig\d*:?/, 'mixamorig');
+// Delta-retargeting: hur mycket varje Xbot-ben vridit sig från sin vilopose (i världsrymd) läggs på
+// målbenets vilopose. Fungerar mellan Mixamo-riggar med olika lokala benaxlar, så länge båda
+// vilar i T-pose. Höften får Xbots rörelse skalad efter höfthöjden. Ger ett clip bundet på nodnamn.
+function retargetDelta(srcRoot, srcRest, tgtRoot, tgtRest, clip, fps = 30) {
+  const srcBones = new Map(); srcRoot.traverse((o) => { if (o.isBone) srcBones.set(o.name, o); });
+  const tgtBones = []; tgtRoot.traverse((o) => { if (o.isBone) tgtBones.push(o); });
+  const saved = tgtBones.map((b) => [b.quaternion.clone(), b.position.clone()]);
+  const srcHips = srcBones.get('mixamorigHips'), tgtHips = tgtBones.find((b) => srcName(b.name) === 'mixamorigHips');
+  const srcHipsRest = srcHips ? srcHips.position.clone() : null, tgtHipsRest = tgtHips ? tgtHips.position.clone() : null;
+  const ratio = srcHipsRest && tgtHipsRest && srcHipsRest.y ? tgtHipsRest.y / srcHipsRest.y : 1;
+  const mixer = new THREE.AnimationMixer(srcRoot), action = mixer.clipAction(clip); action.play();
+  const n = Math.max(2, Math.round(clip.duration * fps) + 1), times = new Float32Array(n);
+  const rot = tgtBones.map(() => new Float32Array(n * 4)), hip = new Float32Array(n * 3);
+  const p = new THREE.Vector3(), sc = new THREE.Vector3(), qs = new THREE.Quaternion(), qp = new THREE.Quaternion(), q = new THREE.Quaternion(), inv = new THREE.Quaternion();
+  for (let f = 0; f < n; f++) {
+    const t = Math.min(clip.duration, f / fps); times[f] = t;
+    mixer.setTime(t); srcRoot.updateMatrixWorld(true);
+    tgtBones.forEach((b, i) => {
+      const sn = srcName(b.name), sb = srcBones.get(sn), r0 = srcRest.get(sn), t0 = tgtRest.get(b.name);
+      if (sb && r0 && t0) {
+        sb.matrixWorld.decompose(p, qs, sc);
+        q.copy(qs).multiply(inv.copy(r0).invert()).multiply(t0);        // målets världsrotation
+        if (b.parent) { b.parent.matrixWorld.decompose(p, qp, sc); b.quaternion.copy(qp.invert()).multiply(q); } else b.quaternion.copy(q);
+        if (b === tgtHips) b.position.copy(tgtHipsRest).addScaledVector(p.copy(sb.position).sub(srcHipsRest), ratio);
+      }
+      b.updateWorldMatrix(false, false);
+      rot[i].set([b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w], f * 4);
+    });
+    if (tgtHips) hip.set([tgtHips.position.x, tgtHips.position.y, tgtHips.position.z], f * 3);
+  }
+  const tracks = tgtBones.map((b, i) => new THREE.QuaternionKeyframeTrack(b.name + '.quaternion', times, rot[i]));
+  if (tgtHips) tracks.push(new THREE.VectorKeyframeTrack(tgtHips.name + '.position', times, hip));
+  tgtBones.forEach((b, i) => { b.quaternion.copy(saved[i][0]); b.position.copy(saved[i][1]); });
+  action.stop(); mixer.uncacheClip(clip);
+  return new THREE.AnimationClip(clip.name, clip.duration, tracks);
+}
+// Reserv om riktig retargeting misslyckas: byt bara benprefix (mixamorig<N>) och skala höftens lägesspår
 function retarget(clip, prefix, ratio) {
   const c = clip.clone();
   for (const t of c.tracks) {
@@ -103,6 +146,7 @@ export class People {
     const box = new THREE.Box3().setFromObject(this.rig, true);
     this.height = Math.max(1.0, box.max.y - box.min.y);
     // bengrupp per benindex (samma ordning i alla kloner): kläderna målas per grupp i skinningen
+    this.srcRest = restRotations(this.rig);   // Xbots vilopose – utgångsläge för retargeting
     let sk = null; this.rig.traverse((o) => { if (o.isSkinnedMesh && !sk) sk = o; });
     this.groups = new Float32Array(sk ? sk.skeleton.bones.length : 0);
     if (sk) sk.skeleton.bones.forEach((b, i) => { this.groups[i] = groupOf(b.name); });
@@ -140,7 +184,19 @@ export class People {
       const ratio = hips && xh && xh.position.y ? hips.position.y / xh.position.y : 1;
       const prefix = c.prefix || (hips ? hips.name.replace(/Hips$/, '') : 'mixamorig');
       e.clips = {};
-      for (const [k, clip] of Object.entries(this.clips)) e.clips[k] = retarget(clip, prefix, ratio);
+      // riktig retargeting: Mixamo-riggarna har olika lokala benaxlar, så Xbots rotationer kan
+      // inte kopieras rakt av – deltat mot viloposen räknas om i världsrymd (retargetDelta)
+      const tgtRest = restRotations(g.scene);
+      const restore = []; this.rig.traverse((o) => { if (o.isBone) restore.push([o, o.quaternion.clone(), o.position.clone()]); });
+      for (const [k, clip] of Object.entries(this.clips)) {
+        if (!['idle', 'walk', 'run'].includes(k)) continue;
+        try { e.clips[k] = retargetDelta(this.rig, this.srcRest, g.scene, tgtRest, clip, 30); }
+        catch (err) { console.warn('3D: retargeting misslyckades för ' + c.file, err); e.clips[k] = retarget(clip, prefix, ratio); }
+        e.clips[k].name = k;
+      }
+      for (const [o, qq, pp] of restore) { o.quaternion.copy(qq); o.position.copy(pp); }   // Xbot tillbaka i vila
+      this.rig.updateMatrixWorld(true);
+      g.scene.updateMatrixWorld(true);
       // fötterna: spela första bildrutan av idle på en testkopia och mät hur långt från golvet de hamnar
       try {
         const test = cloneRig(g.scene), mx = new THREE.AnimationMixer(test), clip = e.clips.idle || Object.values(e.clips)[0];
