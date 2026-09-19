@@ -258,10 +258,20 @@ montrar, inredning, co-op) men med ett kök i stället för en verkstad:
 - **Inredning** (`upgrades.js`): läskkyl och dessertdisk som montrar, jukebox, godishylla,
   såsbar, lekhörna, kaffemaskin; lokaler Gatuköket → Megaburger; dubbelgrill, fritös,
   milkshakemaskin, menytavla; kylrum 2–4 för dyrare kött.
-- **Grafik** (`art.js`): allt ritas som isometriska lådor – runda lager, smält ost som
-  droppar, delad korv, hyvlad parmesan, ringlade såser, pommes med topping, slushkupol,
-  tapiokapärlor, mjukglass i strut, dammsugare, banana split. `tools/restaurang-ikoner.mjs`
-  ritar alla ikoner i ett ark per kategori (`tools/out/rest-ikoner-*.png`).
+- **Grafik** (`art.js`): allt ritas som isometriska voxlar – runda lager (trappstegsrunda
+  cylindrar), smält ost som droppar, delad korv, hyvlad parmesan, ringlade såser, pommes med
+  topping, slushkupol, tapiokapärlor, mjukglass i strut, dammsugare, banana split.
+  `tools/restaurang-ikoner.mjs` ritar alla ikoner i ett ark per kategori (`tools/out/rest-ikoner-*.png`).
+- **Lokalen** (`floor-art.js`, `floor-plans.js`): helt egen inredning – skafferihylla med bröd
+  och såser, menytavla med årets priser, rostfri köksbänk med läskmaskin, milkshakemaskin,
+  fritös och grill, kassa efter epok, bricka och sugrör på disken, läskkyl och dessertdisk som
+  montrar, jukebox, såsbar och lekhörna. **Epoken bestämmer stilen:** femtiotalsdiner (turkos,
+  svartvitt golv, kromborden med röda stolar, konlampor), sextiotal, grillkiosk (brunt trä,
+  orange globlampor), åttiotal (rosa/svart), snabbmatskedja (gult/rött, lysrör), 2005 (grönt
+  och ljust trä), gourmet 2016 (tegel, betong, mörkt trä, Edison-lampor, kritmeny) och 2022
+  (ljust nordiskt, digital meny). Matbord med stolar (sittbås i större lokaler) står i stället
+  för stjärnmonter och soffa: kunderna sätter sig när de hämtat brickan, äter (burgaren blir
+  mindre för varje tugga) och går sedan hem.
 
 
 ```
@@ -369,6 +379,7 @@ node tools/restaurang-rig.mjs            # Node: hamburgerbarens katalog, alla 1
 node tools/restaurang.mjs                # hamburgerbaren i webbläsaren: meny → grossist → guidad kund → kök → servera → betalt
 node tools/restaurang3d.mjs              # hamburgerbaren i 3D: stor burgare i 2D-köket, köket på bänken, servering i 3D
 node tools/restaurang-ikoner.mjs         # ritar alla ingrediensers ikoner i ark per kategori (rest-ikoner-*.png)
+node tools/restaurang-golv.mjs           # restaurangens golv genom epokerna med fyllda montrar, automater och gäster som äter (rest-golv-<år>.png)
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner
 ```
 

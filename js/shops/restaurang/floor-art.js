@@ -62,22 +62,30 @@ export function menuLines(game) {
   }
   return out;
 }
-function menuBoard(P, lines, lit) {
+function menuBoard(P, lines, lit, style = 'felt') {
   const x0 = 334, y0 = 34, w = 38, h = 38;
-  P.rect(x0 - 1, y0 - 1, w + 2, h + 2, lit ? 0xd8b24a : 0x2a2018);
-  for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) P.px(x, y, lit ? mix(0x2a2a30, 0x3c3c48, (bayer(x, y) - 0.5) * 0.3 + 0.5) : mix(0x1a1a1e, 0x26262c, (bayer(x, y) - 0.5) * 0.3 + 0.5));
-  P.hl(x0, y0, w, lit ? 0x4a4a54 : 0x2e2e34);
-  text(P, SMALL, 'MENY', x0 + 3, y0 + 3, lit ? 0xffd23a : 0xe8b230);
+  const chalk = style === 'chalk', digital = style === 'digital', backlit = style === 'lit' || lit;
+  const frame = chalk ? 0x6a4a2a : digital ? 0x2a2a30 : backlit ? 0xd8b24a : 0x2a2018;
+  P.rect(x0 - 1, y0 - 1, w + 2, h + 2, frame);
+  for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) {
+    const d = (bayer(x, y) - 0.5) * 0.3 + 0.5;
+    P.px(x, y, chalk ? mix(0x1e3a2a, 0x2a4a36, d) : digital ? mix(0x0a0a10, 0x141420, d) : backlit ? mix(0x2a2a30, 0x3c3c48, d) : mix(0x1a1a1e, 0x26262c, d));
+  }
+  P.hl(x0, y0, w, chalk ? 0x3a5a46 : digital ? 0x2a2a40 : backlit ? 0x4a4a54 : 0x2e2e34);
+  const head = chalk ? 0xf4f1ea : digital ? 0x7ee8a0 : backlit ? 0xffd23a : 0xe8b230, ink = chalk ? 0xf4f1ea : digital ? 0xf4f1ea : 0xf4f1ea, price = chalk ? 0xf0dc9a : digital ? 0x7ee8a0 : backlit ? 0xffd23a : 0xd8c8a0;
+  text(P, SMALL, 'MENY', x0 + 3, y0 + 3, head);
   burgerSprite(P, x0 + 22, y0 + 1, true);
-  P.hl(x0 + 3, y0 + 10, w - 6, lit ? 0xffd23a : 0xe8b230, 0.6);
-  lines.slice(0, 3).forEach(([name, price], i) => {
-    const y = y0 + 13 + i * 7, ps = String(price);
-    text(P, SMALL, name, x0 + 3, y, 0xf4f1ea); text(P, SMALL, ps, x0 + w - 3 - textW(SMALL, ps), y, lit ? 0xffd23a : 0xd8c8a0);
+  P.hl(x0 + 3, y0 + 10, w - 6, head, 0.6);
+  lines.slice(0, 3).forEach(([name, pr], i) => {
+    const y = y0 + 13 + i * 7, ps = String(pr);
+    text(P, SMALL, name, x0 + 3, y, ink); text(P, SMALL, ps, x0 + w - 3 - textW(SMALL, ps), y, price);
   });
-  if (lit) { for (let x = x0 + 2; x < x0 + w - 2; x += 4) P.px(x, y0 + h - 2, 0xffd23a); P.hl(x0 - 1, y0 - 2, w + 2, 0xfff2a0, 0.5); }
+  if (backlit) { for (let x = x0 + 2; x < x0 + w - 2; x += 4) P.px(x, y0 + h - 2, 0xffd23a); P.hl(x0 - 1, y0 - 2, w + 2, 0xfff2a0, 0.5); }
+  if (digital) { for (let y = y0; y < y0 + h; y += 2) P.hl(x0, y, w, 0x000000, 0.15); P.px(x0 + w - 3, y0 + h - 3, 0x45e06a); }
+  if (chalk) { P.hl(x0 - 1, y0 + h + 1, w + 2, 0x8a6a3a); P.rect(x0 + 2, y0 + h - 1, 6, 1, 0xf4f1ea); P.rect(x0 + 10, y0 + h - 1, 4, 1, 0xf0a0c0); }
 }
 export function paintWallDecor(P, c) {
-  const { items, WALL, SHELF: S, menuLines: lines, theme } = c;
+  const { items, WALL, SHELF: S, menuLines: lines, theme, year } = c, era = eraLook(year || 1990);
   WALL.neonPlate(P);
   // kylhyllan: bröd och muggar upptill, såser, burkar och konserver nedtill
   WALL.shelf(P, items, ['', 'SKAFFERI', 'KYLRUM 2', 'KYLRUM 3', 'RESTAURANGKÖK']);
@@ -85,7 +93,7 @@ export function paintWallDecor(P, c) {
   bottle(P, S.x0 + 5, S.boards[1], 0xc92a2a); bottle(P, S.x0 + 11, S.boards[1], 0xe8b820); bottle(P, S.x0 + 17, S.boards[1], 0xf0eed0);
   jar(P, S.x0 + 26, S.boards[1], 0x5a8a2a); jar(P, S.x0 + 40, S.boards[1], 0xc03a6a); can(P, S.x0 + 55, S.boards[1], 0xf2c84a); can(P, S.x0 + 63, S.boards[1], 0x8ab84a);
   WALL.ac(P, items);
-  menuBoard(P, lines, !!items.menytavla);
+  menuBoard(P, lines, !!items.menytavla, era.board);
   WALL.clock(P); WALL.tv(P); WALL.extinguisher(P);
   WALL.door(P, theme?.workshopSign || 'KÖKET');
   WALL.socket(P); WALL.radio(P, items);
@@ -277,4 +285,86 @@ function playCorner(W) {
   P.rect(4, 2, 22, 8, 0xffd23a); P.box(4, 2, 22, 8, 0x8a6a24); text(P, SMALL, 'LEK', 9, 4, 0x2a2d36);
   P.rect(3, H - 4, W - 6, 2, 0x0e0d12);
   return P.flush();
+}
+
+// ---------- Epoken bestämmer hur restaurangen ser ut ----------
+// färger till väggar/golv/disk/neon + stil på bord, stolar, lampor och menytavla
+export const ERA_LOOK = [
+  { from: 1955, name: 'diner', wall: '#5fbcbc', wallDark: '#c93a3a', floorA: '#f2efe6', floorB: '#2a2a30', counter: '#d8323a', neon: '#ff6f9c', table: 0xf4f1ea, edge: 0xc8ccd6, chair: 0xd8323a, chairHi: 0xf06a70, lamp: 'cone', board: 'felt' },
+  { from: 1965, name: 'sixties', wall: '#e8c060', wallDark: '#8a5a2a', floorA: '#efe4c8', floorB: '#3a2a20', counter: '#c94a3a', neon: '#ffb347', table: 0xf0d060, edge: 0xc8a030, chair: 0xe87a2a, chairHi: 0xf8a860, lamp: 'globe', board: 'felt' },
+  { from: 1975, name: 'seventies', wall: '#c08040', wallDark: '#5a3a20', floorA: '#d8c8a0', floorB: '#8a6a40', counter: '#8a4a2a', neon: '#ff9a3a', table: 0xa87848, edge: 0x6a4a28, chair: 0x8a5a2a, chairHi: 0xc08a50, lamp: 'orange', board: 'felt' },
+  { from: 1985, name: 'eighties', wall: '#f0a8c8', wallDark: '#2a2a30', floorA: '#f4f1ea', floorB: '#2a2a30', counter: '#3ac8c8', neon: '#ff3a8a', table: 0xf8c8e0, edge: 0x2a2a30, chair: 0x2ab8b8, chairHi: 0x7ae0e0, lamp: 'tube', board: 'lit' },
+  { from: 1996, name: 'chain', wall: '#f5e6c8', wallDark: '#c92a2a', floorA: '#e8e4dc', floorB: '#c8c4bc', counter: '#c92a2a', neon: '#ffd23a', table: 0xf5c542, edge: 0xc92a2a, chair: 0xc92a2a, chairHi: 0xe86a60, lamp: 'tube', board: 'lit' },
+  { from: 2005, name: 'fresh', wall: '#cfe0b0', wallDark: '#5a7a3a', floorA: '#e8e0c8', floorB: '#c8b890', counter: '#6a8a3a', neon: '#8ad04a', table: 0xd8b880, edge: 0xa88850, chair: 0x5a9a3a, chairHi: 0x8ac860, lamp: 'pendant', board: 'lit' },
+  { from: 2016, name: 'industrial', wall: '#9a5a48', wallDark: '#3a3a40', floorA: '#8e8e8e', floorB: '#7c7c7c', counter: '#3a3a40', neon: '#ffd08a', table: 0x5a3a26, edge: 0x3a2618, chair: 0x2a2a30, chairHi: 0x5a5a60, lamp: 'edison', board: 'chalk' },
+  { from: 2022, name: 'nordic', wall: '#dfe8d8', wallDark: '#a8c0a0', floorA: '#efe9e0', floorB: '#d8d0c4', counter: '#e8e4dc', neon: '#7ee8a0', table: 0xe8d0a8, edge: 0xc8a878, chair: 0x8ad0b0, chairHi: 0xb8ecd0, lamp: 'led', board: 'digital' },
+];
+export const eraLook = (year) => [...ERA_LOOK].reverse().find((e) => year >= e.from) || ERA_LOOK[0];
+export function themeFor(year) {
+  const e = eraLook(year);
+  return { wall: e.wall, wallDark: e.wallDark, floorA: e.floorA, floorB: e.floorB, counter: e.counter, neon: e.neon, workshopSign: 'KÖKET', era: e.name };
+}
+
+// ---------- Matbord med stolar eller sittbås, och en lampa över bordet ----------
+function lamp(P, cx, y, kind) {
+  P.vl(cx, y, 10, 0x3a3a40);
+  if (kind === 'cone') { for (let i = 0; i < 6; i++) P.hl(cx - i, y + 10 + i, i * 2 + 1, i % 2 ? 0xf4ecd0 : 0xfff6e0); P.hl(cx - 5, y + 16, 11, 0xc8a860); P.hl(cx - 3, y + 17, 7, 0xfff2c0, 0.7); }
+  else if (kind === 'globe' || kind === 'orange') { const c = kind === 'orange' ? 0xf08a2a : 0xf4f1ea; P.ell(cx, y + 14, 5, 5, c, 1, 1); P.px(cx - 2, y + 12, 0xffffff); P.hl(cx - 3, y + 19, 7, 0xfff2c0, 0.5); }
+  else if (kind === 'tube') { P.rect(cx - 12, y + 8, 24, 3, 0xdfe6ec); P.hl(cx - 12, y + 8, 24, 0xffffff); P.hl(cx - 10, y + 11, 20, 0xfff6e0, 0.6); }
+  else if (kind === 'pendant') { P.rect(cx - 5, y + 10, 11, 6, 0x2a2d36); P.hl(cx - 5, y + 10, 11, 0x5a5f6a); P.hl(cx - 4, y + 16, 9, 0xfff2c0); }
+  else if (kind === 'edison') { P.rect(cx - 1, y + 10, 3, 3, 0x8a8f9c); P.ell(cx, y + 16, 3, 4, 0xffc860, 1, 1); P.px(cx, y + 15, 0xfff4c0); P.px(cx, y + 17, 0xf0a030); }
+  else { P.rect(cx - 8, y + 10, 17, 2, 0xf4f1ea); P.hl(cx - 8, y + 12, 17, 0xc8ffe0, 0.8); P.hl(cx - 6, y + 13, 13, 0xe0fff0, 0.4); }
+}
+export function makeTable(t, year, style = 'glass', items = {}) {
+  const e = eraLook(year), W = t.x1 - t.x0, booth = t.booth || items.matta;
+  // stolar/bås bakom bordet (ritas bakom den som sitter)
+  const B = new Pix(W + 8, 30, t.x0 - 4, t.base - 36);
+  if (booth) {
+    B.rect(t.x0 - 4, t.base - 34, W + 8, 14, e.chair); B.hl(t.x0 - 4, t.base - 34, W + 8, e.chairHi); B.vl(t.x0 - 4, t.base - 34, 14, e.chairHi);
+    for (let x = t.x0; x < t.x1 + 2; x += 8) B.vl(x, t.base - 33, 12, mul(e.chair, 0.8));
+    B.rect(t.x0 - 4, t.base - 21, W + 8, 3, mul(e.chair, 0.7));
+  } else {
+    for (const cx of [t.x0 + 11, t.x0 + 33]) {
+      B.rect(cx - 7, t.base - 34, 14, 12, e.chair); B.hl(cx - 7, t.base - 34, 14, e.chairHi); B.vl(cx - 7, t.base - 34, 12, e.chairHi);
+      if (e.name === 'diner' || e.name === 'eighties') { B.hl(cx - 7, t.base - 26, 14, 0xdfe6ec); }
+      if (e.name === 'industrial') { B.rect(cx - 6, t.base - 33, 12, 10, 0x1a1a1e); B.hl(cx - 6, t.base - 28, 12, 0x3a3a40); }
+      B.rect(cx - 7, t.base - 22, 14, 2, mul(e.chair, 0.7));
+    }
+  }
+  const chairs = { img: B.flush(), x: t.x0 - 4, y: t.base - 36, sort: t.base - 36 };
+  // bordet: skiva, kant, ben och lampa
+  const P = new Pix(W + 8, 76, t.x0 - 4, t.base - 76);
+  lamp(P, t.x0 + W / 2, t.base - 76, e.lamp);
+  const top = t.base - 18;
+  for (let y = top; y < top + 12; y++) for (let x = t.x0; x < t.x1; x++) {
+    let c = mix(e.table, mix(e.table, 0xffffff, 0.2), (y - top) / 12 + (bayer(x, y) - 0.5) * 0.1);
+    if (e.name === 'seventies' || e.name === 'fresh' || e.name === 'industrial' || e.name === 'nordic') c = mul(c, 0.94 + hash(x >> 2, y, 91) * 0.1);
+    if (e.name === 'eighties' && ((x + y) & 3) === 0) c = mix(c, 0x2a2a30, 0.35);
+    P.px(x, y, c);
+  }
+  P.hl(t.x0, top, W, mix(e.table, 0xffffff, 0.45));
+  P.rect(t.x0, top + 12, W, 3, e.edge); P.hl(t.x0, top + 14, W, mul(e.edge, 0.7));
+  if (e.name === 'diner') { P.hl(t.x0, top + 12, W, 0xdfe6ec); P.hl(t.x0, top + 13, W, 0x8a8f9c); }
+  // pelarfot (diner/kedja) eller fyra ben
+  if (e.name === 'diner' || e.name === 'chain' || e.name === 'eighties') { P.rect(t.x0 + W / 2 - 3, top + 15, 6, 8, 0x8a8f9c); P.vl(t.x0 + W / 2 - 3, top + 15, 8, 0xc8ccd6); P.rect(t.x0 + W / 2 - 8, top + 22, 16, 2, 0x5a5f6a); }
+  else { for (const lx of [t.x0 + 3, t.x1 - 6]) { P.rect(lx, top + 15, 3, 9, mul(e.edge, 0.8)); P.vl(lx, top + 15, 9, e.edge); } }
+  // ketchup, senap och servetter mitt på bordet
+  P.rect(t.x0 + 20, top + 2, 3, 6, 0xc92a2a); P.rect(t.x0 + 21, top, 1, 2, 0x8a1a14); P.rect(t.x0 + 24, top + 3, 3, 5, 0xe8b820); P.rect(t.x0 + 25, top + 1, 1, 2, 0x8a6a10);
+  P.rect(t.x0 + 16, top + 5, 3, 4, 0xf4f1ea); P.hl(t.x0 + 16, top + 5, 3, 0xffffff);
+  return [chairs, { img: P.flush(), x: t.x0 - 4, y: t.base - 76, sort: t.base }];
+}
+
+// brickan på bordet framför den som äter: burgaren blir mindre för varje tugga, muggen står kvar
+export function eatSprite(ctx, x, y, stage, seed = 0) {
+  const P = { rect: (a, b, w, h, c) => { ctx.fillStyle = css(c); ctx.fillRect(a, b, w, h); }, hl: (a, b, w, c) => { ctx.fillStyle = css(c); ctx.fillRect(a, b, w, 1); }, vl: (a, b, h, c) => { ctx.fillStyle = css(c); ctx.fillRect(a, b, 1, h); }, px: (a, b, c) => { ctx.fillStyle = css(c); ctx.fillRect(a, b, 1, 1); } };
+  traySprite(P, x - 11, y - 3, 22);
+  const cup = seed % 3 === 1 ? 0xf2c8d8 : seed % 3 === 2 ? 0xc92a2a : 0xf4f1ea;
+  cupSprite(P, x + 3, y - 16, cup, 0xc8ccd0);
+  if (stage < 0.3) burgerSprite(P, x - 10, y - 12, seed % 2 === 0);
+  else if (stage < 0.6) { // halväten: en bit borta till höger
+    ctx.save(); ctx.beginPath(); ctx.rect(x - 10, y - 13, 8, 10); ctx.clip(); burgerSprite(P, x - 10, y - 12, seed % 2 === 0); ctx.restore();
+    P.rect(x - 3, y - 10, 2, 6, 0xf0dcb0);
+  } else if (stage < 0.9) { P.rect(x - 9, y - 6, 5, 3, 0xd9a55d); P.px(x - 6, y - 7, 0x6e3a26); P.px(x - 4, y - 5, 0x7fc44a); }
+  else { P.px(x - 8, y - 5, 0xd9a55d); P.px(x - 5, y - 6, 0xd9a55d); P.rect(x - 9, y - 9, 4, 3, 0xf4f1ea); }
+  if (stage > 0.15 && stage < 0.95) { P.rect(x - 2, y - 9, 6, 6, 0xf4f1ea); P.hl(x - 2, y - 9, 6, 0xffffff); }   // servett
 }

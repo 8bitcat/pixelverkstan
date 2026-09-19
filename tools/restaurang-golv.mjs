@@ -1,6 +1,6 @@
-// Hamburgerbarens golv med inredning: Kvartersbaren (lokal 3) med läskkyl och dessertdisk fyllda,
-// jukebox, såsbar, lekhörna, kaffe- och godisautomat, köksprylar (milkshake, fritös, dubbelgrill,
-// menytavla) och brickor vid luckan. Skärmdump tools/out/rest-golv-*.png. node tools/restaurang-golv.mjs [url]
+// Hamburgerbarens golv genom epokerna: Kvartersbaren (lokal 3) med läskkyl, dessertdisk, jukebox,
+// såsbar, lekhörna, köksprylar och matbord där kunderna sitter och äter. En skärmdump per epok:
+// tools/out/rest-golv-<år>.png. node tools/restaurang-golv.mjs [url]
 import { createRequire } from "module";
 const require = createRequire("D:/Qisy/QISYFrontend/QISYFrontend-1/package.json");
 const { chromium } = require("playwright");
@@ -14,12 +14,11 @@ page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 const ok = (c, m) => { console.log((c ? 'OK   ' : 'FEL  ') + m); if (!c) errors.push(m); };
 await page.goto(URL);
 await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForTimeout(300);
-await page.click('[data-shop="restaurang"]'); await page.click('[data-year="2016"]');
+await page.click('[data-shop="restaurang"]'); await page.click('[data-year="1996"]');
 await page.waitForFunction(() => window.PV?.game && PV.game.shop.id === 'restaurang', null, { timeout: 30000 }); await page.waitForTimeout(600);
-const st = await page.evaluate(() => {
-  const g = PV.game, F = g.shop.fit;
+const setup = await page.evaluate(() => {
+  const g = PV.game;
   g.money = 90000; g.tutorialStep = 99; g.stats.served = 9;
-  // lokal 3 med alla prylar och enheter
   for (const id of ['lokal2', 'lokal3', 'milkshake', 'fritos', 'dubbelgrill', 'menytavla', 'lager2', 'kassa2', 'stereo', 'vaxter']) g.fit.items[id] = true;
   g.fit.slots = [];
   g.fit.slots[0] = { kind: 'cat', cat: 'dryck', level: 0 };
@@ -29,23 +28,44 @@ const st = await page.evaluate(() => {
   g.fit.slots[5] = { kind: 'unit', unit: 'jukebox' };
   g.fit.slots[6] = { kind: 'cat', cat: 'dessert', level: 0 };
   g.fit.slots[7] = { kind: 'unit', unit: 'sasbar' };
-  // varor framme
-  const sale = g.shop.onSale(g.year);
-  for (const p of sale.filter((p) => p.cat === 'dryck').slice(0, 14)) { g.stock[p.id] = 3; g.shown[p.id] = 3; }
-  for (const p of sale.filter((p) => p.cat === 'dessert').slice(0, 10)) { g.stock[p.id] = 2; g.shown[p.id] = 2; }
   g.emit('change');
   PV.floor.build(); PV.floor.sig = null; PV.floor.refreshStock();
-  return { lokal: F.lokalOf(g.fit), units: PV.floor.unitList.map((u) => u.unit || u.cat || (u.empty ? 'tom' : '?')), grid: PV.floor.unitList.filter((u) => u.frame?.grid).length };
+  const L = PV.floor.constructor.LY || null;
+  return { lokal: g.shop.fit.lokalOf(g.fit), units: PV.floor.unitList.map((u) => u.unit || u.cat || (u.empty ? 'tom' : '?')), tables: PV.floor.furniture.length, grid: PV.floor.unitList.filter((u) => u.frame?.grid).length };
 });
-ok(st.lokal === 3 && st.grid >= 4, `Kvartersbaren med enheter: ${JSON.stringify(st)}`);
-await page.waitForTimeout(700);
-await page.screenshot({ path: OUT + 'rest-golv-1.png' });
-// brickor som väntar vid luckan
-await page.evaluate(() => { const g = PV.game; for (let i = 0; i < 2; i++) { const o = g.shop.generateOrder(g, ['Nils']); if (!o) continue; const c = g.spawn(o); c.phase = 'ready'; c.x = 453; c.y = 176 + i * 34; c.patience = 9999; c.payout = { total: 90, price: 80, tip: 10, xp: 0, stars: 3 }; } });
-await page.waitForTimeout(400);
-await page.screenshot({ path: OUT + 'rest-golv-2.png' });
-const crop = await page.evaluate(() => { const r = document.querySelector('#floor').getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; });
-console.log('golvet', JSON.stringify(crop));
+ok(setup.lokal === 3 && setup.grid >= 4, `Kvartersbaren med enheter: ${JSON.stringify(setup)}`);
+for (const year of [1955, 1975, 1996, 2016, 2022]) {
+  const st = await page.evaluate((y) => {
+    const g = PV.game;
+    g.startYear = y; g.xp = 0; g.customers = [];
+    const sale = g.shop.onSale(y);
+    for (const id of Object.keys(g.stock)) { delete g.stock[id]; delete g.shown[id]; }
+    for (const p of sale.filter((p) => p.cat === 'dryck').slice(0, 14)) { g.stock[p.id] = 3; g.shown[p.id] = 3; }
+    for (const p of sale.filter((p) => p.cat === 'dessert').slice(0, 10)) { g.stock[p.id] = 2; g.shown[p.id] = 2; }
+    g.emit('change');
+    PV.floor.build(); PV.floor.sig = null; PV.floor.refreshStock();
+    // gäster som sitter och äter vid borden i olika stadier, en som väntar vid luckan och en i kön
+    const seats = PV.floor.unitList ? [] : [];
+    let n = 0;
+    for (let i = 0; i < 6; i++) {
+      const o = g.shop.generateOrder(g, ['Nils', 'Maja', 'Ali', 'Sara', 'Olle', 'Ida']); if (!o) continue;
+      const c = g.spawn(o); c.patience = 9999;
+      if (i < 4) { const seat = PV.floor.pickSeat(c); if (seat < 0) continue; c.phase = 'eating'; c._spot = seat; c._eatMax = 80; c._eatT = 80 - i * 18; c.x = PV.floor.constructor.name ? c.x : c.x; c._path = null; n++; }
+      else if (i === 4) { c.phase = 'ready'; c.x = 453; c.y = 176; c.payout = { total: 90, price: 80, tip: 10, xp: 0, stars: 3 }; }
+      else { c.phase = 'queue'; c.x = 318; c.y = 176; }
+    }
+    return { year: g.year, era: g.shop.themeFor(y).era, eating: n, tables: PV.floor.furniture.filter((f) => f.sort > 200).length };
+  }, year);
+  // låt dem gå till borden och sätta sig
+  await page.evaluate(() => { for (let k = 0; k < 300; k++) PV.floor.update(0.05); });
+  await page.waitForTimeout(300);
+  const seated = await page.evaluate(() => PV.game.customers.filter((c) => c.phase === 'eating' && c._sit).length);
+  ok(st.eating >= 3 && seated >= 3, `${year} ${st.era}: ${st.eating} gäster satte sig och äter (${seated} sitter), ${st.tables} möbler`);
+  await page.screenshot({ path: OUT + `rest-golv-${year}.png` });
+}
+// den som ätit klart går hem
+const left = await page.evaluate(() => { const g = PV.game; for (const c of g.customers) if (c.phase === 'eating') c._eatT = 0.01; for (let k = 0; k < 40; k++) PV.floor.update(0.05); return g.customers.filter((c) => c.phase === 'leaving').length; });
+ok(left >= 3, `${left} gäster reser sig och går när de ätit klart`);
 console.log(errors.length ? 'FEL:\n' + errors.join('\n') : 'Inga fel.');
 await browser.close();
 process.exit(errors.length ? 1 : 0);

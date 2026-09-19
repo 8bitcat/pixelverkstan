@@ -15,7 +15,7 @@ import { runCommand } from './session.js';
 import { serializeBuild, deserializeBuild } from './build-ops.js';
 
 const DIRS = ['down', 'up', 'left', 'right'];
-const PHASES = ['arriving', 'queue', 'waiting', 'ready', 'leaving'];
+const PHASES = ['arriving', 'queue', 'waiting', 'ready', 'leaving', 'eating'];
 export const PLAYER_COLORS = ['#7ee8fa', '#f5c542', '#ff7ab6', '#8be36b', '#b58cff', '#ff9a4d'];
 
 export function econSnap(g) {
@@ -194,7 +194,8 @@ export class CoopHost {
       if (fresh.length) { this.net.sendTo(id, { t: 'cust', list: fresh.map(custFull) }); for (const c of fresh) set.add(c.id); }
     }
     const cust = g.customers.map((c) => [c.id, Math.round(c.x), Math.round(c.y), DIRS.indexOf(c.dir), c.moving ? 1 : 0, PHASES.indexOf(c.phase),
-      isFinite(c.patience) ? Math.round(c.patience) : -1, c.mood || 0, Math.round((c.bubbleT || 0) * 10), c._sit ? 1 : 0, isFinite(c.patienceMax) ? c.patienceMax : -1]);
+      isFinite(c.patience) ? Math.round(c.patience) : -1, c.mood || 0, Math.round((c.bubbleT || 0) * 10), c._sit ? 1 : 0, isFinite(c.patienceMax) ? c.patienceMax : -1,
+      c._spot >= 0 ? c._spot : -1, c._eatMax ? Math.round(100 * Math.max(0, Math.min(1, 1 - c._eatT / c._eatMax))) : 0]);
     const me = f?.localPlayer();
     const pls = (f?.players || []).map((p) => [p === me ? 'host' : p.id, Math.round(p.local ? p.x : (p.tx ?? p.x)), Math.round(p.local ? p.y : (p.ty ?? p.y)), DIRS.indexOf(p.dir), p.moving ? 1 : 0, p.away || 0, p.orderId || 0]);
     this.net.broadcast({ t: 'tick', cust, pls });
@@ -274,13 +275,13 @@ export class CoopClient {
     if (!g) return;
     const seen = new Set();
     let changed = false;
-    for (const [id, x, y, di, mv, ph, pat, mood, bub, sit, pmax] of m.cust) {
+    for (const [id, x, y, di, mv, ph, pat, mood, bub, sit, pmax, spot, eat] of m.cust) {
       const c = g.customers.find((q) => q.id === id);
       if (!c) continue;
       seen.add(id);
       const phase = PHASES[ph];
       if (c.phase !== phase) changed = true;
-      Object.assign(c, { tx: x, ty: y, dir: DIRS[di] || 'down', moving: !!mv, phase, patience: num(pat), patienceMax: num(pmax), _sit: !!sit });
+      Object.assign(c, { tx: x, ty: y, dir: DIRS[di] || 'down', moving: !!mv, phase, patience: num(pat), patienceMax: num(pmax), _sit: !!sit, _spot: spot >= 0 ? spot : c._spot, _eat: eat || 0 });
       if (mood && c.mood !== mood) { c.mood = mood; c.bubbleT = bub / 10; }
     }
     const before = g.customers.length;

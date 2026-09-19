@@ -117,7 +117,7 @@ export function paintRoom(theme, opts = {}) {
   paintFloor(P, flA, flB, lokal, items, opts.openSlots ?? 3);
   paintWalls(P, wall, wallDk, lokal);
   paintStorefront(P, wall, items, opts.sign, lokal);
-  if (opts.art?.paintWallDecor) opts.art.paintWallDecor(P, { wall, wallDk, theme, items, lokal, menuLines: opts.menuLines || [], WALL, SHELF, POSTER, CLOCK, TV, NEON_BOX });
+  if (opts.art?.paintWallDecor) opts.art.paintWallDecor(P, { wall, wallDk, theme, items, lokal, year: opts.year || 1990, menuLines: opts.menuLines || [], WALL, SHELF, POSTER, CLOCK, TV, NEON_BOX });
   else paintWallDecor(P, wall, wallDk, theme, items, lokal);
   if (lokal === 1) { paintWorn(P, wall); paintShabby(P); }
   if (opts.plan?.partition) paintPartition(P, opts.plan);

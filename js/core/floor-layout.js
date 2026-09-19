@@ -29,6 +29,8 @@ export let SOFA = null, ARMCHAIR = null, TABLE = null, BENCH = null;
 export let PLANTS = [], EXTRA_PLANTS = [];
 export let SPOTS = [];
 export let OBSTACLES = [];
+export let TABLES = [];          // matbord (restaurangen): { x0, x1, base, booth, seats: [spotIndex], plates: [[x, y]] }
+let PLAN_SRC = null;             // verksamhetens egna planlösningar (annars datorbutikens)
 
 // väntplatser: sit = sitter (sorteras framför soffan), via = kliv ut/in-punkt,
 // slot = platsen man tittar in i (hoppas över om den är tom)
@@ -42,10 +44,15 @@ function makeSpots(plan) {
     for (const f of xs) out.push({ x: Math.round(s.x0 + w * f), y, dir: 'up', kind: 'case', slot: s.i });
   }
   if (plan.hero) out.push({ x: plan.hero.cx, y: plan.hero.base + 34, dir: 'up', kind: 'hero' }, { x: plan.hero.cx + 78, y: plan.hero.base - 6, dir: 'left', kind: 'hero' }, { x: plan.hero.cx - 34, y: plan.hero.base + 34, dir: 'up', kind: 'hero' });
+  // matbord: två platser bakom varje bord, brickan står på bordet framför den som sitter
+  (plan.tables || []).forEach((t, ti) => {
+    for (const x of [t.x0 + 11, t.x0 + 33]) out.push({ x, y: t.base - 17, dir: 'down', sit: true, via: [x, t.base + 12], kind: 'seat', table: ti, plate: [x, t.base - 7] });
+  });
   return out;
 }
-export function setPlan(lokal) {
-  const plan = planFor(lokal);
+export function setPlan(lokal, plans = undefined) {
+  if (plans !== undefined) PLAN_SRC = plans;
+  const plan = PLAN_SRC ? (PLAN_SRC[lokal] || PLAN_SRC[3]) : planFor(lokal);
   PLAN = plan;
   SLOTS = plan.slots; VITRINES = SLOTS.slice(0, 3);
   HERO = plan.hero || null;
@@ -53,6 +60,7 @@ export function setPlan(lokal) {
   SOFA = plan.sofa || null; ARMCHAIR = plan.armchair || null; TABLE = plan.table || null; BENCH = plan.bench || null;
   PLANTS = plan.plants || []; EXTRA_PLANTS = plan.extraPlants || [];
   SPOTS = makeSpots(plan);
+  TABLES = (plan.tables || []).map((t, ti) => ({ ...t, seats: SPOTS.map((sp, i) => (sp.table === ti ? i : -1)).filter((i) => i >= 0), plates: SPOTS.filter((sp) => sp.table === ti).map((sp) => sp.plate) }));
   // hinder på golvet (fotnivå) [x0, y0, x1, y1]
   OBSTACLES = [
     [COUNTER.x0 - 6, WALL_Y - 6, FW, COUNTER.base],
@@ -62,6 +70,7 @@ export function setPlan(lokal) {
     ...(ARMCHAIR ? [[ARMCHAIR.x0, ARMCHAIR.base - 22, ARMCHAIR.x1, ARMCHAIR.base]] : []),
     ...(TABLE ? [[TABLE.x0, TABLE.base - 14, TABLE.x1, TABLE.base]] : []),
     ...(BENCH ? [[BENCH.x0, BENCH.base - 16, BENCH.x1, BENCH.base]] : []),
+    ...TABLES.map((t) => [t.x0 - 2, t.base - 34, t.x1 + 2, t.base]),
     ...[...PLANTS, ...EXTRA_PLANTS].map(([x, y]) => [x - 8, y - 10, x + 8, y + 1]),
     ...(plan.props || []).map((p) => [p.x0, p.y0, p.x1, p.y1]),
     ...(plan.blocked || []),

@@ -65,11 +65,11 @@ export class Floor {
 
   // ---------- Förberedelse (statiska lager) ----------
   build() {
-    const shop = this.shop, th = shop.theme || {}, g = this.game, F = shop.fit;
+    const shop = this.shop, g = this.game, F = shop.fit, th = shop.themeFor ? shop.themeFor(g.year) : (shop.theme || {});
     const fit = g.fit || { slots: [], items: {} }, items = fit.items || {};
     const lokal = F ? F.lokalOf(fit) : 3;
     // lokalens planlösning: platser, möbler, hinder och gångnät
-    LY.setPlan(lokal); WK.rebuild();
+    LY.setPlan(lokal, shop.floorPlans || null); WK.rebuild();
     const open = LY.SLOTS.length;
     this.lokal = lokal; this.openSlots = open;
     this.fitSig = JSON.stringify(fit);
@@ -91,7 +91,7 @@ export class Floor {
     else this.ropeBack = this.ropeFront = null;
     // rummet
     const art = this.art = shop.floorArt || null;
-    const room = SC.paintRoom(th, { lokal, items, sign: shop.sign, openSlots: open, plan: LY.PLAN, art, menuLines: art?.menuLines ? art.menuLines(g) : [] });
+    const room = SC.paintRoom(th, { lokal, items, sign: shop.sign, openSlots: open, plan: LY.PLAN, art, year: g.year, menuLines: art?.menuLines ? art.menuLines(g) : [] });
     const neon = hex(th.neon, 0x7ee8fa);
     this.room = room.flush();
     const rc = this.room.getContext('2d');
@@ -107,6 +107,8 @@ export class Floor {
     this.furniture = [this.back, ...(LY.SOFA ? [PR.makeSofa()] : []), ...(LY.ARMCHAIR ? [PR.makeArmchair()] : []), ...(LY.TABLE ? [PR.makeTable()] : []), ...(LY.BENCH ? [PR.makeBench(LY.BENCH)] : []),
       ...LY.PLANTS.map(([x, y]) => PR.makePlant(x, y)), ...LY.GATES.map((x) => PR.makeGate(x)), ...(LY.PLAN.props || []).map((pr) => PR.makeProp(pr))];
     if (items.vaxter) this.furniture.push(...LY.EXTRA_PLANTS.map(([x, y]) => PR.makePlant(x, y)));
+    // matbord (restaurangen): stolar bakom, bordet framför den som sitter
+    if (art?.makeTable) for (const t of LY.TABLES) this.furniture.push(...art.makeTable(t, g.year, LY.PLAN.style, items));
     if (items.tidningar) this.furniture.push(PR.makeMagRack());
     this.buildUnits();
     this.shelfImg = null;
@@ -220,7 +222,7 @@ export class Floor {
 
   pickSpot(c) {
     const g = this.game;
-    const used = new Set(g.customers.filter((x) => x !== c && x.phase === 'waiting' && x._spot >= 0).map((x) => x._spot));
+    const used = new Set(g.customers.filter((x) => x !== c && (x.phase === 'waiting' || x.phase === 'eating') && x._spot >= 0).map((x) => x._spot));
     const kid = c.look && c.look.kid;
     const cand = [];
     LY.SPOTS.forEach((s, i) => {
@@ -235,6 +237,14 @@ export class Floor {
     return cand[cand.length - 1][0];
   }
 
+  // ledig stol vid ett matbord (restaurangen)
+  pickSeat(c) {
+    const g = this.game;
+    const used = new Set(g.customers.filter((x) => x !== c && (x.phase === 'waiting' || x.phase === 'eating') && x._spot >= 0).map((x) => x._spot));
+    const cand = [];
+    LY.SPOTS.forEach((s, i) => { if (s.kind === 'seat' && s.table !== undefined && !used.has(i)) cand.push(i); });
+    return cand.length ? cand[Math.floor(Math.random() * cand.length)] : -1;
+  }
   targetFor(c) {
     const g = this.game;
     if (c.phase === 'arriving' || c.phase === 'queue') {
@@ -246,6 +256,11 @@ export class Floor {
       if (c._spot < 0) { const o = OVERFLOW[c.id % OVERFLOW.length]; return { x: o[0], y: o[1], dir: 'down', key: 'o' + c.id }; }
       const s = LY.SPOTS[c._spot];
       return { x: s.x, y: s.y, dir: s.dir, sit: !!s.sit, via: s.via, key: 's' + c._spot };
+    }
+    if (c.phase === 'eating') {
+      if (!(c._spot >= 0)) c._spot = this.pickSeat(c);
+      if (c._spot >= 0) { const s = LY.SPOTS[c._spot]; return { x: s.x, y: s.y, dir: s.dir, sit: true, via: s.via, key: 'e' + c._spot }; }
+      c.phase = 'leaving';
     }
     c._spot = null;
     if (c.phase === 'ready') {
@@ -304,6 +319,7 @@ export class Floor {
     if (T.dir) c.dir = T.dir;
     c._sit = !!T.sit;
     if (T.sit && c._spot >= 0) c._seat = LY.SPOTS[c._spot];
+    if (c.phase === 'eating' && T.sit) { c._eatT = (c._eatT ?? 10) - dt; if (c._eatT <= 0) { c.phase = 'leaving'; c._spot = null; c._sit = false; } }
     if (c.phase === 'arriving' && T.key.startsWith('q')) c.phase = 'queue';
     if (c.phase === 'ready' && T.key === 'p0') {
       if (c.payout) {
@@ -311,6 +327,8 @@ export class Floor {
         this.coins(c.x, c.y - 42, Math.min(18, 5 + Math.floor(p.total / 1500)));
         g.pay(p, c);
       }
+      // restaurangen: sätt dig och ät om det finns en ledig stol
+      if (g.shop.dineIn) { const seat = this.pickSeat(c); if (seat >= 0) { c._spot = seat; c._eatMax = c._eatT = 14 + Math.random() * 10; c.phase = 'eating'; c.mood = c.mood === 'angry' ? c.mood : 'happy'; c.bubbleT = 2; return; } }
       c.phase = 'leaving'; c.mood = c.mood === 'angry' ? c.mood : 'happy'; c.bubbleT = 3;
     }
     if (c.phase === 'leaving' && T.out && c.y < LY.WALL_Y) {
@@ -528,6 +546,10 @@ export class Floor {
     }
     for (const c of g.customers) {
       if (c.y < LY.WALL_Y) continue;
+      if (c.phase === 'eating' && c._sit && c._spot >= 0 && LY.SPOTS[c._spot]?.plate && this.art?.eatSprite) {
+        const [px, py] = LY.SPOTS[c._spot].plate, stage = c._eatMax ? Math.max(0, Math.min(1, 1 - c._eatT / c._eatMax)) : (c._eat || 0) / 100;
+        S.push([c.y + 3, () => this.art.eatSprite(ctx, px, py, stage, c.id)]);
+      }
       const frame = c.moving ? WALK_SEQ[Math.floor(c.walk) % 4] : c._sit ? 5 : (Math.sin(t * 1.9 + c.id * 1.7) > 0.72 ? 4 : 0);
       S.push([c._sit ? c.y + 2 : c.y, () => drawPerson(ctx, c.x, c.y, c.look, c._sit ? 'down' : c.dir, frame)]);
     }

@@ -8,6 +8,7 @@ import * as products from './products.js';
 import { iconCanvas } from './art.js';
 import { Serving } from './serve.js';
 import * as floorArt from './floor-art.js';
+import { PLANS as FLOOR_PLANS } from './floor-plans.js';
 
 export default {
   id: 'restaurang',
@@ -22,6 +23,9 @@ export default {
   // stjärnobjektet i montern och på affischen: årets finaste biff
   heroFor: (game) => [...menu.onSale(game.year).filter((p) => p.cat === 'biff')].sort((a, b) => b.cost - a.cost)[0] || null,
   floorArt,
+  floorPlans: FLOOR_PLANS,          // matbord i stället för stjärnmonter och soffa
+  themeFor: floorArt.themeFor,      // epoken bestämmer färger och stil
+  dineIn: true,                     // kunderna sätter sig och äter efter att de hämtat brickan
   fit: upgrades,
   products,
   isProduct: products.isProduct,
