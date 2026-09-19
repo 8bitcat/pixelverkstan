@@ -478,6 +478,7 @@ function openCoopMenu() {
 async function hostRoom(mod, opts) {
   await avatarReady;
   net = new Net();
+  net.on('status', () => { if (lobbyState) renderLobby(); });
   UI.toast('Skapar rum …');
   try { await net.host(); } catch (e) { UI.toast(e.message, 'bad'); net = null; return; }
   coop = new CoopHost(net, app);
@@ -492,6 +493,7 @@ async function joinRoom(raw) {
   await avatarReady;
   UI.closeModal();
   net = new Net();
+  net.on('status', () => { if (lobbyState) renderLobby(); });
   coop = new CoopClient(net, app);
   lobbyState = { host: false, code, connecting: true };
   lobbyPlayers = [];
@@ -506,6 +508,12 @@ async function joinRoom(raw) {
 }
 
 let lobbyState = null;
+// hur kopplingen går: vilken mäklare som svarade och om spelarna pratar direkt eller via den
+function netStatusText() {
+  const st = net?.status?.();
+  if (!st) return '';
+  return `<p class="sub" style="font-size:15px;opacity:.75">📡 Signal via ${esc(st.broker)}${st.mode ? ' · ' + esc(st.mode) : ''}</p>`;
+}
 function renderLobby() {
   const L = lobbyState;
   if (!L) return;
@@ -517,6 +525,7 @@ function renderLobby() {
     <p class="sub">${L.host ? 'Be kompisarna öppna Pixelverkstan, trycka på 👥 Spela tillsammans och skriva koden:' : L.connecting ? 'Ansluter till rummet …' : 'Du är med! Väntar på att värden öppnar butiken …'}</p>
     <div class="room-code">${code.split('').map((c) => `<span>${c}</span>`).join('')}</div>
     ${L.host ? `<div class="room-link"><input readonly value="${esc(link)}"><button class="btn btn-small" id="l-copy">📋 Kopiera länk</button></div>` : ''}
+    ${netStatusText()}
     <h3>Spelare (${players.length})</h3>
     <div class="lobby-players">${players.map((p) => `<div class="lobby-player" style="--pc:${esc(p.color || '#7ee8fa')}"><span data-look="${esc(p.id)}"></span><b>${esc(p.name)}</b><small>${p.host ? '👑 värd' : 'spelare'}</small></div>`).join('')}</div>
     <div class="menu-row">

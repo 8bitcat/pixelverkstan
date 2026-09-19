@@ -175,7 +175,9 @@ De tre första kunderna är guidade.
   Lobbyn visar alla spelare; värden öppnar butiken.
 - Ni delar kassa, lager, lådor och kunder: en tar emot kunder, en packar upp, båda kan
   gå in i verkstaden och **bygga samma dator samtidigt** – ni ser varandras muspekare
-  och vad kompisen håller i. Nätverket är WebRTC via PeerJS; värden kör spelet och
+  och vad kompisen håller i. Signaleringen går via offentliga MQTT-mäklare (EMQX, HiveMQ,
+  Mosquitto – första som svarar), spelet går direkt via en WebRTC-datakanal när den öppnas och
+  annars via mäklaren med kvittens och omsändning (lobbyn visar vilket). Värden kör spelet och
   sparar det.
 
 ## 3D-läget (🧊 3D i HUD:en)
@@ -276,7 +278,7 @@ js/core/        generisk motor – vet inget om datorer
   pixfont.js    3×5-pixelfont + textstämplar i texturer
   ui.js         HUD, dialoger, grossist (sök/filter/sidor, startpaket), lådor, lager, nytt år, museivy
   session.js    kommandon som ändrar spelet (körs hos värden i co-op)
-  net.js        PeerJS-rum med fyrbokstavskod
+  net.js        rum med fyrbokstavskod: MQTT-signalering (tre mäklare), WebRTC-datakanal, reserv via mäklaren
   coop.js       synk mellan värd och klienter (läge, kunder, avatarer, byggen, muspekare)
   build-ops.js  byggoperationer som delas mellan spelare
   floor-walk.js gångnät (A*) för avatarerna
@@ -340,7 +342,7 @@ node tools/e2e.mjs                       # butik → bygge → skrivbord → lev
 node tools/era-start.mjs                 # startårsval, laddtid, butik och grossist 1983
 node tools/slots.mjs                     # sparningar per startår: byta år, fortsätta, börja om
 node tools/shopflow.mjs                  # tom butik → startpaket → låda → packa upp → kund
-node tools/coop.mjs                      # två webbläsare: lobby, delad butik, bygga ihop, muspekare
+node tools/coop.mjs [url]                # två webbläsare: lobby, delad butik, bygga ihop, muspekare (url?nortc=1 = allt via mäklaren)
 node tools/avatar.mjs                    # avatarredigeraren
 node tools/mobile.mjs                    # mobilvy (iPhone 13)
 node tools/zoom.mjs                      # renderingstider vid zoom

@@ -18,14 +18,17 @@ async function newPlayer(name, color) {
   await page.reload(); await page.waitForTimeout(600);
   return page;
 }
+const diag = async () => { try { const d = await Promise.all([host, kid].map((pg) => pg.evaluate(() => { const n = PV.net; return n ? { role: n.role, status: n.status(), connected: !!n.mq?.connected, age: Math.round((Date.now() - n.lastRecv) / 100) / 10, stats: n.stats, money: PV.game?.money, deliveries: PV.game?.deliveries?.length } : null; }))); console.log('DIAG värd', JSON.stringify(d[0])); console.log('DIAG kompis', JSON.stringify(d[1])); } catch (e) { console.log('diag misslyckades', e.message); } };
+const crashed = async (e) => { console.log('KRASCH ' + String(e.message).split(String.fromCharCode(10))[0]); try { const t = await Promise.all([host, kid].map((pg) => pg.evaluate(() => [...document.querySelectorAll('.toast')].map((x) => x.textContent).join(' | ')))); console.log('TOASTS', JSON.stringify(t)); } catch {} await diag(); process.exit(1); };
+process.on('unhandledRejection', crashed); process.on('uncaughtException', crashed);
 const host = await newPlayer('Pappa', '#f5c542');
 const kid = await newPlayer('Ville', '#ff7ab6');
 // värden startar rum
 await host.click('#m-coop'); await host.click('#c-host');
 await host.click('[data-pick="0"]');
 await host.click('[data-year="1991"]');
-await host.waitForSelector('.room-code', { timeout: 30000 });
-await host.waitForFunction(() => window.PV?.net?.code, null, { timeout: 30000 });
+await host.waitForSelector('.room-code', { timeout: 70000 });
+await host.waitForFunction(() => window.PV?.net?.code, null, { timeout: 70000 });
 const code = await host.evaluate(() => PV.net.code);
 ok(/^[A-Z]{4}$/.test(code), `rum skapat: ${code}`);
 // kompisen går med
@@ -33,6 +36,10 @@ await kid.click('#m-coop'); await kid.fill('#c-code', code); await kid.click('#c
 await host.waitForFunction(() => document.querySelectorAll('.lobby-player').length === 2, null, { timeout: 30000 });
 await kid.waitForFunction(() => document.querySelectorAll('.lobby-player').length === 2, null, { timeout: 30000 });
 ok(true, 'båda syns i lobbyn');
+await host.waitForTimeout(2500);
+const stat = await Promise.all([host.evaluate(() => PV.net.status()), kid.evaluate(() => PV.net.status())]);
+console.log('nät värd', JSON.stringify(stat[0]), '· kompis', JSON.stringify(stat[1]));
+ok(stat[0]?.broker && stat[1]?.broker, `signalen går via ${stat[0]?.broker}, kompisen ${stat[1]?.mode}`);
 await host.screenshot({ path: OUT + "co0-lobby-host.png" });
 await kid.screenshot({ path: OUT + "co0-lobby-kid.png" });
 await host.click('#l-start');
