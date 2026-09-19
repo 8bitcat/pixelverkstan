@@ -111,7 +111,7 @@ export function buildRoom(scene, ctx) {
   // verkstadsdörren (stängd) + skylt
   slab(g, X1 + 0.02, X1 + 0.08, 0, 2.12, doorZ - 0.47, doorZ + 0.47, A.pbr('wood_table_001', { repeat: [0.4, 1], color: 0x8a6a4a }), { pick: { type: 'workshop' } });
   slab(g, X1 - 0.02, X1 + 0.03, 1.05, 1.6, doorZ - 0.28, doorZ + 0.28, glassMat(0xdfe8ee, 0.7));
-  { const s = signBoard('VERKSTAD', 0.9, 0.22, { bg: '#f5a142' }); s.rotation.y = -Math.PI / 2; s.position.set(X1 - 0.03, 2.4, doorZ); g.add(s); }
+  { const s = signBoard(theme.workshopSign || 'VERKSTAD', 0.9, 0.22, { bg: '#f5a142' }); s.rotation.y = -Math.PI / 2; s.position.set(X1 - 0.03, 2.4, doorZ); g.add(s); }
   // golvlister
   const base = paintMat(0x2c2a2e, 0.6);
   slab(g, X0, X0 + 0.02, 0, 0.1, 0, D, base, { cast: false }); slab(g, X1 - 0.02, X1, 0, 0.1, 0, D, base, { cast: false }); slab(g, X0, X1, 0, 0.1, D - 0.02, D, base, { cast: false });
@@ -252,9 +252,9 @@ export function buildRoom(scene, ctx) {
     // verktygstavla på väggen under fönstret, med skylt och några verktyg
     const pbY0 = bh + 0.08, pbY1 = Math.max(pbY0 + 0.12, Math.min(winR.y0 - 0.03, bh + 0.36));
     slab(g, bx0, bx1, pbY0, pbY1, 0.005, 0.025, A.pbr('plywood', { repeat: [1.3, 0.3], color: 0xc4ad82 }), { cast: false });
-    { const sg = signBoard('ARBETSBÄNK', 0.56, 0.13, { bg: '#f5a142', thick: 0.02, twoSided: false }); sg.position.set(bx0 + 0.34, (pbY0 + pbY1) / 2, 0.026); g.add(sg); }
+    { const sg = signBoard(shop.text?.benchSign || 'ARBETSBÄNK', 0.56, 0.13, { bg: '#f5a142', thick: 0.02, twoSided: false }); sg.position.set(bx0 + 0.34, (pbY0 + pbY1) / 2, 0.026); g.add(sg); }
     const toolCols = [0xd23b3b, 0x2f6fb7, 0xf5a142, 0x2f8f46, 0x17151a];
-    for (let i = 0; i < 4; i++) { const x = bx0 + 0.78 + i * 0.17; slab(g, x - 0.006, x + 0.006, pbY0 + 0.03, pbY1 - 0.09, 0.025, 0.037, metalMat(0xb8bcc2, 0.35), { cast: false }); slab(g, x - 0.014, x + 0.014, pbY1 - 0.1, pbY1 - 0.03, 0.025, 0.05, paintMat(toolCols[i], 0.5), { cast: false }); }
+    for (let i = 0; i < (shop.floorArt ? 0 : 4); i++) { const x = bx0 + 0.78 + i * 0.17; slab(g, x - 0.006, x + 0.006, pbY0 + 0.03, pbY1 - 0.09, 0.025, 0.037, metalMat(0xb8bcc2, 0.35), { cast: false }); slab(g, x - 0.014, x + 0.014, pbY1 - 0.1, pbY1 - 0.03, 0.025, 0.05, paintMat(toolCols[i], 0.5), { cast: false }); }
     // antistatmatta, skruvburk och en kaffekopp
     slab(g, bx0 + 0.08, bx1 - 0.08, bh, bh + 0.006, bz0 + 0.08, bz1 - 0.08, paintMat(0x2b3138, 0.95), { cast: false, pick: { type: 'bench' } });
     { const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.09, 14), glassMat(0xe8f0f4, 0.8)); jar.position.set(bx0 + 0.12, bh + 0.045, bz0 + 0.1); g.add(jar); const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.047, 0.047, 0.015, 14), paintMat(0xd23b3b, 0.5)); lid.position.set(bx0 + 0.12, bh + 0.097, bz0 + 0.1); g.add(lid); }

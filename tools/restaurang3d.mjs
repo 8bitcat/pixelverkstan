@@ -76,6 +76,8 @@ ok(await page.evaluate(() => !!PV.view3d.room.bench && !!PV.view3d.bench), 'arbe
 await page.evaluate(() => { const v = PV.view3d, b = v.room.bench; v.setPose(b.stand[0], b.stand[1], 0, -0.72); });
 await waitFrames(2);
 await shot('3-rum');
+await page.evaluate(() => PV.view3d.setPose(-1.0, 1.0, 0, -0.15)); await waitFrames(2); await shot('3b-matsal');
+await page.evaluate(() => PV.view3d.setPose(-1.0, 1.0, Math.PI, -0.15)); await waitFrames(2); await shot('3c-matsal');
 await page.evaluate(() => PV.openBuild(PV.game.orders[0]));
 await page.waitForFunction(() => document.body.dataset.screen === 'build' && PV.build.gl, null, { timeout: 20000 });
 await waitFrames(3); await page.waitForTimeout(400);

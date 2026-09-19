@@ -75,7 +75,7 @@ export default {
   optsFor: orders.optsFor,
   // texter i den generiska byggvyn och dialogerna
   text: {
-    signSale: 'MENY', signTag: 'ALLTID NYGRILLAT', resultParts: 'Mat + tillagning', resultTime: 'Tillagning', emptyUnit: 'TOMT',
+    signSale: 'MENY', signTag: 'ALLTID NYGRILLAT', benchSign: 'KÖKSBÄNK', resultParts: 'Mat + tillagning', resultTime: 'Tillagning', emptyUnit: 'TOMT',
     thing: 'burgare', things: 'burgare', place: 'köket',
     titleFor: (order, gen) => `${order.title} åt ${order.name}`,
     welcome: (name) => `Välkommen till köket! Nu bygger vi ${name}s burgare lager för lager. Följ de gula markeringarna.`,

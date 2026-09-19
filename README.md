@@ -271,7 +271,9 @@ montrar, inredning, co-op) men med ett kök i stället för en verkstad:
   och ljust trä), gourmet 2016 (tegel, betong, mörkt trä, Edison-lampor, kritmeny) och 2022
   (ljust nordiskt, digital meny). Matbord med stolar (sittbås i större lokaler) står i stället
   för stjärnmonter och soffa: kunderna sätter sig när de hämtat brickan, äter (burgaren blir
-  mindre för varje tugga) och går sedan hem.
+  mindre för varje tugga) och går sedan hem. I 3D-läget står samma bord med stolar och lampor i
+  epokens stil i rummet, köksbänken bakom disken har läskmaskin, brickor, fritös och grill,
+  montrarna är vita kylar med kallt ljus och dörren heter KÖKET.
 
 
 ```

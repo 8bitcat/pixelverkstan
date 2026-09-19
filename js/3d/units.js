@@ -89,9 +89,10 @@ export class Units {
     const W = (sl.x1 - sl.x0) * C.S, z0 = C.toZ(sl.base - LY.SLOT_DEPTH[sl.size]), z1 = C.toZ(sl.base), D = z1 - z0, H = small ? 2.0 : 1.9;
     const g = new THREE.Group();
     g.position.set(C.toX((sl.x0 + sl.x1) / 2), 0, (z0 + z1) / 2);
-    const glass = style === 'glass' || style === 'led';
-    const frame = style === 'wood' ? A.pbr('wood_table_001', { repeat: [0.5, 1], color: 0xb08a5a }) : style === 'metal' ? metalMat(0xc9ced3, 0.45) : metalMat(style === 'led' ? 0x0f1114 : 0x1b1d22, 0.3);
-    const back = style === 'wood' ? A.pbr('plywood', { repeat: [W / 2.4, H / 2.4], color: 0xd9c39a }) : style === 'metal' ? paintMat(0xdfe3e6, 0.7) : paintMat(style === 'led' ? 0x14161a : 0x23262b, 0.6);
+    const cooler = !!this.shop.floorArt;   // restaurangen: vita kylar/diskar med kallt ljus
+    const glass = style === 'glass' || style === 'led' || cooler;   // restaurangen: vita kylar/diskar med kallt ljus
+    const frame = cooler ? paintMat(0xf0f0ec, 0.5) : style === 'wood' ? A.pbr('wood_table_001', { repeat: [0.5, 1], color: 0xb08a5a }) : style === 'metal' ? metalMat(0xc9ced3, 0.45) : metalMat(style === 'led' ? 0x0f1114 : 0x1b1d22, 0.3);
+    const back = cooler ? paintMat(0xdfeefc, 0.7) : style === 'wood' ? A.pbr('plywood', { repeat: [W / 2.4, H / 2.4], color: 0xd9c39a }) : style === 'metal' ? paintMat(0xdfe3e6, 0.7) : paintMat(style === 'led' ? 0x14161a : 0x23262b, 0.6);
     const cat = this.shop.cats?.[u.cat], brand = u.brand;
     const col = brand?.color || cat?.color || '#3a78d8';
     // sockel, lågt bakstycke (glasmontrar är genomsiktliga från alla håll), stolpar, topp
@@ -101,9 +102,10 @@ export class Units {
     slab(g, -W / 2, W / 2, H - 0.05, H, -D / 2, D / 2, frame);
     // hyllplan (glas eller trä/plåt) med ljuslist under framkanten
     const ys = small ? [0.38, 0.82, 1.26, 1.66] : [0.5, 0.95, 1.4];
-    const shelfMat = glass ? glassMat(0xe8f4f8, 0.75) : style === 'wood' ? A.pbr('wood_table_001', { repeat: [1, 0.4], color: 0xc7a06a }) : paintMat(0xe8ebee, 0.5);
+    const shelfMat = cooler ? paintMat(0xf4f8ff, 0.4) : glass ? glassMat(0xe8f4f8, 0.75) : style === 'wood' ? A.pbr('wood_table_001', { repeat: [1, 0.4], color: 0xc7a06a }) : paintMat(0xe8ebee, 0.5);
     const led = ledStrip();
     if (style === 'led') led.color.set(col).multiplyScalar(1.6);
+    if (cooler) led.color.set(0xbfe6ff).multiplyScalar(1.5);
     const parts = (this.floor.partsFor ? this.floor.partsFor(u) : []).slice(0, ys.length * this.fitsPerRow(u.cat, W));
     const per = this.fitsPerRow(u.cat, W);
     ys.forEach((y, i) => {
@@ -362,15 +364,61 @@ export class Units {
   backCabinet() {
     const top = this.ctx.room?.cabinetTop;
     if (!top) return;
+    if (this.shop.floorArt) return this.kitchen(top);
     const g = new THREE.Group(); g.position.set((top.x0 + top.x1) / 2, top.y, top.z);
     const parts = this.floor.owned().filter((p) => p.cat !== 'spel' && p.cat !== 'konsol' && p.cat !== 'arkad').sort((a, b) => this.shop.hypeAt(b, this.year) - this.shop.hypeAt(a, this.year)).slice(0, 9);
     this.row(g, parts, 0, top.x1 - top.x0, { gap: 0.08, jitter: 0.12 });
     this.group.add(g);
   }
+  // restaurangens köksbänk: läskmaskin, brickor, fritös och grill på skåpen
+  kitchen(top) {
+    const g = new THREE.Group(); g.position.set(top.x0, top.y, top.z);
+    const W = top.x1 - top.x0, steel = metalMat(0xc8ced6, 0.35), dark = paintMat(0x2a2b2e, 0.5);
+    slab(g, 0, W, 0, 0.03, -0.3, 0.3, steel, { cast: false });   // rostfri skiva
+    // läskmaskin med tre kranar
+    slab(g, 0.1, 0.6, 0.03, 0.55, -0.22, 0.12, paintMat(0x9aa0aa, 0.5)); slab(g, 0.12, 0.58, 0.4, 0.52, 0.12, 0.13, paintMat(0x2c6fb7, 0.4), { cast: false });
+    [0xc92a2a, 0xf0902a, 0x4aa84a].forEach((c, i) => slab(g, 0.18 + i * 0.14, 0.22 + i * 0.14, 0.2, 0.3, 0.12, 0.2, paintMat(c, 0.4)));
+    // brickstapel
+    for (let i = 0; i < 6; i++) slab(g, 0.75, 1.15, 0.03 + i * 0.02, 0.05 + i * 0.02, -0.15, 0.15, paintMat(i % 2 ? 0xc9322a : 0xd93a30, 0.5), { cast: false });
+    // fritös med två korgar
+    if (W > 1.9) { slab(g, 1.3, 1.75, 0.03, 0.42, -0.25, 0.15, steel); for (const x of [1.36, 1.56]) { slab(g, x, x + 0.14, 0.42, 0.45, -0.2, 0.05, dark, { cast: false }); slab(g, x + 0.06, x + 0.08, 0.45, 0.62, -0.05, -0.03, dark, { cast: false }); } }
+    // grillen med två biffar
+    const gx = Math.max(1.9, W - 0.8);
+    if (W > gx + 0.6) { slab(g, gx, gx + 0.7, 0.03, 0.2, -0.28, 0.2, dark); for (const x of [gx + 0.12, gx + 0.4]) slab(g, x, x + 0.22, 0.2, 0.24, -0.15, 0.07, paintMat(0x6e3a26, 0.8)); }
+    this.group.add(g);
+  }
+  // matborden (restaurangen): bordsskiva på fot, två stolar bakom, hänglampa i epokens stil
+  tables() {
+    const look = this.shop.floorArt?.eraLook?.(this.year) || null;
+    if (!look) return;
+    const top = paintMat(look.table, 0.5), edge = paintMat(look.edge, 0.5), chair = paintMat(look.chair, 0.6), steel = metalMat(0xc8ced6, 0.35);
+    for (const t of LY.TABLES) {
+      const r = C.rect([t.x0, t.base - 16, t.x1, t.base]);
+      const g = new THREE.Group(); g.position.set(r.x, 0, r.z);
+      const w = (t.x1 - t.x0) * C.S, d = 0.62;
+      slab(g, -w / 2, w / 2, 0.72, 0.76, -d / 2, d / 2, top); slab(g, -w / 2, w / 2, 0.68, 0.72, -d / 2, d / 2, edge, { cast: false });
+      if (look.name === 'diner' || look.name === 'chain' || look.name === 'eighties') { slab(g, -0.04, 0.04, 0.02, 0.68, -0.04, 0.04, steel); slab(g, -0.22, 0.22, 0, 0.02, -0.22, 0.22, steel, { cast: false }); }
+      else for (const sx of [-1, 1]) for (const sz of [-1, 1]) slab(g, sx * (w / 2 - 0.06) - 0.02, sx * (w / 2 - 0.06) + 0.02, 0, 0.68, sz * (d / 2 - 0.06) - 0.02, sz * (d / 2 - 0.06) + 0.02, edge);
+      // ketchup och senap
+      slab(g, 0.02, 0.06, 0.76, 0.9, 0, 0.04, paintMat(0xc92a2a, 0.4), { cast: false }); slab(g, 0.08, 0.12, 0.76, 0.88, 0, 0.04, paintMat(0xe8b820, 0.4), { cast: false });
+      // stolar/bås bakom bordet (mot minus z)
+      if (t.booth) { slab(g, -w / 2 - 0.1, w / 2 + 0.1, 0, 0.45, -d / 2 - 0.5, -d / 2 - 0.05, chair); slab(g, -w / 2 - 0.1, w / 2 + 0.1, 0.45, 1.0, -d / 2 - 0.5, -d / 2 - 0.4, chair); }
+      else for (const cx of [-w / 4, w / 4]) { slab(g, cx - 0.2, cx + 0.2, 0.4, 0.46, -d / 2 - 0.42, -d / 2 - 0.05, chair); slab(g, cx - 0.2, cx + 0.2, 0.46, 0.9, -d / 2 - 0.42, -d / 2 - 0.36, chair); for (const lx of [cx - 0.16, cx + 0.16]) for (const lz of [-d / 2 - 0.38, -d / 2 - 0.09]) slab(g, lx - 0.015, lx + 0.015, 0, 0.4, lz - 0.015, lz + 0.015, steel, { cast: false }); }
+      // hänglampa
+      const lampY = 1.75;
+      slab(g, -0.005, 0.005, lampY + 0.2, C.ROOM.H, -0.005, 0.005, paintMat(0x2a2a30, 0.5), { cast: false });
+      const cone = look.lamp !== 'edison';
+      const shade = cone ? new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.14, 16, 1, true), paintMat(look.lamp === 'orange' ? 0xf08a2a : look.lamp === 'globe' ? 0xf4f1ea : 0xf4ecd0, 0.5)) : new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffc860 }));
+      shade.position.y = lampY + 0.12; if (cone) shade.rotation.x = Math.PI; g.add(shade);
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfff4d0 })); bulb.position.y = lampY + 0.05; g.add(bulb);
+      this.group.add(g);
+    }
+  }
   rebuild() {
     this.clear();
     this.boxCount = 0;
     this.backCabinet();
+    this.tables();
     for (const u of this.floor.unitList || []) {
       if (u.empty) this.empty(u);
       else if (u.unit === 'tv') this.tvCorner(u);
