@@ -22,7 +22,7 @@ export class Serving {
   get customer() { const o = this.view.order, g = this.view.game; return g?.customers?.find((c) => c.id === o?.customerId) || null; }
 
   enter() {
-    this.run = null; this.t = 0; this.dirty = true; this.plateT = 0;
+    this.run = null; this.t = 0; this.dirty = true; this.plateT = 0; this.finished = false;   // samma final-instans används för nästa beställning
     this.d.success = false;
     const v = this.view;
     this.face = portrait(this.customer?.look || SHOPKEEPER, '#f4f1ea');
