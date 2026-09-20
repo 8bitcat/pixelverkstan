@@ -97,6 +97,19 @@ const projZ = await page.evaluate(() => { const v = PV.build, r = v.canvas.getBo
 ok(projZ < 1.5, `zoomad kamera matchar (${projZ} px)`);
 await shot('3-zoom');
 await page.evaluate(() => PV.build.zoomFit());
+// snurra kameran runt bygget: yaw inom gränserna, projektionen följer kameran, ⟲/⟳-knapparna syns i 3D
+const orb = await page.evaluate(async () => {
+  const v = PV.build; v.orbit(0.5, 0.1); v.orbit(5, 0);   // andra anropet ska klippas vid gränsen
+  await new Promise((r) => setTimeout(r, 50));
+  const r = v.canvas.getBoundingClientRect(), [x, y] = v.P.proj(13, 12, 1), [sx, sy] = v.gl.screenOf(13, 12, 1);
+  const rot = document.querySelector('#zoom-ctl [data-z="rotl"]');
+  return { yaw: +v.gl.orbit.yaw.toFixed(3), pitch: +v.gl.orbit.pitch.toFixed(3), d: +Math.hypot(r.left + x - sx, r.top + y - sy).toFixed(2), btn: !!rot && getComputedStyle(rot).display !== 'none' };
+});
+ok(orb.yaw > 1.5 && orb.yaw < 1.8 && orb.pitch === 0.1 && orb.d < 1.5 && orb.btn, `kameran snurrar runt bygget inom gränserna: ${JSON.stringify(orb)}`);
+await waitFrames(2); await page.waitForTimeout(200);
+await shot('3b-orbit');
+await page.evaluate(() => PV.build.zoomFit());
+ok(await page.evaluate(() => PV.build.gl.orbit.yaw === 0), 'Passa in återställer vridningen');
 // finalen: datorn på skrivbordet – på bänken i 3D (tvingas fram utan att bygget är klart)
 await page.evaluate(() => { const v = PV.build; v.op({ t: 'phase', v: 'desk' }); v.selected = null; v.msg = null; v.finale.enter(); v.refresh(); });
 await waitFrames(3); await page.waitForTimeout(400);

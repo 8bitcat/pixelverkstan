@@ -342,7 +342,7 @@ function openBuild(order) {
     const me = floor.localPlayer();
     if (me) { me.path = []; me.act = null; me.x = WALK_SPOTS.workshop[0]; me.y = WALK_SPOTS.workshop[1]; me.away = 'workshop'; me.orderId = o.id; }
     act('touchOrder', { orderId: o.id });   // teknikern släpper bygget till spelaren
-    if (is3d()) view3d.enterBench(build);    // i 3D byggs datorn på arbetsbänken bakom disken
+    if (is3d()) { view3d.enterBench(build); UI.toast('🔄 Dra i bilden (eller ⟲ ⟳) för att snurra kameran runt bygget.', ''); }    // i 3D byggs datorn på arbetsbänken bakom disken
     show('build');
     build.open(o);
   };

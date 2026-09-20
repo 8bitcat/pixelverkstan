@@ -12,7 +12,8 @@ import * as THREE from 'three';
 export const U = 0.0175;                       // meter per byggenhet (chassit 26 enheter ≈ 45 cm)
 export const U_DESK = 0.046;                   // meter per skrivbordsenhet (skrivbordet 32 enheter ≈ 1,5 m)
 const ELEV = Math.PI / 6;                      // 30° – samma lutning som 2D-vyns (u+v)/2
-const FOV = 32;                                // perspektiv, men måttligt så att bänken inte förvrängs
+const FOV = 32;
+const ORBIT = { yaw: Math.PI * 0.55, pitchUp: 0.6, pitchDown: 0.35, elevMin: 0.12, elevMax: 1.25 };   // så långt får spelaren snurra kameran runt bygget                                // perspektiv, men måttligt så att bänken inte förvrängs
 const PPU = 32;                                // texturpixlar per enhet (max)
 const MAX_FACE = 560 * 560;                    // pixlar per sida (stora ytor får lägre upplösning)
 const ATLAS_W = 2048;
@@ -78,6 +79,7 @@ export class Bench3D {
     this.group.visible = false;
     view3d.scene.add(this.group);
     this.camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 30);
+    this.orbit = { yaw: 0, pitch: 0 };            // spelarens vridning av kameran runt bygget (radianer), inom ORBIT-gränserna
     this.camSig = ''; this._v = new THREE.Vector3();
     this.dirWorld = DIR_LOCAL.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.group.rotation.y).normalize();
     this.rec = new Recorder();
@@ -172,7 +174,7 @@ export class Bench3D {
     const W = Math.max(2, cv.clientWidth), H = Math.max(2, cv.clientHeight);
     const r = board.getBoundingClientRect();
     const rear = !!(this.desk?.showRear && this.desk.rearFace);
-    const sig = [P.k, P.ox, P.oy, W, H, r.left, r.top, this.group.position.x, this.group.position.z, this.U, rear ? 1 : 0].map((n) => Math.round(n * 1000)).join(',');
+    const sig = [P.k, P.ox, P.oy, W, H, r.left, r.top, this.group.position.x, this.group.position.z, this.U, rear ? 1 : 0, this.orbit.yaw, this.orbit.pitch].map((n) => Math.round(n * 1000)).join(',');
     if (!force && sig === this.camSig) return;
     this.camSig = sig;
     const cam = this.camera;
@@ -182,7 +184,7 @@ export class Bench3D {
       const mid = new THREE.Vector3((A[0] + B[0] + D[0] + (B[0] + D[0] - A[0])) / 4, (A[2] + D[2]) / 2, (A[1] + B[1]) / 2);
       const target = this.group.localToWorld(mid.clone());
       const faceH = (A[2] - D[2]) * this.U, dist = Math.max(0.4, faceH / 0.62 / (2 * Math.tan(FOV * Math.PI / 360)));
-      const dir = new THREE.Vector3(-1, 0.42, 0.3).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.rotY);
+      const dir = this.orbited(new THREE.Vector3(-1, 0.42, 0.3).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.rotY));
       cam.position.copy(target).addScaledVector(dir, dist);
       cam.up.set(0, 1, 0); cam.lookAt(target);
       cam.aspect = W / H; cam.near = 0.05; cam.far = dist + 16;
@@ -195,12 +197,27 @@ export class Bench3D {
     const target = this.group.localToWorld(new THREE.Vector3(u, this.desk ? 6 : 0, v));
     const pxPerM = P.k * Math.SQRT2 / this.U;
     const dist = Math.max(0.6, H / (2 * Math.tan(FOV * Math.PI / 360) * pxPerM));
-    cam.position.copy(target).addScaledVector(this.dirWorld, dist);
+    cam.position.copy(target).addScaledVector(this.orbited(this.dirWorld), dist);
     cam.up.set(0, 1, 0); cam.lookAt(target);
     cam.aspect = W / H; cam.near = Math.max(0.05, dist - 1.2); cam.far = dist + 16;
     cam.updateProjectionMatrix();
     cam.updateMatrixWorld();
   }
+  // kamerariktningen vriden med spelarens yaw (runt lodlinjen) och pitch (upp/ner), begränsat så man
+  // bara går runt bygget – inte under bänken eller bakom väggen
+  orbited(dir) {
+    const d = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.orbit.yaw);
+    const side = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), d).normalize();
+    const elev = Math.asin(Math.max(-1, Math.min(1, d.y)));
+    const pitch = Math.max(ORBIT.elevMin - elev, Math.min(ORBIT.elevMax - elev, this.orbit.pitch));
+    return d.applyAxisAngle(side, -pitch).normalize();
+  }
+  orbitBy(dYaw, dPitch) {
+    this.orbit.yaw = Math.max(-ORBIT.yaw, Math.min(ORBIT.yaw, this.orbit.yaw + dYaw));
+    this.orbit.pitch = Math.max(-ORBIT.pitchDown, Math.min(ORBIT.pitchUp, this.orbit.pitch + dPitch));
+    this.updateCamera(true);
+  }
+  resetOrbit() { this.orbit.yaw = 0; this.orbit.pitch = 0; this.updateCamera(true); }
   update(dt) { this.updateCamera(); }
   // scenens (u, v, z) → css-px på #board (byggvyns P.proj / finalens proj i 3D-läget)
   project(u, v, z = 0) {

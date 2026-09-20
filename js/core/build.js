@@ -522,7 +522,8 @@ export class BuildView {
     this.renderDue = this.t + 0.15;
   }
   zoomBy(f) { this.zoomAt([this.cw / 2, this.ch / 2], f); }
-  zoomFit() { this.userCam = false; this.cam = { ...this.fit }; this.applyCam(); this.renderDue = this.t; }
+  zoomFit() { this.userCam = false; this.cam = { ...this.fit }; this.applyCam(); this.renderDue = this.t; this.gl?.resetOrbit?.(); }
+  orbit(dYaw, dPitch = 0) { this.gl?.orbitBy?.(dYaw, dPitch); }
   clampCam() {
     // håll chassits mitt inom skärmen
     const [mx, my] = this.P.proj.call({ ...this.P, k: this.cam.zoom, hz: this.cam.zoom * this.hzRatio, ox: this.cam.x, oy: this.cam.y }, 13, 12, 0);
@@ -560,6 +561,12 @@ export class BuildView {
     box.querySelector('[data-z="in"]').onclick = () => this.zoomBy(1.6);
     box.querySelector('[data-z="out"]').onclick = () => this.zoomBy(1 / 1.6);
     box.querySelector('[data-z="fit"]').onclick = () => this.zoomFit();
+    // i 3D: snurra kameran runt bygget (visas bara i bänkläget, css body.bench3d)
+    for (const [key, title, dy] of [['rotl', 'Snurra åt vänster', 0.35], ['rotr', 'Snurra åt höger', -0.35], ['up', 'Titta mer uppifrån', 0], ['down', 'Titta mer framifrån', 0]]) {
+      const b = document.createElement('button'); b.className = 'btn btn-small rot'; b.dataset.z = key; b.title = title; b.textContent = key === 'rotl' ? '⟲' : key === 'rotr' ? '⟳' : key === 'up' ? '⤒' : '⤓';
+      b.onclick = () => (key === 'up' ? this.orbit(0, 0.2) : key === 'down' ? this.orbit(0, -0.2) : this.orbit(dy));
+      box.append(b);
+    }
     stage.append(box);
   }
 
@@ -673,6 +680,7 @@ export class BuildView {
     }
     if (!this.gesture.moved && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < 7) return;
     this.gesture.moved = true;
+    if (this.gl) { this.gl.orbitBy(-dx * 0.006, dy * 0.005); this.canvas.style.cursor = 'grabbing'; return; }
     this.cam.x += dx; this.cam.y += dy; this.userCam = true;
     this.clampCam(); this.applyCam();
     this.renderDue = this.t + 0.15;

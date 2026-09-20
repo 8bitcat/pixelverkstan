@@ -224,7 +224,10 @@ valet sparas (`pixelverkstan_3d`). 2D-läget finns kvar orört.
   skärmen, chassits sidofönster och **datorns baksida** är levande texturer på chassit, sladdarna
   3D-rör som ligger på bordet. Knappen **🔌 Baksidan** (eller att man tar en kontakt som hör
   dit) flyttar kameran bakom datorn, där uttagen träffas via projektion; en gul ring och texten
-  "börja här" visar var man börjar. Efter bygget står du kvar vid bänken.
+  "börja här" visar var man börjar. Efter bygget står du kvar vid bänken. **Dra i bilden**
+  (eller ⟲ ⟳ ⤒ ⤓ bredvid zoomen) så snurrar kameran runt bygget inom ett fast intervall –
+  ±100° i sidled och 7–70° elevation – så att man ser datorns front och sidor; Passa in
+  återställer vinkeln. Nyp/＋/－ zoomar som förut.
 - **Tillgångar:** `assets/3d/` (modeller, texturer, HDRI, Xbot), hämtade med
   `python tools/ph-fetch.py`; licenser i `assets/3d/LICENSES.md`.
 
