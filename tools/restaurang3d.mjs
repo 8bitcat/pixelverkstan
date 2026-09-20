@@ -117,7 +117,7 @@ await page.evaluate(() => { const f = PV.build.finale; f.onPointerDown([f.serveB
 try { await page.waitForFunction(() => PV.game.orders.length === 0 || PV.build.finale.run?.done, null, { timeout: 180000 }); } /* SwiftShader ritar långsamt – animationen tar realtid */ catch (e) { const dbg = await page.evaluate(() => { const f = PV.build.finale; return { run: f.run && { t: f.run.t, done: f.run.done }, btn: f.serveBtn, success: f.d.success, phase: PV.build.phase, cw: PV.build.cw, help: PV.build.b.help, screen: document.body.dataset.screen, t: f.t }; }); ok(false, 'servering i 3D blev inte klar: ' + JSON.stringify(dbg)); }
 await page.waitForTimeout(300);
 await shot('8-omdome3d');
-await page.waitForFunction(() => document.body.dataset.screen === 'shop', null, { timeout: 60000 }); await page.waitForTimeout(600);
+await page.waitForFunction(() => document.body.dataset.screen === 'shop', null, { timeout: 240000 }); await page.waitForTimeout(600);   /* SwiftShader: tallriken glider i realtid */
 const after = await page.evaluate(() => ({ screen: document.body.dataset.screen, mode: PV.view3d.mode, kitchen: !!PV.view3d.kitchen, modal: document.querySelector('#modal h2')?.textContent, gl: !!PV.build.gl }));
 ok(after.screen === 'shop' && after.mode === 'walk' && !after.gl && !after.kitchen && /disken|nöjd/i.test(after.modal || ''), `tillbaka i restaurangen efter servering: ${JSON.stringify(after)}`);
 await page.evaluate(() => { const b = [...document.querySelectorAll('#modal .btn')].find((x) => /butiken|ok|stäng|klar/i.test(x.textContent)); b?.click(); });
