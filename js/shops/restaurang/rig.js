@@ -3,7 +3,7 @@
 // läggs i fickan och drycken på brickan. Samma API som datorbutikens rigg (core/build.js
 // pratar bara med riggen), men utan kablar och uttag.
 import { DB, layerHeight, bunTopHeight, burgerRadius, BURGER_CATS, CATS } from './menu.js';
-import { drawTray, drawToaster, drawGrill, drawLayer, drawSide, drawFryer, drawDrinkTower } from './art.js';
+import { drawPlate, drawPass, drawToaster, drawGrill, drawLayer, drawSide, drawFryer, drawDrinkTower } from './art.js';
 import { eraLook } from './era.js';
 
 export const VIEW = { w: 872, h: 504, k: 16, hz: 13, ox: 400, oy: 80 };
@@ -12,7 +12,9 @@ export const CONN = {};
 export const connectorIcon = (conn, W = 40, H = 30) => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c; };
 
 // var sakerna står (enheter): brödrost och grill till vänster, brickan till höger
-export const K = { toaster: [0.5, 1], grill: [0.5, 8.5], fryer: [0.5, 15], tower: [24, 17], tray: [7, 0.5, 29, 15.5], burger: [13, 8], basket: [22, 5], cup: [22, 12], dessert: [26.5, 9.5] };
+export const K = { toaster: [0.5, 1], grill: [0.5, 8.5], fryer: [-4.5, 15], tower: [24, 17], plate: [13, 8, 8, 5.8], pass: [3, 17, 23, 21.5], burger: [13, 8], basket: [19.5, 3.5], cup: [24.5, 11.5], dessert: [26.5, 6.5] };
+// vid servering glider tallriken (med allt på) från arbetsytan till luckan
+export const SLIDE_DV = (K.pass[1] + K.pass[3]) / 2 - K.plate[1];
 // tillbehör som friteras och drycker som tappas upp ur maskinen (flaskor och burkar tas ur kylen under)
 export const isFried = (p) => ['fries', 'nuggets', 'ringbasket'].includes(p?.look?.shape);
 export const isPoured = (p) => p?.look?.shape === 'cup' && !p.look.bottle && !p.look.can && !p.look.box;
@@ -139,12 +141,13 @@ function makeRig(order) {
   function drawScene(R, b, anim = {}) {
     rig.lastB = b;
     const ids = Object.fromEntries(S.map((s) => [s.id, s.n]));
-    drawTray(R, K.tray[0], K.tray[2], K.tray[1], K.tray[3], 0);
+    const era = eraLook(order.year || 1990), dv = (anim.plateT || 0) * SLIDE_DV;
+    drawPass(R, K.pass[0], K.pass[2], K.pass[1], K.pass[3], era, 0);
+    drawPlate(R, K.plate[0], K.plate[1] + dv, K.plate[2], K.plate[3], era, 0);
     drawToaster(R, K.toaster[0], K.toaster[1], 0, actDone(b, 'rosta') && !b.placed.l0);
     const fb = firstBiff ? S.find((s) => s.cat === 'biff') : null;
     const pattyPart = fb ? (b.placed[fb.id] || fb.part || DB.parts.find((p) => p.cat === 'biff')) : null;
     drawGrill(R, K.grill[0], K.grill[1], 0, pattyPart, fb && !b.placed[fb.id] ? actCount(b, 'grill') : 0);
-    const era = eraLook(order.year || 1990);
     drawFryer(R, K.fryer[0], K.fryer[1], 0, era, b.placed.pommes ? 0 : actCount(b, 'fritera'), fried);
     drawDrinkTower(R, K.tower[0], K.tower[1], 0, era, poured && actDone(b, 'tappa') && !b.placed.dryck, drinkPart);
     // burgaren
@@ -153,13 +156,13 @@ function makeRig(order) {
       if (s.k === undefined) continue;
       const p = b.placed[s.id];
       if (!p) break;
-      drawLayer(R, p, { id: ids[s.id], at: [cu, cv, z], r, top: s.top, bottom: s.k === 0 });
+      drawLayer(R, p, { id: ids[s.id], at: [cu, cv + dv, z], r, top: s.top, bottom: s.k === 0 });
       z += s.top ? bunTopHeight(p) : layerHeight(p);
     }
     // tillbehör och dryck
-    if (SLOT.pommes) { const p = b.placed.pommes; if (p) drawSide(R, p, { id: ids.pommes, at: [K.basket[0], K.basket[1], 0] }); else R.box(K.basket[0] - 2.3, K.basket[0] + 2.3, K.basket[1] - 1.5, K.basket[1] + 1.5, 0, 0.02, (f, x, y, W, H) => (Math.min(x, W - x, y, H - y) < 0.15 ? 0xd0c4b0 : -1), ids.pommes, { noEdges: true }); }
-    if (SLOT.dryck) { const p = b.placed.dryck; if (p) drawSide(R, p, { id: ids.dryck, at: [K.cup[0], K.cup[1], 0] }); else R.box(K.cup[0] - 1.6, K.cup[0] + 1.6, K.cup[1] - 1.6, K.cup[1] + 1.6, 0, 0.02, (f, x, y, W, H) => { const d = Math.hypot(x - W / 2, y - H / 2) / (W / 2); return d < 1 && d > 0.85 ? 0xd0c4b0 : -1; }, ids.dryck, { noEdges: true }); }
-    if (SLOT.dessert) { const p = b.placed.dessert; if (p) drawSide(R, p, { id: ids.dessert, at: [K.dessert[0], K.dessert[1], 0] }); else R.box(K.dessert[0] - 2.0, K.dessert[0] + 2.0, K.dessert[1] - 1.8, K.dessert[1] + 1.8, 0, 0.02, (f, x, y, W, H) => (Math.min(x, W - x, y, H - y) < 0.15 ? 0xd0c4b0 : -1), ids.dessert, { noEdges: true }); }
+    if (SLOT.pommes) { const p = b.placed.pommes; if (p) drawSide(R, p, { id: ids.pommes, at: [K.basket[0], K.basket[1] + dv, 0] }); else R.box(K.basket[0] - 2.3, K.basket[0] + 2.3, K.basket[1] - 1.5, K.basket[1] + 1.5, 0, 0.02, (f, x, y, W, H) => (Math.min(x, W - x, y, H - y) < 0.15 ? 0xd0c4b0 : -1), ids.pommes, { noEdges: true }); }
+    if (SLOT.dryck) { const p = b.placed.dryck; if (p) drawSide(R, p, { id: ids.dryck, at: [K.cup[0], K.cup[1] + dv, 0] }); else R.box(K.cup[0] - 1.6, K.cup[0] + 1.6, K.cup[1] - 1.6, K.cup[1] + 1.6, 0, 0.02, (f, x, y, W, H) => { const d = Math.hypot(x - W / 2, y - H / 2) / (W / 2); return d < 1 && d > 0.85 ? 0xd0c4b0 : -1; }, ids.dryck, { noEdges: true }); }
+    if (SLOT.dessert) { const p = b.placed.dessert; if (p) drawSide(R, p, { id: ids.dessert, at: [K.dessert[0], K.dessert[1] + dv, 0] }); else R.box(K.dessert[0] - 2.0, K.dessert[0] + 2.0, K.dessert[1] - 1.8, K.dessert[1] + 1.8, 0, 0.02, (f, x, y, W, H) => (Math.min(x, W - x, y, H - y) < 0.15 ? 0xd0c4b0 : -1), ids.dessert, { noEdges: true }); }
   }
   const drawCables = (ctx) => ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 

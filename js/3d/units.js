@@ -414,6 +414,27 @@ export class Units {
       this.group.add(g);
     }
   }
+  // tallrikar med burgare: vid luckan (kunder som hämtar) och på borden (kunder som äter)
+  plates(list) {
+    const sig = list.map((p) => p.key + ':' + p.stage).join('|');
+    if (sig === this.plateSig) return;
+    this.plateSig = sig;
+    if (!this.plateGroup) { this.plateGroup = new THREE.Group(); this.scene.add(this.plateGroup); }
+    for (const m of [...this.plateGroup.children]) { this.plateGroup.remove(m); m.traverse((o) => o.geometry?.dispose()); }
+    const white = paintMat(0xf6f3ec, 0.4), bun = paintMat(0xd9a55d, 0.7), patty = paintMat(0x6e3a26, 0.8), cup = paintMat(0xf4f1ea, 0.5);
+    for (const p of list) {
+      const g = new THREE.Group(); g.position.set(p.x, p.y, p.z);
+      const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.012, 20), white); plate.position.y = 0.006; plate.castShadow = true; g.add(plate);
+      if (p.stage < 0.9) {
+        const s = p.stage < 0.3 ? 1 : p.stage < 0.6 ? 0.7 : 0.45;
+        const b1 = new THREE.Mesh(new THREE.CylinderGeometry(0.055 * s, 0.055 * s, 0.014, 14), bun); b1.position.set(-0.03, 0.02, 0); g.add(b1);
+        const pt = new THREE.Mesh(new THREE.CylinderGeometry(0.058 * s, 0.058 * s, 0.014, 14), patty); pt.position.set(-0.03, 0.034, 0); g.add(pt);
+        const b2 = new THREE.Mesh(new THREE.SphereGeometry(0.058 * s, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), bun); b2.scale.y = 0.6; b2.position.set(-0.03, 0.041, 0); g.add(b2);
+      }
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.025, 0.09, 12), cup); c.position.set(0.11, 0.045, 0.06); g.add(c);
+      this.plateGroup.add(g);
+    }
+  }
   rebuild() {
     this.clear();
     this.boxCount = 0;

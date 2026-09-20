@@ -264,9 +264,12 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   grillen, fritösen, dryckesmaskinen och brickan, gå runt med W A S D. Lådan med råvaror och
   checklistan ligger ovanpå bilden (`shop.kitchen3d`, `view3d.enterKitchen`, bänken med
   `free`-kamera).
-- **Servering** (`serve.js`): kunden vid luckan smakar, betyg beror på tid och kladd,
-  betalar när brickan hämtas. Fungerar i 3D på arbetsbänken (brickan, grillen och
-  brödrosten voxlas som datorbygget).
+- **Servering** (`serve.js`): burgaren byggs på en tallrik; med 🍽️ Ställ på disken glider
+  tallriken (med pommes, dryck och efterrätt) bort till luckan med värmelamporna. Kunden
+  hämtar den där, säger sitt omdöme (beror på tid och kladd) och betalar, bär tallriken till
+  ett bord, sätter sig och äter: burgaren lyfts mot munnen vid varje tugga, käkarna går, och
+  burgaren blir mindre tills bara smulor och servetten är kvar. I 3D sjunker gästen ner på
+  stolen och tuggar, tallrikar står vid luckan och på borden.
 - **Inredning** (`upgrades.js`): läskkyl och dessertdisk som montrar, jukebox, godishylla,
   såsbar, lekhörna, kaffemaskin; lokaler Gatuköket → Megaburger; dubbelgrill, fritös,
   milkshakemaskin, menytavla; kylrum 2–4 för dyrare kött.

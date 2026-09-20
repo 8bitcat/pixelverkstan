@@ -485,3 +485,20 @@ export function drawDrinkTower(R, u0, v0, id, era, filled = false, drink = null)
   for (let i = 0; i < 3; i++) R.box(u0 + 0.55 + i * 1.35, u0 + 0.95 + i * 1.35, v0 + 1.6, v0 + 2.2, 2.0, 2.3, () => 0x2a2d36, id, { noEdges: true });
   if (filled && drink) drawCup(R, drink, u0 + 2.1, v0 + 3.2, 0.35, id);
 }
+
+// ---------- Tallriken och luckan ----------
+// oval tallrik: vit med en rand i epokens färg och en lätt upphöjd kant
+export function drawPlate(R, cu, cv, rx, ry, era, id = 0) {
+  const trim = era?.trim ?? 0xc92a2a, white = 0xf6f3ec;
+  disc(R, cu, cv, -0.3, 0, rx, (f, x, y, W, Hh, d) => (f === 'top' ? (d > 0.96 ? shade(white, 0.85) : d > 0.86 ? trim : d > 0.8 ? shade(white, 0.92) : hash(x * 2 | 0, y * 2 | 0) > 0.94 ? shade(white, 0.96) : white) : shade(white, 0.8)), id, { ry });
+}
+// luckan/serveringsdisken: rostfri hylla med värmelampor där färdiga tallrikar ställs
+export function drawPass(R, u0, u1, v0, v1, era, id = 0) {
+  const steel = era?.steel ?? 0xc8ced6, trim = era?.trim ?? 0xc92a2a;
+  R.box(u0, u1, v0, v1, -0.4, 0, (f, x, y, W, Hh) => (f === 'top' ? (Math.min(x, W - x, y, Hh - y) < 0.2 ? shade(steel, 0.8) : hash(x * 2 | 0, y * 2 | 0) > 0.95 ? shade(steel, 1.08) : steel) : shade(steel, 0.85)), id, { noEdges: true });
+  // stolpar och lampbåge med tre värmelampor
+  for (const u of [u0 + 0.3, u1 - 0.7]) R.box(u, u + 0.4, v1 - 0.6, v1 - 0.2, 0, 5.2, () => 0x3a3d44, id, { noEdges: true });
+  R.box(u0 + 0.3, u1 - 0.3, v1 - 0.9, v1 - 0.1, 5.2, 5.7, (f, x, y, W, Hh) => (f === 'top' ? trim : shade(trim, 0.8)), id, { noEdges: true });
+  const n = 3, span = (u1 - u0 - 2) / (n - 1);
+  for (let i = 0; i < n; i++) { const u = u0 + 1 + i * span; R.box(u - 0.5, u + 0.5, v1 - 0.9, v1 - 0.1, 4.4, 5.2, (f) => (f === 'top' ? 0x2a2d36 : 0xffb347), id, { noEdges: true }); R.box(u - 0.3, u + 0.3, v1 - 0.8, v1 - 0.2, 4.2, 4.4, () => 0xfff0c0, id, { noEdges: true, alpha: 0.8 }); }
+}

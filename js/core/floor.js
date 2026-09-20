@@ -319,7 +319,7 @@ export class Floor {
     if (T.dir) c.dir = T.dir;
     c._sit = !!T.sit;
     if (T.sit && c._spot >= 0) c._seat = LY.SPOTS[c._spot];
-    if (c.phase === 'eating' && T.sit) { c._eatT = (c._eatT ?? 10) - dt; if (c._eatT <= 0) { c.phase = 'leaving'; c._spot = null; c._sit = false; } }
+    if (c.phase === 'eating' && T.sit) { c._carry = false; c._eatT = (c._eatT ?? 10) - dt; if (c._eatT <= 0) { c.phase = 'leaving'; c._spot = null; c._sit = false; } }
     if (c.phase === 'arriving' && T.key.startsWith('q')) c.phase = 'queue';
     if (c.phase === 'ready' && T.key === 'p0') {
       if (c.payout) {
@@ -328,7 +328,8 @@ export class Floor {
         g.pay(p, c);
       }
       // restaurangen: sätt dig och ät om det finns en ledig stol
-      if (g.shop.dineIn) { const seat = this.pickSeat(c); if (seat >= 0) { c._spot = seat; c._eatMax = c._eatT = 14 + Math.random() * 10; c.phase = 'eating'; c.mood = c.mood === 'angry' ? c.mood : 'happy'; c.bubbleT = 2; return; } }
+      if (c.sayPickup) { c.say = c.sayPickup; c.sayPickup = null; c.bubbleT = 3.5; }
+      if (g.shop.dineIn) { const seat = this.pickSeat(c); if (seat >= 0) { c._spot = seat; c._eatMax = c._eatT = 14 + Math.random() * 10; c.phase = 'eating'; c._carry = true; c.mood = c.mood === 'angry' ? c.mood : 'happy'; c.bubbleT = 3.5; return; } }
       c.phase = 'leaving'; c.mood = c.mood === 'angry' ? c.mood : 'happy'; c.bubbleT = 3;
     }
     if (c.phase === 'leaving' && T.out && c.y < LY.WALL_Y) {
@@ -546,12 +547,17 @@ export class Floor {
     }
     for (const c of g.customers) {
       if (c.y < LY.WALL_Y) continue;
-      if (c.phase === 'eating' && c._sit && c._spot >= 0 && LY.SPOTS[c._spot]?.plate && this.art?.eatSprite) {
+      const eating = c.phase === 'eating' && c._sit && c._spot >= 0 && LY.SPOTS[c._spot]?.plate;
+      const chew = eating ? this.art?.eatPhase?.(t, c.id) : null;   // { bite, munch } – tuggor och käkrörelser
+      if (eating && this.art?.eatSprite) {
         const [px, py] = LY.SPOTS[c._spot].plate, stage = c._eatMax ? Math.max(0, Math.min(1, 1 - c._eatT / c._eatMax)) : (c._eat || 0) / 100;
-        S.push([c.y + 3, () => this.art.eatSprite(ctx, px, py, stage, c.id)]);
+        S.push([c.y + 3, () => this.art.eatSprite(ctx, px, py, stage, c.id, t, chew)]);
       }
+      // bär tallriken från luckan till bordet
+      if (c._carry && !c._sit && this.art?.carrySprite) S.push([c.y + 1, () => this.art.carrySprite(ctx, c.x, c.y, c.dir, c.id)]);
       const frame = c.moving ? WALK_SEQ[Math.floor(c.walk) % 4] : c._sit ? 5 : (Math.sin(t * 1.9 + c.id * 1.7) > 0.72 ? 4 : 0);
-      S.push([c._sit ? c.y + 2 : c.y, () => drawPerson(ctx, c.x, c.y, c.look, c._sit ? 'down' : c.dir, frame)]);
+      const bob = chew?.munch ? 1 : 0;
+      S.push([c._sit ? c.y + 2 : c.y, () => drawPerson(ctx, c.x, c.y - bob, c.look, c._sit ? 'down' : c.dir, frame)]);
     }
     S.sort((a, b) => a[0] - b[0]);
     for (const s of S) s[1]();
@@ -1182,7 +1188,7 @@ export class Floor {
       ctx.fillStyle = Math.floor(t * 2) % 2 ? '#7ee8fa' : '#45b964'; ctx.fillRect(bx + 4, by + 4, 7, 3);
     }
     // "Datahörnan då!" – arga kunder som går över gatan
-    if (c.say && c.bubbleT > 0 && c.phase === 'leaving') {
+    if (c.say && c.bubbleT > 0 && (c.phase === 'leaving' || c.phase === 'eating' || c._carry)) {
       const label = c.say.toUpperCase().slice(0, 12) + '!', w = textW(SMALL, label) + 6, bx = x - Math.round(w / 2), by = head - 20;
       ctx.fillStyle = INK; ctx.fillRect(bx - 1, by - 1, w + 2, 10); ctx.fillRect(x - 1, by + 9, 3, 2);
       ctx.fillStyle = '#ffffff'; ctx.fillRect(bx, by, w, 8); ctx.fillRect(x, by + 8, 1, 2);

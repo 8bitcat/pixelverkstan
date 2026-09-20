@@ -180,9 +180,9 @@ export function counterItems(P, C, year, items = {}) {
 // bricka som väntar på att hämtas vid luckan (ritas på canvas, inte Pix)
 export function readyItem(ctx, i, bx, by) {
   const P = { rect: (x, y, w, h, c) => { ctx.fillStyle = css(c); ctx.fillRect(x, y, w, h); }, hl: (x, y, w, c) => { ctx.fillStyle = css(c); ctx.fillRect(x, y, w, 1); }, vl: (x, y, h, c) => { ctx.fillStyle = css(c); ctx.fillRect(x, y, 1, h); }, px: (x, y, c) => { ctx.fillStyle = css(c); ctx.fillRect(x, y, 1, 1); } };
-  ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(bx - 1, by + 22, 22, 2);
-  traySprite(P, bx - 1, by + 19, 22);
-  burgerSprite(P, bx, by + 10, i % 2 === 0); cupSprite(P, bx + 13, by + 6, i % 3 === 1 ? 0xf2c8d8 : 0xf4f1ea, 0xc92a2a);
+  ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(bx - 1, by + 23, 22, 2);
+  plateRows(P, bx - 2, by + 15, 22);
+  burgerSprite(P, bx, by + 8, i % 2 === 0); cupSprite(P, bx + 13, by + 5, i % 3 === 1 ? 0xf2c8d8 : 0xf4f1ea, 0xc92a2a);
 }
 
 // ---------- Montrar: läskkyl och dessertdisk (innehållet ritas av floor.js via frame.grid) ----------
@@ -340,17 +340,40 @@ export function makeTable(t, year, style = 'glass', items = {}) {
   return [chairs, { img: P.flush(), x: t.x0 - 4, y: t.base - 76, sort: t.base }];
 }
 
-// brickan på bordet framför den som äter: burgaren blir mindre för varje tugga, muggen står kvar
-export function eatSprite(ctx, x, y, stage, seed = 0) {
+// tallrik (oval, vit med kant) ritad med rektangelrader – på canvas (ctx) eller Pix (P)
+function plateRows(P, x, y, w) {
+  const h = Math.max(4, Math.round(w * 0.38)), rows = [];
+  for (let j = 0; j < h; j++) { const t = (j + 0.5) / h * 2 - 1, half = Math.round(w / 2 * Math.sqrt(Math.max(0, 1 - t * t))); rows.push([x + Math.round(w / 2) - half, y + j, half * 2]); }
+  for (const [rx, ry, rw] of rows) P.hl(rx, ry + 1, rw, 0xc8c4bc);   // skugga/kant under
+  for (const [rx, ry, rw] of rows) P.hl(rx, ry, rw, 0xf6f3ec);
+  P.hl(rows[0][0], rows[0][1], rows[0][2], 0xffffff);
+}
+// när i tuggcykeln gästen är: bite = burgaren lyfts mot munnen, munch = käkarna går
+export function eatPhase(t, seed = 0) {
+  const k = (t * 0.9 + seed * 0.37) % 3.2;
+  return { bite: k < 0.6, munch: k >= 0.6 && k < 1.7 && Math.floor(t * 6) % 2 === 0 };
+}
+// tallriken på bordet framför den som äter: burgaren blir mindre för varje tugga, lyfts mot munnen
+// när gästen tar en tugga, muggen står kvar
+export function eatSprite(ctx, x, y, stage, seed = 0, t = 0, chew = null) {
   const P = { rect: (a, b, w, h, c) => { ctx.fillStyle = css(c); ctx.fillRect(a, b, w, h); }, hl: (a, b, w, c) => { ctx.fillStyle = css(c); ctx.fillRect(a, b, w, 1); }, vl: (a, b, h, c) => { ctx.fillStyle = css(c); ctx.fillRect(a, b, 1, h); }, px: (a, b, c) => { ctx.fillStyle = css(c); ctx.fillRect(a, b, 1, 1); } };
-  traySprite(P, x - 11, y - 3, 22);
+  plateRows(P, x - 12, y - 6, 24);
   const cup = seed % 3 === 1 ? 0xf2c8d8 : seed % 3 === 2 ? 0xc92a2a : 0xf4f1ea;
-  cupSprite(P, x + 3, y - 16, cup, 0xc8ccd0);
-  if (stage < 0.3) burgerSprite(P, x - 10, y - 12, seed % 2 === 0);
+  cupSprite(P, x + 6, y - 17, cup, 0xc8ccd0);
+  const lift = chew?.bite && stage < 0.9 ? 16 : 0;   // tuggan: burgaren vid munnen
+  if (stage < 0.3) burgerSprite(P, x - 10, y - 12 - lift, seed % 2 === 0);
   else if (stage < 0.6) { // halväten: en bit borta till höger
-    ctx.save(); ctx.beginPath(); ctx.rect(x - 10, y - 13, 8, 10); ctx.clip(); burgerSprite(P, x - 10, y - 12, seed % 2 === 0); ctx.restore();
-    P.rect(x - 3, y - 10, 2, 6, 0xf0dcb0);
-  } else if (stage < 0.9) { P.rect(x - 9, y - 6, 5, 3, 0xd9a55d); P.px(x - 6, y - 7, 0x6e3a26); P.px(x - 4, y - 5, 0x7fc44a); }
+    ctx.save(); ctx.beginPath(); ctx.rect(x - 10, y - 13 - lift, 8, 10); ctx.clip(); burgerSprite(P, x - 10, y - 12 - lift, seed % 2 === 0); ctx.restore();
+    P.rect(x - 3, y - 10 - lift, 2, 6, 0xf0dcb0);
+  } else if (stage < 0.9) { P.rect(x - 9, y - 6 - lift, 5, 3, 0xd9a55d); P.px(x - 6, y - 7 - lift, 0x6e3a26); P.px(x - 4, y - 5 - lift, 0x7fc44a); }
   else { P.px(x - 8, y - 5, 0xd9a55d); P.px(x - 5, y - 6, 0xd9a55d); P.rect(x - 9, y - 9, 4, 3, 0xf4f1ea); }
   if (stage > 0.15 && stage < 0.95) { P.rect(x - 2, y - 9, 6, 6, 0xf4f1ea); P.hl(x - 2, y - 9, 6, 0xffffff); }   // servett
+}
+// gästen bär tallriken (med burgaren) från luckan till bordet
+export function carrySprite(ctx, x, y, dir = 'down', seed = 0) {
+  const P = { rect: (a, b, w, h, c) => { ctx.fillStyle = css(c); ctx.fillRect(a, b, w, h); }, hl: (a, b, w, c) => { ctx.fillStyle = css(c); ctx.fillRect(a, b, w, 1); }, vl: (a, b, h, c) => { ctx.fillStyle = css(c); ctx.fillRect(a, b, 1, h); }, px: (a, b, c) => { ctx.fillStyle = css(c); ctx.fillRect(a, b, 1, 1); } };
+  const dx = dir === 'left' ? -7 : dir === 'right' ? 7 : 0, dy = dir === 'up' ? -4 : 0;
+  if (dir === 'up') return;   // ryggen mot oss – tallriken skyms
+  plateRows(P, x + dx - 8, y + dy - 16, 16);
+  burgerSprite(P, x + dx - 6, y + dy - 24, seed % 2 === 0);
 }

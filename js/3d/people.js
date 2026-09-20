@@ -296,7 +296,9 @@ export class People {
       if (ac?.wantChar && this.charRigs.get(ac.wantChar)?.rig) { const yaw = ac.yaw; this.remove(a.key, ac); ac = this.make(a); ac.yaw = yaw; }
       if (!ac) ac = this.make(a);
       ac.h = a.kid ? 1.25 : 1.76;
-      ac.g.position.set(a.x, a.y || 0, a.z);
+      // sitter: figuren sjunker ner på stolen; äter: små tuggor (huvudet gungar) var annan sekund
+      const munch = a.eat && ((this.t * 1.1 + ac.seed) % 2.4) < 0.7 ? Math.abs(Math.sin(this.t * 14)) * 0.035 : 0;
+      ac.g.position.set(a.x, (a.y || 0) + munch, a.z);
       let d = (a.yaw ?? 0) - ac.yaw; d = Math.atan2(Math.sin(d), Math.cos(d));
       ac.yaw += d * Math.min(1, dt * 9);
       ac.g.rotation.y = ac.yaw;

@@ -251,6 +251,7 @@ export class Shop3D {
     this.room.update(dt, fl);
     this.units.update(dt);
     this.people.sync(this.peopleList(), dt);
+    this.units.plates?.(this.plateList());
     this.bench.update(dt);
     this.renderer.info.reset();
     if (this.benchComposer) this.benchComposer.render(); else this.renderer.render(this.scene, this.bench.camera);
@@ -367,6 +368,20 @@ export class Shop3D {
     this.lastPos.set(key, { x, z, yaw: yaw ?? C.yawOf(dir) });
     return yaw ?? C.yawOf(dir);
   }
+  // tallrikar i rummet: vid luckan för dem som hämtar, på bordet för dem som sitter och äter
+  plateList() {
+    const g = this.game, out = [];
+    let i = 0;
+    for (const c of g.customers) {
+      if (c.phase === 'ready' && c.payout) { out.push({ key: 'r' + c.id, x: C.toX(428 + 9 + Math.min(2, i++) * 22), y: 1.04, z: C.toZ(LY.COUNTER.top + 6), stage: 0 }); continue; }
+      if (c.phase === 'eating' && c._sit && c._spot >= 0) {
+        const sp = LY.SPOTS[c._spot]; if (!sp?.plate) continue;
+        const stage = c._eatMax ? Math.max(0, Math.min(1, 1 - c._eatT / c._eatMax)) : (c._eat || 0) / 100;
+        out.push({ key: 'e' + c.id, x: C.toX(sp.plate[0]), y: 0.76, z: C.toZ(sp.plate[1]), stage: Math.round(stage * 10) / 10 });
+      }
+    }
+    return out;
+  }
   peopleList() {
     const g = this.game, fl = this.floor, out = [], seen = new Set();
     const say = (c) => (typeof c.say === 'string' ? c.say : c.say?.text && (!c.say.until || performance.now() < c.say.until) ? c.say.text : '');
@@ -378,7 +393,7 @@ export class Shop3D {
       const want = c.order?.title || c.order?.want || '';
       const mood = c.phase === 'leaving' ? (c.mood === 'angry' ? ' 😠' : c.mood === 'happy' ? ' 😊' : '') : '';
       const label = cl ? (want ? `${c.name}: ${want}` : c.name) : say(c) || (c.phase === 'ready' ? c.name + ' hämtar' : c.phase === 'leaving' && mood ? c.name + mood : '');
-      out.push({ key, x, z, yaw: c.moving ? yaw : C.yawOf(c.dir), moving: c.moving, kid: !!c.look?.kid, name: c.name, color: c.look?.shirt || '#7ea0c8', look: c.look, label, labelColor: cl ? '#f5c542' : c.mood === 'angry' ? '#e23b5a' : '#7ee8fa', mark: cl });
+      out.push({ key, x, z, y: c._sit ? -0.42 : 0, sit: !!c._sit, eat: c.phase === 'eating' && !!c._sit, carry: !!c._carry && !c._sit, yaw: c.moving ? yaw : C.yawOf(c.dir), moving: c.moving, kid: !!c.look?.kid, name: c.name, color: c.look?.shirt || '#7ea0c8', look: c.look, label, labelColor: cl ? '#f5c542' : c.mood === 'angry' ? '#e23b5a' : '#7ee8fa', mark: cl });
       seen.add(key);
     }
     for (const pl of fl.players) {
