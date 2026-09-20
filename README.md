@@ -289,8 +289,10 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   cylindrar), smält ost som droppar, delad korv, hyvlad parmesan, ringlade såser, pommes med
   topping, slushkupol, tapiokapärlor, mjukglass i strut, dammsugare, banana split.
   `tools/restaurang-ikoner.mjs` ritar alla ikoner i ett ark per kategori (`tools/out/rest-ikoner-*.png`).
-- **Lokalen** (`floor-art.js`, `floor-plans.js`): helt egen inredning – skafferihylla med bröd
-  och såser, menytavla med årets priser, rostfri köksbänk med läskmaskin, milkshakemaskin,
+- **Lokalen** (`floor-art.js`, `floor-plans.js`): helt egen inredning – en **kyldisk med glasfront**
+  på köksväggen där råvarorna i lagret ligger i skålar (bröd, biffar, ost, grönt, extra, såser i sina
+  egna färger; högen växer med antalet, ritas om när lagret ändras – även i 3D på köksbänken),
+  menytavla med årets priser, rostfri köksbänk med läskmaskin, milkshakemaskin,
   fritös och grill, kassa efter epok, bricka och sugrör på disken, läskkyl och dessertdisk som
   montrar, jukebox, såsbar och lekhörna. **Epoken bestämmer stilen:** femtiotalsdiner (turkos,
   svartvitt golv, kromborden med röda stolar, konlampor), sextiotal, grillkiosk (brunt trä,

@@ -647,7 +647,7 @@ export class Floor {
       else if (u.unit === 'arkad') u.img = u.prod ? cabinetSprite(u.prod, this.RES) : null;
       else if (u.frame) u.img = u.frame.grid ? this.renderGrid(u) : u.frame.tower ? this.renderTower(u) : this.renderVitrine(u);
     }
-    this.shelfImg = this.art?.noShelf ? null : this.renderShelf();
+    this.shelfImg = this.art?.renderDisplay ? this.art.renderDisplay(this) : this.art?.noShelf ? null : this.renderShelf();
   }
 
   // produkter som står framme, hetast först
@@ -908,7 +908,7 @@ export class Floor {
     ctx.globalAlpha = (t % 7) < 0.15 ? 0.35 : 0.95;
     ctx.drawImage(this.open.img, 146 - (this.open.img.width >> 1), 21);
     ctx.globalAlpha = 1;
-    if (this.shelfImg) ctx.drawImage(this.shelfImg, SC.SHELF.x0, 20);
+    if (this.shelfImg) ctx.drawImage(this.shelfImg, SC.SHELF.x0 - 2, this.art?.renderDisplay ? 26 : 20);
     // klockan (riktig tid)
     const [cx, cy] = SC.CLOCK, now = new Date();
     const hand = (ang, len, col) => {

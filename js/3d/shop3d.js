@@ -387,7 +387,9 @@ export class Shop3D {
     const say = (c) => (typeof c.say === 'string' ? c.say : c.say?.text && (!c.say.until || performance.now() < c.say.until) ? c.say.text : '');
     for (const c of g.customers) {
       if (c.x === undefined) continue;
-      const key = 'c' + c.id, x = C.toX(c.x), z = C.toZ(c.y) + (c._sit ? 0.32 : 0), yaw = c.moving ? this.yawFor(key, x, z, c.dir) : (this.lastPos.get(key)?.yaw ?? C.yawOf(c.dir));
+      const seat = c._sit && c._spot >= 0 ? LY.SPOTS[c._spot] : null;
+      // sitter vid ett matbord: bak på stolen (bordet står framför); i soffan: fram på dynan
+      const key = 'c' + c.id, x = C.toX(c.x), z = C.toZ(c.y) + (c._sit ? (seat?.table !== undefined ? -0.3 : 0.32) : 0), yaw = c.moving ? this.yawFor(key, x, z, c.dir) : (this.lastPos.get(key)?.yaw ?? C.yawOf(c.dir));
       if (!c.moving) this.lastPos.set(key, { x, z, yaw: C.yawOf(c.dir) });
       const cl = fl.clickable(c);
       const want = c.order?.title || c.order?.want || '';

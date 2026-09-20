@@ -379,10 +379,24 @@ export class Units {
     // läskmaskin med tre kranar
     slab(g, 0.1, 0.6, 0.03, 0.55, -0.22, 0.12, paintMat(0x9aa0aa, 0.5)); slab(g, 0.12, 0.58, 0.4, 0.52, 0.12, 0.13, paintMat(0x2c6fb7, 0.4), { cast: false });
     [0xc92a2a, 0xf0902a, 0x4aa84a].forEach((c, i) => slab(g, 0.18 + i * 0.14, 0.22 + i * 0.14, 0.2, 0.3, 0.12, 0.2, paintMat(c, 0.4)));
-    // brickstapel
-    for (let i = 0; i < 6; i++) slab(g, 0.75, 1.15, 0.03 + i * 0.02, 0.05 + i * 0.02, -0.15, 0.15, paintMat(i % 2 ? 0xc9322a : 0xd93a30, 0.5), { cast: false });
+    // kyldisken: rostfri sockel, glashuv och brickor med råvarorna i lagret (högen växer med antalet)
+    const dx0 = 0.7, dx1 = Math.min(W - 0.9, 1.45);
+    slab(g, dx0, dx1, 0.03, 0.14, -0.28, 0.2, paintMat(0xf0f0ec, 0.5));
+    slab(g, dx0, dx1, 0.14, 0.16, -0.28, 0.2, steel, { cast: false });
+    const cats = ['brod', 'biff', 'ost', 'gront', 'extra', 'sas'];
+    const goods = this.floor.owned().filter((p) => cats.includes(p.cat)).map((p) => ({ p, n: this.ctx.game.stockFree(p.id) })).filter((x) => x.n > 0).sort((a, b) => cats.indexOf(a.p.cat) - cats.indexOf(b.p.cat) || b.n - a.n).slice(0, 8);
+    goods.forEach(({ p, n }, i) => {
+      const col = i % 4, row = Math.floor(i / 4), x = dx0 + 0.06 + col * ((dx1 - dx0 - 0.12) / 4), z = -0.2 + row * 0.2, cw = (dx1 - dx0 - 0.12) / 4 - 0.02;
+      slab(g, x, x + cw, 0.16, 0.2, z, z + 0.16, paintMat(0xf6f3ec, 0.4), { cast: false });   // skål/bricka
+      const h = 0.015 + Math.min(5, 1 + Math.floor(Math.log2(Math.max(1, n)))) * 0.012;
+      slab(g, x + 0.015, x + cw - 0.015, 0.2, 0.2 + h, z + 0.02, z + 0.14, paintMat(hexOf(p.look?.color, 0xc8a060), 0.85), { cast: false });   // högen
+    });
+    for (const [z0, z1] of [[-0.29, -0.28], [0.2, 0.21]]) slab(g, dx0, dx1, 0.16, 0.5, z0, z1, glassMat(0xe4eef2, 0.9), { cast: false });   // glas fram/bak
+    for (const x of [dx0, dx1 - 0.01]) slab(g, x, x + 0.01, 0.16, 0.5, -0.28, 0.2, glassMat(0xe4eef2, 0.9), { cast: false });
+    slab(g, dx0, dx1, 0.5, 0.52, -0.29, 0.21, paintMat(0x2a2a30, 0.5), { cast: false });   // ram upptill
+    slab(g, dx0, dx1, 0.16, 0.52, -0.29, -0.28, glassMat(0xe4eef2, 0.9), { cast: false });
     // fritös med två korgar
-    if (W > 1.9) { slab(g, 1.3, 1.75, 0.03, 0.42, -0.25, 0.15, steel); for (const x of [1.36, 1.56]) { slab(g, x, x + 0.14, 0.42, 0.45, -0.2, 0.05, dark, { cast: false }); slab(g, x + 0.06, x + 0.08, 0.45, 0.62, -0.05, -0.03, dark, { cast: false }); } }
+    if (W > 2.3) { slab(g, 1.55, 2.0, 0.03, 0.42, -0.25, 0.15, steel); for (const x of [1.61, 1.81]) { slab(g, x, x + 0.14, 0.42, 0.45, -0.2, 0.05, dark, { cast: false }); slab(g, x + 0.06, x + 0.08, 0.45, 0.62, -0.05, -0.03, dark, { cast: false }); } }
     // grillen med två biffar
     const gx = Math.max(1.9, W - 0.8);
     if (W > gx + 0.6) { slab(g, gx, gx + 0.7, 0.03, 0.2, -0.28, 0.2, dark); for (const x of [gx + 0.12, gx + 0.4]) slab(g, x, x + 0.22, 0.2, 0.24, -0.15, 0.07, paintMat(0x6e3a26, 0.8)); }

@@ -134,6 +134,7 @@ export class People {
     scene.add(this.group);
     this.rig = null; this.clips = {}; this.height = 1.8;
     this.chars = []; this.charRigs = new Map();   // Mixamo-figurer ur chars/manifest.json, laddade vid behov
+    this.extraSrc = {};   // extra klipp (sitta/äta/bära) med sitt eget källskelett
     this.actors = new Map();
     this.t = 0;
   }
@@ -159,9 +160,17 @@ export class People {
         if (!c.file || !c.key) continue;
         const g2 = await loadRig('anim/' + c.file);
         const clip = g2?.animations?.[0]; if (!clip) continue;
+        // klippets eget skelett (bara noder i glb:n) blir källrigg: dess ben har FBX-exportens viloorientering,
+        // som skiljer sig från Xbot.glb – rotationerna översätts därför som deltan från klippets egen vilopose
+        const src = g2.scene; src.traverse((o) => { if (/^mixamorig/.test(o.name)) o.isBone = true; }); src.updateMatrixWorld(true);
         // gångklipp som inte exporterats "In Place" flyttar höften framåt – ta bort x/z-rörelsen så figuren stannar på sin plats
         if (/carry|walk|run/.test(c.key)) for (const t of clip.tracks) if (/Hips\.position$/.test(t.name)) { const v = t.values; for (let i = 3; i < v.length; i += 3) { v[i] = v[0]; v[i + 2] = v[2]; } }
-        clip.name = c.key; this.clips[c.key] = clip;
+        clip.name = c.key;
+        const srcRest = restRotations(src);
+        this.extraSrc[c.key] = { src, srcRest, clip };
+        try { const x = retargetDelta(src, srcRest, this.rig, this.srcRest, clip, 30); x.name = c.key; this.clips[c.key] = x; }
+        catch (err) { console.warn('3D: klippet ' + c.key + ' gick inte att lägga på Xbot', err); }
+        this.rig.updateMatrixWorld(true);
       }
     } catch {}
   }
@@ -203,7 +212,8 @@ export class People {
       const restore = []; this.rig.traverse((o) => { if (o.isBone) restore.push([o, o.quaternion.clone(), o.position.clone()]); });
       for (const [k, clip] of Object.entries(this.clips)) {
         if (!['idle', 'walk', 'run', ...EXTRA_CLIPS].includes(k)) continue;
-        try { e.clips[k] = retargetDelta(this.rig, this.srcRest, g.scene, tgtRest, clip, 30); }
+        const ex = this.extraSrc[k];   // extra klipp: från klippets eget skelett, inte via Xbot
+        try { e.clips[k] = ex ? retargetDelta(ex.src, ex.srcRest, g.scene, tgtRest, ex.clip, 30) : retargetDelta(this.rig, this.srcRest, g.scene, tgtRest, clip, 30); }
         catch (err) { console.warn('3D: retargeting misslyckades för ' + c.file, err); e.clips[k] = retarget(clip, prefix, ratio); }
         e.clips[k].name = k;
       }
