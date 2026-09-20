@@ -77,8 +77,23 @@ ok(!errors.some((e) => e.includes('går inte att göra')), 'alla menyer går att
 ok(top.hl[4] > 2 && top.anchor[2] > 2, `toppbrödets markering ligger högt upp i stapeln (z ${top.hl[4].toFixed(2)})`);
 // prissättning och inredning
 ok(O.priceFor(order) > 20, `pris ${O.priceFor(order)} kr, avgift ${O.feeFor(order)} kr, xp ${O.xpFor(order)}`);
-const fit = F.emptyFit([{ cat: 'dryck' }]);
-ok(F.capFor(fit, P.cola) === 9 && F.capFor(fit, P.applepaj) === 0 && F.capFor(fit, P['biff-wagyu']) === 2, `kylen säljer cola, dessertdisk saknas, wagyu kräver kylrum (${F.needFor(fit, P['biff-wagyu'])})`);
-ok(F.optionsFor(fit, 4, 'wide', 1996).some((o) => o.id === 'cat:dessert') && F.optionsFor(fit, 5, 'small', 1996).some((o) => o.id === 'unit:jukebox'), 'inredningsalternativ: dessertdisk och jukebox');
+const fit = F.emptyFit([]);
+ok(F.capFor(fit, P.cola) >= 2 && F.capFor(fit, P.applepaj) >= 2 && F.capFor(fit, P['biff-wagyu']) === 2 && F.capFor(fit, P['milkshake-vanilj']) === 0, `cola och äppelpaj görs i köket utan montrar, wagyu kräver kylrum (${F.needFor(fit, P['biff-wagyu'])}), milkshake kräver maskin`);
+ok(!F.optionsFor(fit, 4, 'wide', 1996).some((o) => o.kind === 'cat') && F.optionsFor(fit, 5, 'small', 1996).some((o) => o.id === 'unit:jukebox') && F.optionsFor(fit, 4, 'wide', 1996).some((o) => o.id === 'unit:lekhorna'), 'inga montrar att köpa – bara jukebox, såsbar, lekhörna m.m.');
+// fritösen och dryckesmaskinen: pommes kräver fritering (två steg), en mugg läsk kräver tappning, en flaska inte
+{
+  const o = { id: 7, items: [{ cat: 'brod', part: 'brod-klassiskt' }, { cat: 'biff', part: 'biff-90' }, { cat: 'brod', part: 'brod-klassiskt' }, { cat: 'tillbehor', part: 'pommes' }, { cat: 'dryck', part: 'cola' }, { cat: 'dessert', part: 'applepaj' }], year: 1996 };
+  const b = o.build = newBuild(); b.help = true; const L2 = rigFor(o);
+  ok(L2.ACTION.fritera && L2.ACTION.tappa && L2.SLOT.dessert && L2.STEPS.indexOf('act:fritera') < L2.STEPS.indexOf('slot:pommes') && L2.STEPS.indexOf('act:tappa') < L2.STEPS.indexOf('slot:dryck'), `köket har fritös, dryckesmaskin och efterrättsplats (${L2.STEPS.join(' ')})`);
+  ok(!L2.canPlace(L2.SLOT.pommes, P.pommes, b).ok && !L2.canPlace(L2.SLOT.dryck, P.cola, b).ok, 'pommesen måste friteras och colan tappas upp först: ' + L2.canPlace(L2.SLOT.pommes, P.pommes, b).msg);
+  applyBuildOp(shop, o, { t: 'act', id: 'fritera', i: 0 }); ok(!L2.actDone(b, 'fritera'), 'korgen nere (1/2)');
+  applyBuildOp(shop, o, { t: 'act', id: 'fritera', i: 1 }); applyBuildOp(shop, o, { t: 'act', id: 'tappa', i: 0 });
+  ok(L2.canPlace(L2.SLOT.pommes, P.pommes, b).ok && L2.canPlace(L2.SLOT.dryck, P.cola, b).ok && L2.canPlace(L2.SLOT.dessert, P.applepaj, b).ok, 'friterat, upptappat och efterrätten får läggas på brickan');
+  let n = 0; const R3 = { k: 16, hz: 13, ox: 0, oy: 0, defaultId: 0, box: () => n++, proj: (u, v, z) => [u - v, (u + v) / 2 - z] };
+  L2.drawScene(R3, b, {}); ok(n > 30, `köksscenen med fritös och dryckesmaskin ritar ${n} lådor`);
+  const o2 = { id: 8, items: [{ cat: 'brod', part: 'brod-klassiskt' }, { cat: 'biff', part: 'biff-90' }, { cat: 'brod', part: 'brod-klassiskt' }, { cat: 'tillbehor', part: 'sallad-skal' }, { cat: 'dryck', part: 'julmust' }], year: 1996 };
+  o2.build = newBuild(); const L3 = rigFor(o2);
+  ok(!L3.ACTION.fritera && !L3.ACTION.tappa, 'sallad friteras inte och julmust på flaska tappas inte upp');
+}
 console.log(errors.length ? 'FEL:\n' + errors.join('\n') : 'Inga fel.');
 process.exit(errors.length ? 1 : 0);

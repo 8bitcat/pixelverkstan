@@ -78,7 +78,7 @@ export class Bench3D {
     this.group.rotation.y = this.rotY;
     this.group.visible = false;
     view3d.scene.add(this.group);
-    this.camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 30);
+    this.camera = this.ownCamera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 30);
     this.orbit = { yaw: 0, pitch: 0 };            // spelarens vridning av kameran runt bygget (radianer), inom ORBIT-gränserna
     this.camSig = ''; this._v = new THREE.Vector3();
     this.dirWorld = DIR_LOCAL.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.group.rotation.y).normalize();
@@ -118,10 +118,11 @@ export class Bench3D {
     this.camSig = '';
   }
   // ---------- Byggläget (chassit på bänken) ----------
-  attach(view) {
+  attach(view, opts = {}) {
     this.detachDesk();
     this.view = view;
     view.gl = this;
+    this.free = !!opts.free;   // köket: ingen låst kamera – spelarens egen kamera används
     view.dirty = true;
     this.U = U; this.off.set(13, 0, 12); this.filter = null; this.ppu = PPU; this.rotY = -Math.PI / 4;
     this.pSrc = () => view.P;
@@ -156,6 +157,7 @@ export class Bench3D {
     if (this.view) { this.U = U; this.off.set(13, 0, 12); this.filter = null; this.ppu = PPU; this.rotY = -Math.PI / 4; this.pSrc = () => this.view.P; this.layout(); this.view.dirty = true; }
   }
   detach() {
+    this.free = false;
     this.detachDesk();
     if (this.view) { this.view.gl = null; this.view.dirty = true; if (this.origProj) this.view.P.proj = this.origProj; }
     this.view = null; this.pSrc = null;
@@ -169,6 +171,8 @@ export class Bench3D {
   // Punkten som 2D-formeln lägger mitt i fönstret blir kamerans mål; avståndet väljs så att skalan
   // i målplanet blir densamma som 2D-vyns (k√2 px per enhet).
   updateCamera(force = false) {
+    if (this.free) { this.camera = this.v.camera; return; }   // fri kamera: spelaren tittar själv
+    if (this.camera === this.v.camera) this.camera = this.ownCamera;
     const view = this.view; if (!view || !this.pSrc) return;
     const P = this.pSrc(), cv = this.v.canvas, board = view.canvas;
     const W = Math.max(2, cv.clientWidth), H = Math.max(2, cv.clientHeight);
@@ -213,6 +217,7 @@ export class Bench3D {
     return d.applyAxisAngle(side, -pitch).normalize();
   }
   orbitBy(dYaw, dPitch) {
+    if (this.free) { const v = this.v; v.yaw += dYaw; v.pitch = Math.max(-1.35, Math.min(1.35, v.pitch - dPitch)); return; }
     this.orbit.yaw = Math.max(-ORBIT.yaw, Math.min(ORBIT.yaw, this.orbit.yaw + dYaw));
     this.orbit.pitch = Math.max(-ORBIT.pitchDown, Math.min(ORBIT.pitchUp, this.orbit.pitch + dPitch));
     this.updateCamera(true);

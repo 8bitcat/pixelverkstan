@@ -18,7 +18,7 @@ export default {
   worker: 'kock',
   theme: { wall: '#c94a3a', wallDark: '#9a2f24', floorA: '#f2efe6', floorB: '#2a2a30', counter: '#e8e4dc', neon: '#ff6f9c', workshopSign: 'KÖKET' },
   // läskkylen står framme från start; dessertdisken köps
-  showcases: [{ cat: 'dryck', title: 'Läskkyl' }],
+  showcases: [],                    // inga hyllor i dinern – drycken tappas upp och pommesen friteras i köket
   hero: null,
   // stjärnobjektet i montern och på affischen: årets finaste biff
   heroFor: (game) => [...menu.onSale(game.year).filter((p) => p.cat === 'biff')].sort((a, b) => b.cost - a.cost)[0] || null,
@@ -26,11 +26,12 @@ export default {
   floorPlans: FLOOR_PLANS,          // matbord i stället för stjärnmonter och soffa
   themeFor: floorArt.themeFor,      // epoken bestämmer färger och stil
   dineIn: true,                     // kunderna sätter sig och äter efter att de hämtat brickan
+  kitchen3d: true,                  // i 3D byggs burgaren i köket bakom disken med fri kamera – ingen låst byggbild
   fit: upgrades,
   products,
   isProduct: products.isProduct,
   hypeAt: products.hypeAt,
-  productCats: menu.PRODUCT_CATS,
+  productCats: [],                  // inget säljs över disk – allt går via köket
   cats: menu.CATS,
   catOrder: menu.CAT_ORDER,
   get parts() { return menu.DB.parts; },

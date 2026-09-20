@@ -21,19 +21,15 @@ const setup = await page.evaluate(() => {
   g.money = 90000; g.tutorialStep = 99; g.stats.served = 9;
   for (const id of ['lokal2', 'lokal3', 'milkshake', 'fritos', 'dubbelgrill', 'menytavla', 'lager2', 'kassa2', 'stereo', 'vaxter']) g.fit.items[id] = true;
   g.fit.slots = [];
-  g.fit.slots[0] = { kind: 'cat', cat: 'dryck', level: 0 };
-  g.fit.slots[1] = { kind: 'cat', cat: 'dessert', level: 0 };
   g.fit.slots[2] = { kind: 'unit', unit: 'lekhorna' };
-  g.fit.slots[4] = { kind: 'cat', cat: 'dryck', level: 0 };
   g.fit.slots[5] = { kind: 'unit', unit: 'jukebox' };
-  g.fit.slots[6] = { kind: 'cat', cat: 'dessert', level: 0 };
   g.fit.slots[7] = { kind: 'unit', unit: 'sasbar' };
   g.emit('change');
   PV.floor.build(); PV.floor.sig = null; PV.floor.refreshStock();
   const L = PV.floor.constructor.LY || null;
-  return { lokal: g.shop.fit.lokalOf(g.fit), units: PV.floor.unitList.map((u) => u.unit || u.cat || (u.empty ? 'tom' : '?')), tables: PV.floor.furniture.length, grid: PV.floor.unitList.filter((u) => u.frame?.grid).length };
+  return { lokal: g.shop.fit.lokalOf(g.fit), units: PV.floor.unitList.map((u) => u.unit || u.def?.unit || u.cat || (u.empty ? 'tom' : '?')), tables: PV.floor.furniture.length, grid: PV.floor.unitList.filter((u) => u.frame?.grid).length };
 });
-ok(setup.lokal === 3 && setup.grid >= 4, `Kvartersbaren med enheter: ${JSON.stringify(setup)}`);
+ok(setup.lokal === 3 && setup.grid === 0 && setup.units.includes('jukebox'), `Kvartersbaren utan montrar men med jukebox, såsbar och lekhörna: ${JSON.stringify(setup)}`);
 for (const year of [1955, 1975, 1996, 2016, 2022]) {
   const st = await page.evaluate((y) => {
     const g = PV.game;

@@ -434,3 +434,54 @@ export function iconCanvas(part, W = 64, H = 54) {
   c.getContext('2d').drawImage(src, 0, 0);
   return c;
 }
+
+// ---------- Köksstationerna: fritös och dryckesmaskin (epokens stil) ----------
+// fritös: rostfri låda med två oljekar; korgen hänger på kroken (state 0), ligger i oljan (1)
+// eller är upplyft med gyllene pommes (2)
+export function drawFryer(R, u0, v0, id, era, state = 0, fries = true) {
+  const steel = era?.steel ?? 0xc8ccd6, trim = era?.trim ?? 0xc92a2a;
+  R.box(u0, u0 + 4.5, v0, v0 + 4.5, 0, 2.2, (f, x, y, W, Hh) => {
+    if (f === 'top') {
+      const inVat = (x > 0.5 && x < 2.0 && y > 0.6 && y < 3.9) || (x > 2.5 && x < 4.0 && y > 0.6 && y < 3.9);
+      if (inVat) return hash(x * 4 | 0, y * 4 | 0) > 0.85 ? 0xe8b850 : 0xd8a040;   // olja
+      return x < 0.15 || y < 0.15 || x > W - 0.15 || y > Hh - 0.15 ? shade(steel, 0.8) : steel;
+    }
+    if (f === 'left' && y > 1.6 && y < 2.0 && x > 0.4 && x < 4.1) return trim;   // reglagelist
+    if (f === 'left' && y > 1.7 && y < 1.9 && ((x > 0.8 && x < 1.1) || (x > 1.6 && x < 1.9))) return 0x2a2d36;
+    return y < 0.12 ? shade(steel, 1.15) : shade(steel, 0.92 - y * 0.03);
+  }, id, { noEdges: true });
+  // korgen
+  const bu = u0 + 0.6, bv = v0 + 0.8;
+  const basket = (z0, golden) => {
+    R.box(bu, bu + 1.3, bv, bv + 3.0, z0, z0 + 0.8, (f, x, y, W, Hh) => {
+      if (f === 'top') return golden && !(x < 0.15 || y < 0.15 || x > W - 0.15 || y > Hh - 0.15) ? (hash(x * 5 | 0, y * 5 | 0) > 0.5 ? 0xf0c050 : 0xe8b040) : ((x * 4 | 0) % 2 === (y * 4 | 0) % 2 ? 0x8a8f9c : -1);
+      return ((x * 4 | 0) + (y * 4 | 0)) % 2 ? 0x8a8f9c : 0x6a6f7a;
+    }, id, { noEdges: true });
+    // handtag
+    R.box(bu + 0.55, bu + 0.75, bv + 3.0, bv + 4.4, z0 + 0.6, z0 + 0.75, () => 0x2a2d36, id, { noEdges: true });
+  };
+  if (!fries) return;
+  if (state === 0) basket(2.6, false);          // hänger på kroken ovanför oljan
+  else if (state === 1) { basket(1.6, false); for (let i = 0; i < 5; i++) R.box(bu + 0.2 + i * 0.22, bu + 0.32 + i * 0.22, bv + 0.4 + (i % 3) * 0.8, bv + 0.52 + (i % 3) * 0.8, 2.2, 2.32, () => 0xfff0c0, id, { noEdges: true }); }   // bubblor
+  else basket(2.8, true);                       // upplyft med gyllene pommes
+}
+// dryckesmaskin: torn med tre kranar, droppbricka och (när man tappat upp) en fylld mugg under
+export function drawDrinkTower(R, u0, v0, id, era, filled = false, drink = null) {
+  const steel = era?.steel ?? 0xc8ccd6, trim = era?.trim ?? 0xc92a2a, neon = era?.neon ? hex(era.neon) : 0xff6f9c;
+  // sockel/droppbricka
+  R.box(u0, u0 + 4.5, v0, v0 + 4.5, 0, 0.35, (f, x, y, W, Hh) => (f === 'top' ? ((x * 3 | 0) % 2 ? shade(steel, 0.75) : shade(steel, 0.6)) : shade(steel, 0.85)), id, { noEdges: true });
+  // tornet baktill
+  R.box(u0, u0 + 4.5, v0, v0 + 1.6, 0.35, 4.2, (f, x, y, W, Hh) => {
+    if (f === 'top') return steel;
+    if (f === 'left') {   // frontpanelen med skylt och tre kranar
+      if (y > 0.2 && y < 1.2) return hash(x * 3 | 0, y * 3 | 0) > 0.92 ? shade(trim, 1.2) : trim;
+      if (y > 1.25 && y < 1.4 && x > 0.3 && x < W - 0.3) return neon;
+      if (y > 2.4 && y < 3.2) { const k = ((x - 0.4) % 1.35); if (x > 0.4 && k < 0.5) return 0x2a2d36; }
+      return shade(steel, 0.95);
+    }
+    return shade(steel, 0.85);
+  }, id, { noEdges: true });
+  // kranarnas pipar
+  for (let i = 0; i < 3; i++) R.box(u0 + 0.55 + i * 1.35, u0 + 0.95 + i * 1.35, v0 + 1.6, v0 + 2.2, 2.0, 2.3, () => 0x2a2d36, id, { noEdges: true });
+  if (filled && drink) drawCup(R, drink, u0 + 2.1, v0 + 3.2, 0.35, id);
+}

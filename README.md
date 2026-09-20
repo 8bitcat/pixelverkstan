@@ -234,7 +234,7 @@ valet sparas (`pixelverkstan_3d`). 2D-läget finns kvar orört.
 ## Hamburgerbaren
 
 Andra verksamheten i menyn. Samma motor som datorbutiken (kunder, lager, grossist, lådor,
-montrar, inredning, co-op) men med ett kök i stället för en verkstad:
+inredning, co-op) men med ett kök i stället för en verkstad:
 
 - **Epoker 1955–2026:** femtiotalsdinern (pannbiff, rödbetssallad, patty melt, Oklahoma
   onion burger), sextiotalets bacon och milkshake, grillkiosken (korv i bröd, räksallad,
@@ -253,8 +253,17 @@ montrar, inredning, co-op) men med ett kök i stället för en verkstad:
   ibland något som saknas, ibland får du välja drycken.
 - **Köket** (`rig.js`): rosta brödet i brödrosten → underbrödet → lägg biffen på grillen,
   vänd, salta och peppra → lager i rätt ordning → toppbrödet (samma sort som under) →
-  pommes/tillbehör i fickan och drycken på brickan. Fakta om Maillard, kärntemperaturer,
-  dubbelfritering m.m. i guiden.
+  **fritösen** (sänk ner korgen, lyft upp) innan pommes, nuggets och lökringar läggs i fickan →
+  **dryckesmaskinen** (tappa upp) innan muggen ställs på brickan (flaskor och burkar tas ur
+  kylen under) → efterrätten sist. Inget säljs över disk och det finns inga hyllor eller montrar
+  i restaurangen: allt görs i köket. Köksutrustningen följer epoken (krom på femtiotalet,
+  rostfritt i kedjan, svart stål 2016). Fakta om Maillard, kärntemperaturer, dubbelfritering
+  m.m. i guiden.
+- **Köket i 3D**: ingen låst byggbild som i datorbutiken. Du står vid disken, vänder dig om
+  (dra i bilden) och jobbar vid köksbänken bakom dig med din egen kamera: klicka på brödrosten,
+  grillen, fritösen, dryckesmaskinen och brickan, gå runt med W A S D. Lådan med råvaror och
+  checklistan ligger ovanpå bilden (`shop.kitchen3d`, `view3d.enterKitchen`, bänken med
+  `free`-kamera).
 - **Servering** (`serve.js`): kunden vid luckan smakar, betyg beror på tid och kladd,
   betalar när brickan hämtas. Fungerar i 3D på arbetsbänken (brickan, grillen och
   brödrosten voxlas som datorbygget).

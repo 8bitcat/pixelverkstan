@@ -7,7 +7,7 @@ import { hypeAt, isProduct } from './products.js';
 export const ARKAD = [];
 export const arkadInfo = () => null;
 export const CAP = [2, 3, 4, 5];
-export const SHOWCASE_CATS = ['dryck', 'dessert'];   // kategorier som får egna montrar (kyl/disk)
+export const SHOWCASE_CATS = [];   // inga montrar i restaurangen – dryck och efterrätt görs i köket
 export const LEVEL_NAME = ['disk', 'kyl', 'belyst kyl', 'flaggskeppskyl'];
 export const BRANDS = {};
 export const brandInfo = () => null;
@@ -89,16 +89,15 @@ export function capFor(fit, p) {
   if (!p) return 0;
   const lagerCap = lagerLevel(fit) + 1;   // 2, 3, 4, 5
   if (isProduct(p)) {
-    if (!hasCase(fit, p.cat)) return 0;
     if (p.look?.shake && !fit.items.milkshake) return 0;
-    return p.tier <= lagerCap ? 9 : 0;
+    return p.tier <= lagerCap ? lagerCap + 4 : 0;
   }
   return lagerCap;
 }
 export function needFor(fit, p) {
   if (!p) return '';
-  if (p.cat === 'dryck') return p.look?.shake && !fit.items.milkshake ? 'kräver en milkshakemaskin' : !hasCase(fit, 'dryck') ? 'kräver en läskkyl' : `kräver kylrum nivå ${p.tier - 1}`;
-  if (p.cat === 'dessert') return !hasCase(fit, 'dessert') ? 'kräver en dessertdisk' : `kräver kylrum nivå ${p.tier - 1}`;
+  if (p.cat === 'dryck') return p.look?.shake && !fit.items.milkshake ? 'kräver en milkshakemaskin' : `kräver kylrum nivå ${p.tier - 1}`;
+  if (p.cat === 'dessert') return `kräver kylrum nivå ${p.tier - 1}`;
   const lvl = p.tier - 1;
   return lvl >= 4 ? 'kräver restaurangkök' : `kräver kylrum nivå ${lvl}`;
 }

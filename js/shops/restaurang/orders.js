@@ -373,6 +373,7 @@ function sidesFor(t, year, game, pick = rnd) {
   const choose = (cat) => { const list = sale.filter((p) => p.cat === cat && (!game?.canSell || game.canSell(p))); if (!list.length) return null; const have = list.filter(shown); return pick(have.length && Math.random() < 0.8 ? have : list); };
   if (Math.random() < (t.sides.tillbehor ?? 0.5)) { const p = choose('tillbehor'); if (p) out.push(p); }
   if (Math.random() < (t.sides.dryck ?? 0.6)) { const p = choose('dryck'); if (p) out.push(p); }
+  if (Math.random() < (t.sides.dessert ?? 0.18)) { const p = choose('dessert'); if (p) out.push(p); }
   return out;
 }
 
@@ -388,8 +389,8 @@ function pickWeighted(list, wf) { let r = Math.random() * list.reduce((s, x) => 
 export function generateOrder(game, names) {
   const year = game.year;
   const em = (k, s) => (game.eventMul ? game.eventMul(k, s) : 1);
-  // bara något att dricka eller en efterrätt
-  if (Math.random() < 0.18 * em('products')) { const o = productOrder(game, names); if (o) return o; }
+  // allt går genom köket – inga varor över disk (game.shop.productCats är tom)
+  if (game.shop?.productCats?.length && Math.random() < 0.18 * em('products')) { const o = productOrder(game, names); if (o) return o; }
   const pool = templatesFor(year);
   if (!pool.length) return null;
   const t = pickWeighted(pool, (x) => templateWeight(x, game));
@@ -415,7 +416,7 @@ export function generateOrder(game, names) {
   const drink = items.find((it) => it.cat === 'dryck');
   if (drink && Math.random() < 0.3 && onSale(year).some((p) => p.cat === 'dryck' && game.stockFree(p.id) > 0)) { drink.part = null; drink.choice = true; }
   let msg = rnd(t.msgs);
-  if (sides.length) msg += ' ' + (sides.length === 2 ? `Och ${sides[0].name.toLowerCase()} och en ${sides[1].name.toLowerCase()}.` : `Och ${sides[0].name.toLowerCase()}.`);
+  if (sides.length) msg += ' Och ' + sides.map((p) => p.name.toLowerCase()).join(sides.length > 2 ? ', ' : ' och ').replace(/, ([^,]*)$/, ' och $1') + '.';
   if (drink?.choice) msg += ' Drycken får du välja!';
   return { template: t.id, title: t.name, name: rnd(names), msg, items, year };
 }

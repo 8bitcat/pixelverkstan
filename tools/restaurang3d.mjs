@@ -81,8 +81,13 @@ await page.evaluate(() => PV.view3d.setPose(-1.0, 1.0, Math.PI, -0.15)); await w
 await page.evaluate(() => PV.openBuild(PV.game.orders[0]));
 await page.waitForFunction(() => document.body.dataset.screen === 'build' && PV.build.gl, null, { timeout: 20000 });
 await waitFrames(3); await page.waitForTimeout(400);
-const i1 = await page.evaluate(() => ({ mode: PV.view3d.mode, info: PV.build.gl.info(), body: document.body.className }));
-ok(i1.mode === 'bench' && i1.info.faces > 0 && /bench3d/.test(i1.body), `köket i 3D: ${i1.info.boxes} lådor, ${i1.info.faces} sidor, atlas ${i1.info.atlas.join('×')}, ${i1.info.ms} ms`);
+const i1 = await page.evaluate(() => ({ mode: PV.view3d.mode, kitchen: PV.view3d.kitchen, free: PV.build.gl.free, info: PV.build.gl.info(), body: document.body.className, locked: PV.view3d.locked }));
+ok(i1.mode === 'walk' && i1.kitchen && i1.free && i1.info.faces > 0 && /kitchen3d/.test(i1.body) && !i1.locked, `köket i 3D med fri kamera (ingen låst byggbild): ${i1.info.boxes} lådor, ${i1.info.faces} sidor, ${i1.info.ms} ms`);
+// vänd dig om: dra i bilden vrider spelaren, och stationerna hamnar där byggvyn tror (projektionen går genom spelarens kamera)
+const turn = await page.evaluate(() => { const v = PV.view3d, y0 = v.yaw; PV.build.orbit(-1.0, 0); return { before: +y0.toFixed(2), after: +v.yaw.toFixed(2) }; });
+ok(Math.abs(turn.after - turn.before + 1.0) < 0.01, `drag i bilden vänder spelaren (${turn.before} → ${turn.after})`);
+await page.evaluate(() => { const v = PV.view3d, b = v.room.bench; v.setPose(b.stand[0], b.stand[1], 0, -0.6); });
+await waitFrames(2);
 const proj = await page.evaluate(() => {
   const v = PV.build, r = v.canvas.getBoundingClientRect(), out = [];
   for (const [u, w, z] of [[13, 8, 1], [2.5, 3, 2.4], [22, 12, 0], [7, 0.5, 0], [29, 15.5, 0]]) { const [x, y] = v.P.proj(u, w, z), [sx, sy] = v.gl.screenOf(u, w, z); out.push(+Math.hypot(r.left + x - sx, r.top + y - sy).toFixed(2)); }
@@ -114,8 +119,8 @@ try { await page.waitForFunction(() => PV.build.finale.run?.done, null, { timeou
 await page.waitForTimeout(300);
 await shot('8-omdome3d');
 await page.evaluate(() => PV.build.guideAction('deliver')); await page.waitForTimeout(600);
-const after = await page.evaluate(() => ({ screen: document.body.dataset.screen, mode: PV.view3d.mode, modal: document.querySelector('#modal h2')?.textContent, gl: !!PV.build.gl }));
-ok(after.screen === 'shop' && after.mode === 'walk' && !after.gl && /nöjd/i.test(after.modal || ''), `tillbaka i restaurangen efter servering: ${JSON.stringify(after)}`);
+const after = await page.evaluate(() => ({ screen: document.body.dataset.screen, mode: PV.view3d.mode, kitchen: !!PV.view3d.kitchen, modal: document.querySelector('#modal h2')?.textContent, gl: !!PV.build.gl }));
+ok(after.screen === 'shop' && after.mode === 'walk' && !after.gl && !after.kitchen && /nöjd/i.test(after.modal || ''), `tillbaka i restaurangen efter servering: ${JSON.stringify(after)}`);
 await page.evaluate(() => { const b = [...document.querySelectorAll('#modal .btn')].find((x) => /butiken|ok|stäng|klar/i.test(x.textContent)); b?.click(); });
 await waitFrames(2); await page.waitForTimeout(300);
 await shot('9-tillbaka');

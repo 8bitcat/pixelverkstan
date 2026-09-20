@@ -198,7 +198,32 @@ export class Shop3D {
     this.bench.attach(view);
     return true;
   }
+  // Köket (restaurangen): ingen låst kamera – spelaren står vid disken, vänder sig om och jobbar
+  // vid köksbänken bakom sig. Byggvyns låda/checklista ligger ovanpå bilden, klick träffar
+  // stationerna genom spelarens egen kamera, drag i bilden vänder på huvudet.
+  enterKitchen(view) {
+    if (!this.ready || !this.bench || !this.room?.bench) return false;
+    if (!this.kitchen) {
+      this.kitchen = true;
+      if (this.locked) document.exitPointerLock?.();
+      this.keys.clear(); this.hover = null; this.canvas.style.cursor = 'default';
+      document.body.classList.add('bench3d', 'kitchen3d');
+      const b = this.room.bench;
+      // ställ dig vid disken med ryggen mot köket – vänd dig om!
+      if (Math.hypot(this.pos.x - b.stand[0], this.pos.z - b.stand[1]) > 1.2) this.setPose(b.stand[0], b.stand[1], Math.PI, -0.1);
+      this.hint('🍔 Köket är bakom dig – dra i bilden för att vända dig om · klicka på brödrosten, grillen, fritösen, dryckesmaskinen och brickan · W A S D går');
+    }
+    this.bench.attach(view, { free: true });
+    return true;
+  }
   leaveBench() {
+    if (this.kitchen) {
+      this.kitchen = false;
+      this.bench.detach();
+      document.body.classList.remove('bench3d', 'kitchen3d');
+      this.hint();
+      return;
+    }
     if (this.mode !== 'bench') return;
     this.mode = 'walk';
     this.bench.detach();
@@ -209,6 +234,13 @@ export class Shop3D {
     const b = this.room?.bench;
     if (b) { this.pos.set(b.stand[0], 0, b.stand[1]); this.yaw = 0; this.pitch = -0.45; this.vel.set(0, 0, 0); this.wasAway = false; }
     this.hint();
+  }
+  // köksläget: vanlig promenad + bänkens scen
+  renderKitchen(dt) {
+    if (!this.ready || !this.kitchen) return;
+    this.update(dt);
+    this.bench.update(dt);
+    this.render();
   }
   renderBench(dt) {
     if (!this.ready || this.mode !== 'bench') return;
@@ -279,6 +311,7 @@ export class Shop3D {
   hint(text = null) {
     const el = $('#hint3d'); if (!el) return;
     if (text !== null) { el.textContent = text; el.classList.toggle('hidden', !text); return; }
+    if (this.kitchen) { el.textContent = '🍔 Köket: dra i bilden för att titta · klicka på stationerna och brickan · W A S D går'; el.classList.remove('hidden'); return; }
     el.textContent = this.locked ? '' : 'Klicka i bilden för att styra · W A S D går · musen tittar (eller dra i bilden) · piltangenter går och vänder · klicka på kunder, montrar och lådor · bygg vid arbetsbänken bakom disken · Esc släpper musen · Q byter grafikkvalitet';
     el.classList.toggle('hidden', this.locked);
   }

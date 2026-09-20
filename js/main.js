@@ -342,7 +342,10 @@ function openBuild(order) {
     const me = floor.localPlayer();
     if (me) { me.path = []; me.act = null; me.x = WALK_SPOTS.workshop[0]; me.y = WALK_SPOTS.workshop[1]; me.away = 'workshop'; me.orderId = o.id; }
     act('touchOrder', { orderId: o.id });   // teknikern släpper bygget till spelaren
-    if (is3d()) { view3d.enterBench(build); UI.toast('🔄 Dra i bilden (eller ⟲ ⟳) för att snurra kameran runt bygget.', ''); }    // i 3D byggs datorn på arbetsbänken bakom disken
+    if (is3d()) {
+      if (game.shop.kitchen3d) { view3d.enterKitchen(build); UI.toast('🍔 Vänd dig om – köket är bakom dig. Dra i bilden för att titta.', ''); }   // restaurangen: jobba i köket med fri kamera
+      else { view3d.enterBench(build); UI.toast('🔄 Dra i bilden (eller ⟲ ⟳) för att snurra kameran runt bygget.', ''); }   // datorn byggs på arbetsbänken bakom disken
+    }
     show('build');
     build.open(o);
   };
@@ -588,7 +591,7 @@ function loop(now) {
       if (hudDirty) { UI.renderHud(game, hudHandlers, coop ? { code: net.code, count: (coop instanceof CoopHost ? coop.players.size + 1 : coop.list.length) } : null); hudDirty = false; }
       if (ordersTimer <= 0) { UI.renderOrders(game, openBuild, floor.players); ordersTimer = 0.5; }
     }
-    if (screen === 'build') { build.frame(dt); if (is3d() && view3d.mode === 'bench' && build.order) view3d.renderBench(dt); }
+    if (screen === 'build') { build.frame(dt); if (is3d() && build.order) { if (view3d.kitchen) view3d.renderKitchen(dt); else if (view3d.mode === 'bench') view3d.renderBench(dt); } }
     if (screen === 'play') { try { play.frame(dt); } catch (e) { console.error(e); } }
     if (screen === 'arcade' && arcade) { arcade.update(dt); arcade.draw(); }
     friendsTimer -= dt;
