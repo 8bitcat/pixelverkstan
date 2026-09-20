@@ -46,7 +46,7 @@ const stock = await page.evaluate(() => ({ stock: Object.entries(PV.game.stock).
 ok(stock.stock > 5, `lagret fyllt: ${JSON.stringify(stock)}`);
 const disp = await page.evaluate(() => { PV.floor.sig = null; PV.floor.refreshStock(); const c = PV.floor.display?.img; if (!c) return null; const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return { w: c.width, h: c.height, painted: n }; });
 ok(disp && disp.painted > 300, `kyldisken på disken visar råvarorna i skålar: ${JSON.stringify(disp)}`);
-const lay = await page.evaluate(async () => { const LY = await import('/js/core/floor-layout.js'); return { q: LY.QUEUE[0], p: LY.PICKUP[0], keeper: LY.KEEPER_HOME }; });
+const lay = await page.evaluate(async () => { const LY = await import('./js/core/floor-layout.js'); return { q: LY.QUEUE[0], p: LY.PICKUP[0], keeper: LY.KEEPER_HOME }; });
 ok(lay.q[0] > 400 && lay.p[0] < 400, `kön vid kassan till höger, luckan ovanpå kyldisken till vänster: ${JSON.stringify(lay)}`);
 // första kunden (tutorial): teleportera till kön och ta emot
 await page.evaluate(() => { const g = PV.game; g.spawnTimer = 0; g.update(0.05, { shopVisible: true }); });
