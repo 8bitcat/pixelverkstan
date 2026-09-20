@@ -255,7 +255,10 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   vänd, salta och peppra → lager i rätt ordning → toppbrödet (samma sort som under) →
   **fritösen** (sänk ner korgen, lyft upp) innan pommes, nuggets och lökringar läggs i fickan →
   **dryckesmaskinen** (tappa upp) innan muggen ställs på brickan (flaskor och burkar tas ur
-  kylen under) → efterrätten sist. Inget säljs över disk och det finns inga hyllor eller montrar
+  kylen under) → efterrätten sist. Råvaran kan **släppas direkt på stationen** (brödet på
+  brödrosten, biffen på grillen, pommesen i fritösen, muggen vid maskinen) – det utför
+  handgreppet, i hjälpläget likaväl som i proffsläget. Bara nästa lager i stapeln markeras, med
+  en ring i stället för en fylld ruta så att burgaren syns. Inget säljs över disk och det finns inga hyllor eller montrar
   i restaurangen: allt görs i köket. Köksutrustningen följer epoken (krom på femtiotalet,
   rostfritt i kedjan, svart stål 2016). Fakta om Maillard, kärntemperaturer, dubbelfritering
   m.m. i guiden.

@@ -59,17 +59,30 @@ await page.waitForFunction(() => document.body.dataset.screen === 'build', null,
 const bv = await page.evaluate(() => { const v = PV.build; return { title: document.querySelector('#build-title')?.textContent, slots: v.L.SLOTS.length, tray: v.trayEntries().length, steps: v.steps().map((s) => s.key), next: v.nextStep()?.key, btn: document.querySelector('#build-boot')?.textContent, guide: document.querySelector('#build-guide')?.textContent?.slice(0, 80) }; });
 ok(bv.slots >= 5 && bv.tray >= 5 && bv.next === 'act:rosta', `köket öppet: ${JSON.stringify(bv)}`);
 await page.screenshot({ path: OUT + 'rest-4-kok.png' });
+// släpp brödet rakt på brödrosten (proffsläget): stationen ska ta emot råvaran och rosta
+const drop = await page.evaluate(() => {
+  const v = PV.build, L = v.L, e = v.trayEntries().find((x) => x.part.cat === 'brod');
+  const [x, y] = v.P.proj(...L.ACTION.rosta.points[0]);
+  v.dropAt(e, [x + 6, y - 4]);
+  const rostat = L.actDone(v.b, 'rosta');
+  const biff = v.trayEntries().find((x) => x.part.cat === 'biff'), [gx, gy] = v.P.proj(...L.ACTION.grill.points[0]);
+  v.dropAt(biff, [gx, gy]);
+  return { rostat, grill: L.actCount(v.b, 'grill'), msg: (v.msg?.html || '').replace(/<[^>]+>/g, '').slice(0, 60) };
+});
+ok(drop.rostat && drop.grill === 1, `brödet släppt på brödrosten rostar, biffen släppt på grillen läggs på: ${JSON.stringify(drop)}`);
 // bygg via byggvyns egna funktioner i hjälpens ordning
+const midShot = page.waitForFunction(() => window.__midShot, null, { timeout: 20000 }).then(() => page.screenshot({ path: OUT + 'rest-4b-markering.png' })).catch(() => {});
 const built = await page.evaluate(async () => {
   const v = PV.build, L = v.L, log = [];
   for (let guard = 0; guard < 40; guard++) {
     const s = v.nextStep(); if (!s || s.kind === 'stand') break;
     if (s.kind === 'act') { const a = L.ACTION[s.id]; const done = L.actSet(v.b, a.id); const i = a.points.findIndex((p, k) => !done.has(k)); v.doAction(a, i); log.push('act:' + a.id + ':' + i); }
-    else if (s.kind === 'slot') { const e = v.trayEntries().find((x) => x.key === s.entryKey) || v.partEntries().find((x) => L.slotsFor(x.part).some((sl) => sl.id === s.id)); if (!e) { log.push('ingen del för ' + s.id); break; } const r = v.place(e, L.SLOT[s.id]); log.push('slot:' + s.id + ':' + (r ? 'ok' : 'nej')); }
+    else if (s.kind === 'slot') { const e = v.trayEntries().find((x) => x.key === s.entryKey) || v.partEntries().find((x) => L.slotsFor(x.part).some((sl) => sl.id === s.id)); if (!e) { log.push('ingen del för ' + s.id); break; } if (s.id === 'l3') { v.selected = e.key; await new Promise((r) => setTimeout(r, 250)); window.__midShot = true; await new Promise((r) => setTimeout(r, 900)); v.selected = null; } const r = v.place(e, L.SLOT[s.id]); log.push('slot:' + s.id + ':' + (r ? 'ok' : 'nej')); }
     await new Promise((r) => setTimeout(r, 30));
   }
   return { log, built: v.isBuilt(), placed: Object.keys(v.b.placed).length, msg: v.msg?.html?.slice(0, 120) };
 });
+await midShot;
 ok(built.built, `burgaren byggd: ${JSON.stringify(built)}`);
 await page.waitForTimeout(500);
 await page.screenshot({ path: OUT + 'rest-5-burgare.png' });

@@ -46,7 +46,7 @@ function makeRig(order) {
     const name = k === 0 ? 'Underbrödet' : top ? 'Toppbrödet' : `Lager ${k}: ${(CATS[l.it.cat]?.name || l.it.cat).toLowerCase()}`;
     const requires = k === 0 ? ['act:rosta'] : [prev];
     if (l.it.cat === 'biff' && !layers.slice(0, k).some((x) => x.it.cat === 'biff')) requires.push('act:salt');
-    S.push({ id, cat: l.it.cat, name, requires, k, top, part, accept: (p) => p.cat === l.it.cat });
+    S.push({ id, cat: l.it.cat, name, requires, k, top, part, ring: true, accept: (p) => p.cat === l.it.cat });
   });
   const sideItem = items.find((it) => it.cat === 'tillbehor'), sidePart = sideItem?.part ? DB.part[sideItem.part] : null;
   const drinkItem = items.find((it) => it.cat === 'dryck'), drinkPart = drinkItem?.part ? DB.part[drinkItem.part] : null;
@@ -67,7 +67,7 @@ function makeRig(order) {
   const A = [{ id: 'rosta', name: 'Rosta brödet', icon: '🍞', requires: [], points: [[K.toaster[0] + 2, K.toaster[1] + 2, 2.4]] }];
   const firstBiff = layers.find((l) => l.it.cat === 'biff');
   if (firstBiff) {
-    A.push({ id: 'grill', name: 'Stek biffen (lägg på, vänd)', icon: '🔥', requires: ['l0'], points: [[K.grill[0] + 1.6, K.grill[1] + 2.0, 1.15], [K.grill[0] + 4.0, K.grill[1] + 4.0, 1.15]] });
+    A.push({ id: 'grill', name: 'Stek biffen (lägg på, vänd)', icon: '🔥', requires: [], points: [[K.grill[0] + 1.6, K.grill[1] + 2.0, 1.15], [K.grill[0] + 4.0, K.grill[1] + 4.0, 1.15]] });
     A.push({ id: 'salt', name: 'Salta och peppra', icon: '🧂', requires: ['act:grill'], points: [[K.grill[0] + 2.75, K.grill[1] + 3, 1.9]] });
   }
   if (fried) A.push({ id: 'fritera', name: 'Fritera (sänk ner korgen, lyft upp)', icon: '🍟', requires: [], points: [[K.fryer[0] + 1.2, K.fryer[1] + 2.3, 2.9], [K.fryer[0] + 3.3, K.fryer[1] + 2.3, 2.3]] });
@@ -89,7 +89,10 @@ function makeRig(order) {
     for (const r of reqs) if (!has(b, r)) return NEED_MSG[r] || `${SLOT[r]?.name || r} måste ligga på först.`;
     return null;
   }
-  const slotsFor = (part) => S.filter((s) => s.cat === part.cat && (!s.accept || s.accept(part)));
+  // lagren tas i ordning: bara nästa lediga plats i stapeln för den här sortens råvara (så ligger inte gula rutor över hela burgaren)
+  const slotsFor = (part) => { const all = S.filter((s) => s.cat === part.cat && (!s.accept || s.accept(part))); const stack = all.filter((s) => s.k !== undefined); const next = stack.find((s) => !rig.lastB?.placed?.[s.id]); return [...(next ? [next] : []), ...all.filter((s) => s.k === undefined)]; };
+  // släpp råvaran på stationen = handgreppet: bröd på brödrosten, biff på grillen, pommes i fritösen, mugg vid dryckesmaskinen
+  const dropAction = (part, a) => (a.id === 'rosta' && part.cat === 'brod') || (a.id === 'grill' && part.cat === 'biff') || (a.id === 'fritera' && part.cat === 'tillbehor' && isFried(part)) || (a.id === 'tappa' && part.cat === 'dryck' && isPoured(part));
   function canPlace(slot, part, b) {
     rig.lastB = b;
     if (slot.cat !== part.cat) return { ok: false, msg: `${part.name} hör inte hemma i ${slot.name.toLowerCase()}.` };
@@ -169,7 +172,7 @@ function makeRig(order) {
   Object.assign(rig, {
     VIEW, MAX_K, CONN, connectorIcon, order, year: order.year, layers, r, cu, cv,
     SLOTS: S, SLOT, ACTIONS: A, ACTION, CABLES, CABLE, STEPS, PORTS,
-    actSet, actCount, actDone, missingReq, slotsFor, canPlace, canRemove, onRemove, wattNeed, actionReady,
+    actSet, actCount, actDone, missingReq, slotsFor, dropAction, canPlace, canRemove, onRemove, wattNeed, actionReady,
     portPos, portType, availablePorts, portLabel, portBusy, cableConn, cableNeeded, cableReady, cableOk, cableFrom, canConnect,
     SCREW_OF, screwStatus, standCheck, fact, drawScene, drawCables,
   });

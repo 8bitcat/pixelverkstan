@@ -341,11 +341,12 @@ export class BuildView {
   // ---------- Input ----------
   local(e) { const r = this.canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
 
-  actionAt(pt) {
-    const r = this.help ? 26 : 22;
+  actionAt(pt, part = null) {
+    const r = part ? 48 : this.help ? 26 : 22;   // ett släpp får vara slarvigare än ett klick
     let best = null, bd = r;
     for (const a of this.L.ACTIONS) {
       if (!this.L.actionReady(a, this.b)) continue;
+      if (part && !this.L.dropAction?.(part, a)) continue;
       const done = this.L.actSet(this.b, a.id);
       a.points.forEach((p, i) => {
         if (done.has(i)) return;
@@ -383,6 +384,8 @@ export class BuildView {
     }
     const hit = this.slotAt(pt, entry.part);
     if (hit?.slot && this.b.placed[hit.slot.id]) { const free = this.L.slotsFor(entry.part).find((s) => !this.b.placed[s.id]); if (free) hit.slot = free; }
+    // släpp på en station (brödrost, grill, fritös, dryckesmaskin …) = utför handgreppet
+    if (!hit || hit.wrong) { const act = this.actionAt(pt, entry.part); if (act) return this.doAction(act.a, act.i); }
     if (!hit) return this.say(this.help ? 'Släpp delen på den gula markeringen.' : 'Släpp delen där den ska sitta.', 'err');
     if (hit.wrong) {
       const right = this.L.slotsFor(entry.part)[0];

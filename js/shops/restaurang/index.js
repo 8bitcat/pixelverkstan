@@ -82,7 +82,7 @@ export default {
     titleFor: (order, gen) => `${order.title} åt ${order.name}`,
     welcome: (name) => `Välkommen till köket! Nu bygger vi ${name}s burgare lager för lager. Följ de gula markeringarna.`,
     build: (name) => `Bygg burgaren åt ${name}. Rosta brödet, stek biffen och lägg lagren i rätt ordning.`,
-    pro: 'Proffsläge! Inga markeringar – du vet hur den ska se ut. Lycka till!',
+    pro: 'Proffsläge! Inga markeringar. Släpp brödet på brödrosten, biffen på grillen (två gånger: lägg på och vänd), salta, pommesen i fritösen och muggen vid dryckesmaskinen – och bygg lagren på tallriken i beställningens ordning.',
     dragHint: 'Dra ingredienserna från lådan till brickan.',
     standBtn: '🍽️ Servera', openBtn: '🔙 Tillbaka till köket', standStep: '🍽️ Ställ tallriken på disken', testHead: 'Servering',
     builtHint: 'Allt är på tallriken! Tryck på 🍽️ Servera.', doneHint: 'Allt är klart! Tryck på <b>🍽️ Servera</b> och ställ tallriken på disken.',

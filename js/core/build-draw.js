@@ -29,7 +29,8 @@ export function drawHighlight(ctx, view, slot, t, color = '#f5c542') {
   const a = 0.5 + 0.5 * Math.sin(t * 6);
   ctx.save();
   ctx.beginPath(); poly.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath();
-  ctx.fillStyle = color; ctx.globalAlpha = 0.16 + 0.18 * a; ctx.fill();
+  // ring = bara en streckad kant (lager i en stapel – fyllningen skulle täcka det som redan ligger där)
+  if (!slot.ring) { ctx.fillStyle = color; ctx.globalAlpha = 0.16 + 0.18 * a; ctx.fill(); }
   ctx.globalAlpha = 1; ctx.lineWidth = 3; ctx.strokeStyle = color; ctx.setLineDash([8, 5]); ctx.lineDashOffset = -t * 30; ctx.stroke();
   ctx.restore();
 }
