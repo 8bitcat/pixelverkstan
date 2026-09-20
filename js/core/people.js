@@ -125,7 +125,8 @@ function render(L0, dir, frame) {
   const capc = ramp(toInt(L.cap, 0xc9323a)), bagc = ramp(toInt(L.bagColor, 0x2f3440));
   const sole = (toInt(L.shoes, 0) === 0xf2f2f2 || L.bottom === 'shorts') ? 0xd9d6cc : 0xe9e6dc;
 
-  const walkA = frame === 1, walkB = frame === 2, sit = frame === 5;
+  const eat = frame === 6, carry = frame >= 7;
+  const walkA = frame === 1 || frame === 7, walkB = frame === 2 || frame === 8, sit = frame === 5 || eat;
   const bob = sit ? 1 : (frame === 3 || frame === 4) ? -1 : 0;
 
   // proportioner
@@ -265,6 +266,19 @@ function render(L0, dir, frame) {
     // ---------- armar ----------
     const arm = (left, swing) => {
       const x0 = left ? 12 - tw - 2 : 12 + tw;
+      if (eat) {   // sitter och äter: överarmen ner, underarmen upp mot munnen
+        for (let j = 0; j < 3; j++) { const y = torsoTop + 1 + j, c = longSleeve || j < 2 ? shirt : skin; put(x0, y, left ? c.hi : c.base); put(x0 + 1, y, left ? c.base : c.lo); }
+        for (let k = 0; k < 4; k++) { const x = left ? x0 + 1 + k : x0 - k, y = torsoTop + 3 - k; put(x, y, k < 2 && longSleeve ? shirt.base : skin.base); }
+        put(left ? 11 : 12, torsoTop - 1, skin.lo); put(left ? 10 : 13, torsoTop - 1, skin.base);   // händerna vid munnen
+        put(left ? x0 + 1 : x0, torsoTop, shirt.base);
+        return;
+      }
+      if (carry) {   // bär tallriken: armarna framåt, händerna ihop framför magen
+        const len = armLen - 2;
+        for (let j = 0; j < len; j++) { const y = torsoTop + 1 + j, inward = Math.round(j / len * (tw + 1)), x = left ? x0 + inward : x0 - inward, c = j >= len - 2 ? skin : (longSleeve || j < 3) ? shirt : skin; put(x, y, left ? c.hi : c.base); put(x + 1, y, left ? c.base : c.lo); }
+        put(left ? x0 + 1 : x0, torsoTop, shirt.base);
+        return;
+      }
       const len = sit ? armLen : armLen + swing;
       const sleeve = longSleeve ? len - 2 : Math.min(3, len - 2);
       for (let j = 0; j < len; j++) {
@@ -478,6 +492,17 @@ function render(L0, dir, frame) {
     const drawArm = (swing, far) => {
       const C = far ? { hi: shirt.lo, base: shirt.lo, lo: shirt.dk } : shirt;
       const Sk = far ? { hi: skin.lo, base: skin.lo, lo: skin.dk } : skin;
+      if (eat) {   // underarmen upp mot munnen
+        for (let j = 0; j < 3; j++) { rect(11, torsoTop + 1 + j, 3, 1, (longSleeve || j < 2 ? C : Sk).base); }
+        for (let k = 0; k < 4; k++) { const c = k < 2 && longSleeve ? C : Sk; rect(12 + k, torsoTop + 3 - k, 2, 1, c.base); put(12 + k, torsoTop + 3 - k, c.lo); }
+        put(16, torsoTop - 1, Sk.base); put(15, torsoTop - 1, Sk.lo);
+        return;
+      }
+      if (carry) {   // armen rakt fram
+        for (let j = 0; j < 3; j++) rect(11, torsoTop + 1 + j, 3, 1, (longSleeve || j < 2 ? C : Sk).base);
+        for (let k = 0; k < 5; k++) { const c = k < 2 && longSleeve ? C : Sk; rect(12 + k, torsoTop + 4, 2, 1, c.base); put(12 + k, torsoTop + 5, c.lo); }
+        return;
+      }
       const len = sit ? armLen - 2 : armLen;
       const sleeve = longSleeve ? len - 2 : 3;
       for (let j = 0; j < len; j++) {
@@ -631,7 +656,7 @@ function spriteFor(look, dir, frame) {
 export function drawPerson(ctx, fx, fy, L, dir = 'down', frame = 0) {
   if (!['down', 'up', 'left', 'right'].includes(dir)) dir = 'down';
   frame = frame | 0;
-  if (frame < 0 || frame > 5) frame = 0;
+  if (frame < 0 || frame > 9) frame = 0;
   const x = Math.round(fx), y = Math.round(fy);
   // skugga
   ctx.fillStyle = 'rgba(20,12,30,.28)';

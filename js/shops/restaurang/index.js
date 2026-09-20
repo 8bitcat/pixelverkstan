@@ -26,6 +26,15 @@ export default {
   floorPlans: FLOOR_PLANS,          // matbord i stället för stjärnmonter och soffa
   themeFor: floorArt.themeFor,      // epoken bestämmer färger och stil
   dineIn: true,                     // kunderna sätter sig och äter efter att de hämtat brickan
+  // måltiden som byggdes: lagren i stapelordning, pommes, dryck och efterrätt – följer med kunden till bordet
+  mealOf(order) {
+    const b = order.build, L = rig.rigFor(order);
+    const placed = b?.placed || {};
+    const stack = L.SLOTS.filter((s) => s.k !== undefined);
+    const layers = stack.map((s) => placed[s.id]?.id || s.part?.id).filter(Boolean);
+    const side = (id, cat) => placed[id]?.id || order.items.find((it) => it.cat === cat)?.part || null;
+    return { layers, pommes: side('pommes', 'tillbehor'), dryck: side('dryck', 'dryck'), dessert: side('dessert', 'dessert') };
+  },
   kitchen3d: true,                  // i 3D byggs burgaren i köket bakom disken med fri kamera – ingen låst byggbild
   fit: upgrades,
   products,

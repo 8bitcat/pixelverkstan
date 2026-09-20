@@ -1,0 +1,74 @@
+{
+ "clips": [
+  {
+   "file": "carryTurn.glb",
+   "key": "carryTurn",
+   "src": "Carrying Turn.fbx",
+   "dur": 3.8,
+   "tracks": 53,
+   "bones": 65,
+   "hips": "mixamorigHips",
+   "bytes": 143352
+  },
+  {
+   "file": "carry.glb",
+   "key": "carry",
+   "src": "Carrying.fbx",
+   "dur": 10,
+   "tracks": 53,
+   "bones": 65,
+   "hips": "mixamorigHips",
+   "bytes": 199356
+  },
+  {
+   "file": "stand.glb",
+   "key": "stand",
+   "src": "Sit To Stand.fbx",
+   "dur": 2.07,
+   "tracks": 53,
+   "bones": 65,
+   "hips": "mixamorigHips",
+   "bytes": 140960
+  },
+  {
+   "file": "drink.glb",
+   "key": "drink",
+   "src": "Sitting Drinking.fbx",
+   "dur": 15.2,
+   "tracks": 53,
+   "bones": 65,
+   "hips": "mixamorigHips",
+   "bytes": 274384
+  },
+  {
+   "file": "sitIdle.glb",
+   "key": "sitIdle",
+   "src": "Sitting Idle.fbx",
+   "dur": 4.27,
+   "tracks": 53,
+   "bones": 65,
+   "hips": "mixamorigHips",
+   "bytes": 108112
+  },
+  {
+   "file": "eat.glb",
+   "key": "eat",
+   "src": "Sitting Talking.fbx",
+   "dur": 44.97,
+   "tracks": 53,
+   "bones": 65,
+   "hips": "mixamorigHips",
+   "bytes": 638652
+  },
+  {
+   "file": "sit.glb",
+   "key": "sit",
+   "src": "Stand To Sit.fbx",
+   "dur": 2.2,
+   "tracks": 53,
+   "bones": 65,
+   "hips": "mixamorigHips",
+   "bytes": 138976
+  }
+ ]
+}

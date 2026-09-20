@@ -9,6 +9,7 @@ import { slab, glassMat, metalMat, paintMat, signBoard, neonSign } from './room.
 import * as LY from '../core/floor-layout.js';
 import * as WK from '../core/floor-walk.js';
 import { consoleSprite, coverSprite, marqueeText, attractFrame, ATTRACT_FOR_ENGINE } from '../shops/dator/art-products.js';
+const hexOf = (s, fb) => (typeof s === 'string' && /^#[0-9a-f]{6}$/i.test(s) ? parseInt(s.slice(1), 16) : fb);
 
 const BOX = { gpu: [0.3, 0.24, 0.08], cpu: [0.11, 0.11, 0.1], ram: [0.15, 0.1, 0.03], storage: [0.16, 0.13, 0.05], sound: [0.22, 0.17, 0.06], mb: [0.32, 0.27, 0.09], case: [0.34, 0.42, 0.22], psu: [0.19, 0.17, 0.13], cooler: [0.15, 0.16, 0.14], fans: [0.13, 0.13, 0.05], media: [0.14, 0.13, 0.02], konsol: [0.36, 0.26, 0.13], spel: [0.14, 0.19, 0.02] };
 const DEF_BOX = [0.2, 0.16, 0.08];
@@ -416,7 +417,7 @@ export class Units {
   }
   // tallrikar med burgare: vid luckan (kunder som hämtar) och på borden (kunder som äter)
   plates(list) {
-    const sig = list.map((p) => p.key + ':' + p.stage).join('|');
+    const sig = list.map((p) => p.key + ':' + p.stage + ':' + (p.meal ? p.meal.layers.join(',') + p.meal.pommes + p.meal.dryck : '')).join('|');
     if (sig === this.plateSig) return;
     this.plateSig = sig;
     if (!this.plateGroup) { this.plateGroup = new THREE.Group(); this.scene.add(this.plateGroup); }
@@ -425,13 +426,31 @@ export class Units {
     for (const p of list) {
       const g = new THREE.Group(); g.position.set(p.x, p.y, p.z);
       const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.012, 20), white); plate.position.y = 0.006; plate.castShadow = true; g.add(plate);
+      const part = (id) => this.shop.part?.[id];
+      const meal = p.meal;
       if (p.stage < 0.9) {
         const s = p.stage < 0.3 ? 1 : p.stage < 0.6 ? 0.7 : 0.45;
-        const b1 = new THREE.Mesh(new THREE.CylinderGeometry(0.055 * s, 0.055 * s, 0.014, 14), bun); b1.position.set(-0.03, 0.02, 0); g.add(b1);
-        const pt = new THREE.Mesh(new THREE.CylinderGeometry(0.058 * s, 0.058 * s, 0.014, 14), patty); pt.position.set(-0.03, 0.034, 0); g.add(pt);
-        const b2 = new THREE.Mesh(new THREE.SphereGeometry(0.058 * s, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), bun); b2.scale.y = 0.6; b2.position.set(-0.03, 0.041, 0); g.add(b2);
+        const layers = meal ? meal.layers.map(part).filter(Boolean) : [];
+        if (layers.length) {
+          let y = 0.012;
+          layers.forEach((q, i) => {
+            const L = q.look || {}, top = i === layers.length - 1 && L.shape === 'bun';
+            const h = L.shape === 'bun' ? 0.016 : L.shape === 'patty' ? 0.014 : L.shape === 'cheese' || L.shape === 'sauce' || L.shape === 'drizzle' ? 0.004 : 0.007;
+            const r = (L.shape === 'leaf' ? 0.064 : L.shape === 'cheese' && !L.round ? 0.06 : 0.055) * s;
+            const m = paintMat(hexOf(L.color, 0xc8a060), 0.7);
+            const mesh = top ? new THREE.Mesh(new THREE.SphereGeometry(r, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), m) : new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 14), m);
+            if (top) { mesh.scale.y = 0.55; mesh.position.set(-0.03, y, 0); } else mesh.position.set(-0.03, y + h / 2, 0);
+            g.add(mesh); y += top ? 0 : h;
+          });
+        } else {
+          const b1 = new THREE.Mesh(new THREE.CylinderGeometry(0.055 * s, 0.055 * s, 0.014, 14), bun); b1.position.set(-0.03, 0.02, 0); g.add(b1);
+          const pt = new THREE.Mesh(new THREE.CylinderGeometry(0.058 * s, 0.058 * s, 0.014, 14), patty); pt.position.set(-0.03, 0.034, 0); g.add(pt);
+          const b2 = new THREE.Mesh(new THREE.SphereGeometry(0.058 * s, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), bun); b2.scale.y = 0.6; b2.position.set(-0.03, 0.041, 0); g.add(b2);
+        }
+        // pommes: små gula stavar, färre ju mer som ätits
+        if (meal?.pommes) { const n = Math.round(6 * (1 - p.stage)); for (let i = 0; i < n; i++) { const f = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.05, 0.008), paintMat(0xf0c050, 0.6)); f.position.set(0.06 + (i % 3) * 0.012, 0.035, -0.04 + Math.floor(i / 3) * 0.014); f.rotation.z = (i % 2 ? 0.2 : -0.15); g.add(f); } }
       }
-      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.025, 0.09, 12), cup); c.position.set(0.11, 0.045, 0.06); g.add(c);
+      if (!meal || meal.dryck) { const d = meal?.dryck ? part(meal.dryck) : null, L = d?.look || {}, cm = d ? paintMat(hexOf(L.cup || L.color, 0xf4f1ea), 0.5) : cup; const c = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.025, 0.09, 12), cm); c.position.set(0.11, 0.045, 0.06); g.add(c); }
       this.plateGroup.add(g);
     }
   }

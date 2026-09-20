@@ -373,11 +373,11 @@ export class Shop3D {
     const g = this.game, out = [];
     let i = 0;
     for (const c of g.customers) {
-      if (c.phase === 'ready' && c.payout) { out.push({ key: 'r' + c.id, x: C.toX(428 + 9 + Math.min(2, i++) * 22), y: 1.04, z: C.toZ(LY.COUNTER.top + 6), stage: 0 }); continue; }
+      if (c.phase === 'ready' && c.payout) { out.push({ key: 'r' + c.id, x: C.toX(428 + 9 + Math.min(2, i++) * 22), y: 1.04, z: C.toZ(LY.COUNTER.top + 6), stage: 0, meal: c.meal || null }); continue; }
       if (c.phase === 'eating' && c._sit && c._spot >= 0) {
         const sp = LY.SPOTS[c._spot]; if (!sp?.plate) continue;
         const stage = c._eatMax ? Math.max(0, Math.min(1, 1 - c._eatT / c._eatMax)) : (c._eat || 0) / 100;
-        out.push({ key: 'e' + c.id, x: C.toX(sp.plate[0]), y: 0.76, z: C.toZ(sp.plate[1]), stage: Math.round(stage * 10) / 10 });
+        out.push({ key: 'e' + c.id, x: C.toX(sp.plate[0]), y: 0.76, z: C.toZ(sp.plate[1]), stage: Math.round(stage * 10) / 10, meal: c.meal || null });
       }
     }
     return out;

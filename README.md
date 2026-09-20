@@ -271,8 +271,17 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   tallriken (med pommes, dryck och efterrätt) bort till luckan med värmelamporna. Kunden
   hämtar den där, säger sitt omdöme (beror på tid och kladd) och betalar, bär tallriken till
   ett bord, sätter sig och äter: burgaren lyfts mot munnen vid varje tugga, käkarna går, och
-  burgaren blir mindre tills bara smulor och servetten är kvar. I 3D sjunker gästen ner på
-  stolen och tuggar, tallrikar står vid luckan och på borden.
+  burgaren blir mindre tills bara smulor och servetten är kvar. **Måltiden du byggde följer
+  med fysiskt** (`shop.mealOf`): samma lager i samma ordning, pommes, mugg i dryckens färg och
+  efterrätt ritas på tallriken vid luckan, i händerna på vägen till bordet och på bordet, och
+  äts upp bit för bit. Pixelfigurerna har egna poser för att bära tallriken (armarna fram) och
+  äta (händerna vid munnen). I 3D sjunker gästen ner på stolen och tuggar, tallrikarna byggs av
+  samma lager, och gästerna spelar riktiga Mixamo-klipp: Stand To Sit, Sitting Idle, Sitting
+  Talking (tuggorna), Sitting Drinking, Sit To Stand och Carrying (tallriken). Klippen exporteras
+  från Mixamo på X Bot (Without Skin, FBX Binary, 30 fps) till `assets/3d/mixamo/anim/` och
+  konverteras med `node tools/mixamo-anim.mjs` till små glb-filer i `assets/3d/anim/` (manifest med
+  nycklar sit/sitIdle/eat/drink/stand/carry); `people.js` lägger dem på alla figurer med samma
+  retargeting som idle/walk och tar bort höftens x/z-rörelse ur gångklipp som inte är In Place.
 - **Inredning** (`upgrades.js`): läskkyl och dessertdisk som montrar, jukebox, godishylla,
   såsbar, lekhörna, kaffemaskin; lokaler Gatuköket → Megaburger; dubbelgrill, fritös,
   milkshakemaskin, menytavla; kylrum 2–4 för dyrare kött.
@@ -400,6 +409,8 @@ node tools/restaurang.mjs                # hamburgerbaren i webbläsaren: meny �
 node tools/restaurang3d.mjs              # hamburgerbaren i 3D: stor burgare i 2D-köket, köket på bänken, servering i 3D
 node tools/restaurang-ikoner.mjs         # ritar alla ingrediensers ikoner i ark per kategori (rest-ikoner-*.png)
 node tools/restaurang-golv.mjs           # restaurangens golv genom epokerna med fyllda montrar, automater och gäster som äter (rest-golv-<år>.png)
+node tools/restaurang-anim.mjs           # 3D: Mixamo-klippen laddas, gäster som sitter spelar sitt-/ätklipp, den som bär spelar bärklippet (rest-anim-*.png)
+node tools/mixamo-anim.mjs [filter]      # konverterar Mixamo-animationer (Without Skin) i assets/3d/mixamo/anim/ till assets/3d/anim/*.glb + manifest
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner
 ```
 

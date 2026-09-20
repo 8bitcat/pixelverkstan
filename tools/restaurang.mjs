@@ -99,6 +99,8 @@ await page.screenshot({ path: OUT + 'rest-7-glider.png' });
 await page.waitForFunction(() => PV.game.customers[0]?.phase === 'ready', null, { timeout: 15000 }); await page.waitForTimeout(400);
 const said = await page.evaluate(() => PV.game.customers[0]?.sayPickup || '');
 ok(said.length > 5, `kundens omdöme sägs vid luckan: ${said}`);
+const meal = await page.evaluate(() => PV.game.customers[0]?.meal || null);
+ok(meal && meal.layers.length >= 5 && meal.layers[0].startsWith('brod') && meal.layers.at(-1).startsWith('brod'), `måltiden som byggdes följer med kunden: ${JSON.stringify(meal)}`);
 const after = await page.evaluate(() => { const c = PV.game.customers[0]; return { money: PV.game.money, screen: document.body.dataset.screen, modal: document.querySelector('#modal h2')?.textContent, phase: c?.phase, payout: c?.payout?.total }; });
 ok(after.phase === 'ready' && after.payout > 0 && /disken|nöjd/i.test(after.modal || ''), `kunden hämtar och betalar ${after.payout} kr vid luckan: ${JSON.stringify(after)}`);
 await page.screenshot({ path: OUT + 'rest-8-betalt.png' });

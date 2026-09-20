@@ -922,7 +922,7 @@ export class Game {
     if (o.model) { const m = this.modelOf(o.model); if (m) { m.sold++; m.earned += price; m.hype = Math.min(2, m.hype + 0.03); this.stats.modelSold = (this.stats.modelSold || 0) + 1; } }
     o.payout = { price, tip, bonus, total: price + tip + bonus, xp: this.shop.xpFor(o) + result.stars * 2 + (bonus ? 5 : 0), stars: result.stars };
     this.orders = this.orders.filter((x) => x !== o);
-    if (c) { c.phase = 'ready'; c.payout = o.payout; c.patience = Infinity; }
+    if (c) { c.phase = 'ready'; c.payout = o.payout; c.patience = Infinity; if (this.shop.mealOf) { c.meal = this.shop.mealOf(o); this.emit('meal', { id: c.id, meal: c.meal }); } }
     else this.pay(o.payout);
     this.emit('change');
     return o.payout;

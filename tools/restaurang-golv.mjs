@@ -45,7 +45,7 @@ for (const year of [1955, 1975, 1996, 2016, 2022]) {
     let n = 0;
     for (let i = 0; i < 6; i++) {
       const o = g.shop.generateOrder(g, ['Nils', 'Maja', 'Ali', 'Sara', 'Olle', 'Ida']); if (!o) continue;
-      const c = g.spawn(o); c.patience = 9999;
+      const c = g.spawn(o); c.patience = 9999; c.meal = g.shop.mealOf(c.order);
       if (i < 4) { const seat = PV.floor.pickSeat(c); if (seat < 0) continue; c.phase = 'eating'; c._spot = seat; c._eatMax = 80; c._eatT = 80 - i * 18; c.x = PV.floor.constructor.name ? c.x : c.x; c._path = null; n++; }
       else if (i === 4) { c.phase = 'ready'; c.x = 453; c.y = 176; c.payout = { total: 90, price: 80, tip: 10, xp: 0, stars: 3 }; }
       else { c.phase = 'queue'; c.x = 318; c.y = 176; }

@@ -551,11 +551,13 @@ export class Floor {
       const chew = eating ? this.art?.eatPhase?.(t, c.id) : null;   // { bite, munch } – tuggor och käkrörelser
       if (eating && this.art?.eatSprite) {
         const [px, py] = LY.SPOTS[c._spot].plate, stage = c._eatMax ? Math.max(0, Math.min(1, 1 - c._eatT / c._eatMax)) : (c._eat || 0) / 100;
-        S.push([c.y + 3, () => this.art.eatSprite(ctx, px, py, stage, c.id, t, chew)]);
+        S.push([c.y + 3, () => this.art.eatSprite(ctx, px, py, stage, c.id, t, chew, c.meal || null)]);
       }
       // bär tallriken från luckan till bordet
-      if (c._carry && !c._sit && this.art?.carrySprite) S.push([c.y + 1, () => this.art.carrySprite(ctx, c.x, c.y, c.dir, c.id)]);
-      const frame = c.moving ? WALK_SEQ[Math.floor(c.walk) % 4] : c._sit ? 5 : (Math.sin(t * 1.9 + c.id * 1.7) > 0.72 ? 4 : 0);
+      if (c._carry && !c._sit && this.art?.carrySprite) S.push([c.y + 1, () => this.art.carrySprite(ctx, c.x, c.y, c.dir, c.id, c.meal || null)]);
+      // poser: 6 = sitter och äter (tuggan), 7/8/9 = bär tallriken (gående A/B, stående)
+      const walkF = WALK_SEQ[Math.floor(c.walk) % 4];
+      const frame = c._carry && !c._sit ? (c.moving ? (walkF === 1 ? 7 : walkF === 2 ? 8 : 9) : 9) : c.moving ? walkF : c._sit ? (chew?.bite ? 6 : 5) : (Math.sin(t * 1.9 + c.id * 1.7) > 0.72 ? 4 : 0);
       const bob = chew?.munch ? 1 : 0;
       S.push([c._sit ? c.y + 2 : c.y, () => drawPerson(ctx, c.x, c.y - bob, c.look, c._sit ? 'down' : c.dir, frame)]);
     }
@@ -994,7 +996,7 @@ export class Floor {
     const ready = this.game.customers.filter((x) => x.phase === 'ready').length;
     for (let i = 0; i < Math.min(3, ready); i++) {
       const bx = 428 + i * 22, by = 98;
-      if (this.art?.readyItem) { this.art.readyItem(ctx, i, bx, by); continue; }
+      if (this.art?.readyItem) { this.art.readyItem(ctx, i, bx, by, this.game.customers.filter((x) => x.phase === 'ready')[i]); continue; }
       ctx.fillStyle = '#17151a'; ctx.fillRect(bx - 1, by - 1, 20, 25);
       ctx.fillStyle = '#c9a36b'; ctx.fillRect(bx, by + 4, 18, 19);
       ctx.fillStyle = '#e0c08a'; ctx.fillRect(bx, by, 18, 4);

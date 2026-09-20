@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { clone as cloneRig } from 'three/addons/utils/SkeletonUtils.js';
 import { loadRig, BASE } from './assets.js';
+const EXTRA_CLIPS = ['sit', 'sitIdle', 'eat', 'drink', 'stand', 'carry', 'happy', 'sad'];   // ur assets/3d/anim/manifest.json
 import { tag, marker } from './textures.js';
 
 
@@ -151,6 +152,18 @@ export class People {
     this.groups = new Float32Array(sk ? sk.skeleton.bones.length : 0);
     if (sk) sk.skeleton.bones.forEach((b, i) => { this.groups[i] = groupOf(b.name); });
     try { const r = await fetch(BASE + 'chars/manifest.json'); if (r.ok) this.chars = ((await r.json()).chars || []).filter((c) => c.file && c.file !== 'Xbot.glb'); } catch { this.chars = []; }
+    // extra klipp (sitta, äta, dricka, resa sig, bära) från Mixamo, konverterade med tools/mixamo-anim.mjs
+    try {
+      const r = await fetch(BASE + 'anim/manifest.json');
+      if (r.ok) for (const c of (await r.json()).clips || []) {
+        if (!c.file || !c.key) continue;
+        const g2 = await loadRig('anim/' + c.file);
+        const clip = g2?.animations?.[0]; if (!clip) continue;
+        // gångklipp som inte exporterats "In Place" flyttar höften framåt – ta bort x/z-rörelsen så figuren stannar på sin plats
+        if (/carry|walk|run/.test(c.key)) for (const t of clip.tracks) if (/Hips\.position$/.test(t.name)) { const v = t.values; for (let i = 3; i < v.length; i += 3) { v[i] = v[0]; v[i + 2] = v[2]; } }
+        clip.name = c.key; this.clips[c.key] = clip;
+      }
+    } catch {}
   }
   // vilken figur en person får: bestäms av nyckeln (samma kund → samma figur)
   charFor(a) {
@@ -189,7 +202,7 @@ export class People {
       const tgtRest = restRotations(g.scene);
       const restore = []; this.rig.traverse((o) => { if (o.isBone) restore.push([o, o.quaternion.clone(), o.position.clone()]); });
       for (const [k, clip] of Object.entries(this.clips)) {
-        if (!['idle', 'walk', 'run'].includes(k)) continue;
+        if (!['idle', 'walk', 'run', ...EXTRA_CLIPS].includes(k)) continue;
         try { e.clips[k] = retargetDelta(this.rig, this.srcRest, g.scene, tgtRest, clip, 30); }
         catch (err) { console.warn('3D: retargeting misslyckades för ' + c.file, err); e.clips[k] = retarget(clip, prefix, ratio); }
         e.clips[k].name = k;
@@ -224,7 +237,7 @@ export class People {
       root.position.y = (ce.footFix || 0) * s;
       mixer = new THREE.AnimationMixer(root);
       actions = {};
-      for (const k of ['idle', 'walk', 'run', 'agree', 'headShake']) if (ce.clips[k]) actions[k] = mixer.clipAction(ce.clips[k]);
+      for (const k of ['idle', 'walk', 'run', 'agree', 'headShake', ...EXTRA_CLIPS]) if (ce.clips[k]) actions[k] = mixer.clipAction(ce.clips[k]);
       if (actions.idle) actions.idle.play();
     } else if (this.rig) {
       root = cloneRig(this.rig);
@@ -243,7 +256,7 @@ export class People {
       root.scale.setScalar(s);
       mixer = new THREE.AnimationMixer(root);
       actions = {};
-      for (const k of ['idle', 'walk', 'run', 'agree', 'headShake']) if (this.clips[k]) actions[k] = mixer.clipAction(this.clips[k]);
+      for (const k of ['idle', 'walk', 'run', 'agree', 'headShake', ...EXTRA_CLIPS]) if (this.clips[k]) actions[k] = mixer.clipAction(this.clips[k]);
       if (actions.idle) { actions.idle.play(); }
     } else {
       // reserv: en enkel kapselfigur
@@ -297,13 +310,17 @@ export class People {
       if (!ac) ac = this.make(a);
       ac.h = a.kid ? 1.25 : 1.76;
       // sitter: figuren sjunker ner på stolen; äter: små tuggor (huvudet gungar) var annan sekund
-      const munch = a.eat && ((this.t * 1.1 + ac.seed) % 2.4) < 0.7 ? Math.abs(Math.sin(this.t * 14)) * 0.035 : 0;
-      ac.g.position.set(a.x, (a.y || 0) + munch, a.z);
+      // med riktiga sittklipp sitter figuren själv – utan dem sjunker den ner på stolen och gungar vid tuggorna
+      const hasSit = !!ac.actions?.sitIdle;
+      const munch = a.eat && !ac.actions?.eat && ((this.t * 1.1 + ac.seed) % 2.4) < 0.7 ? Math.abs(Math.sin(this.t * 14)) * 0.035 : 0;
+      ac.g.position.set(a.x, (a.sit && !hasSit ? (a.y || 0) : 0) + munch, a.z);
       let d = (a.yaw ?? 0) - ac.yaw; d = Math.atan2(Math.sin(d), Math.cos(d));
       ac.yaw += d * Math.min(1, dt * 9);
       ac.g.rotation.y = ac.yaw;
       if (ac.mixer) {
-        const want = a.moving ? (a.run && ac.actions.run ? 'run' : 'walk') : 'idle';
+        const A = ac.actions, biting = ((this.t * 0.9 + ac.seed) % 3.2) < 1.4;
+        const want = a.sit ? (a.eat && A.eat && biting ? 'eat' : A.sitIdle ? 'sitIdle' : 'idle')
+          : a.moving ? (a.carry && A.carry ? 'carry' : a.run && A.run ? 'run' : 'walk') : 'idle';
         if (want !== ac.cur && ac.actions[want]) {
           const from = ac.actions[ac.cur], to = ac.actions[want];
           to.reset().setEffectiveTimeScale(want === 'walk' ? (a.kid ? 1.15 : 1) : 1).setEffectiveWeight(1).play();

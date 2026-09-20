@@ -44,7 +44,7 @@ export function applyEcon(g, e) {
   if (e.start) g.startInfo = { template: e.start.template, builds: e.start.builds.map((ids) => ids.map((id) => g.shop.part[id]).filter(Boolean)) };
 }
 const orderSnap = (o) => ({ id: o.id, customerId: o.customerId, template: o.template, title: o.title, name: o.name, msg: o.msg, items: o.items, guided: o.guided, tutorial: o.tutorial, year: o.year, reserved: o.reserved, chosen: o.chosen, startedAt: o.startedAt, staff: o.staff, touched: o.touched, model: o.model, price: o.price, fee: o.fee, service: o.service, serviceT: o.serviceT, opts: o.opts });
-const custFull = (c) => ({ id: c.id, name: c.name, look: c.look, order: c.order, phase: c.phase, patience: isFinite(c.patience) ? c.patience : -1, patienceMax: isFinite(c.patienceMax) ? c.patienceMax : -1, x: c.x, y: c.y, dir: c.dir });
+const custFull = (c) => ({ id: c.id, name: c.name, look: c.look, order: c.order, meal: c.meal || null, phase: c.phase, patience: isFinite(c.patience) ? c.patience : -1, patienceMax: isFinite(c.patienceMax) ? c.patienceMax : -1, x: c.x, y: c.y, dir: c.dir });
 const num = (v) => (v === -1 ? Infinity : v);
 
 // ---------- Värden ----------
@@ -173,6 +173,7 @@ export class CoopHost {
       this.net.broadcast({ t: 'toast', text: data.text, kind: data.kind });
     }
     if (type === 'delivery') this.net.broadcast({ t: 'ev', type: 'delivery' });
+    if (type === 'meal') this.net.broadcast({ t: 'meal', id: data.id, meal: data.meal });
     if (type === 'levelup') this.net.broadcast({ t: 'ev', type: 'levelup', data });
     return true;
   }
@@ -214,6 +215,7 @@ export class CoopClient {
     net.on('econ', (m) => { if (!this.game) return; applyEcon(this.game, m.econ); this.game.emit('change'); });
     net.on('orders', (m) => this.orders(m.orders));
     net.on('cust', (m) => this.custFull(m.list));
+    net.on('meal', (m) => { const c = this.game?.customers.find((x) => x.id === m.id); if (c) c.meal = m.meal; });
     net.on('tick', (m) => this.tick(m));
     net.on('toast', (m) => app.toast?.(m.text, m.kind));
     net.on('ev', (m) => app.onEvent?.(m.type, m.data));
