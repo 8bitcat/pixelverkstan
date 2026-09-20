@@ -111,7 +111,7 @@ export class Floor {
     if (art?.makeTable) for (const t of LY.TABLES) this.furniture.push(...art.makeTable(t, g.year, LY.PLAN.style, items));
     if (items.tidningar) this.furniture.push(PR.makeMagRack());
     this.buildUnits();
-    this.shelfImg = null;
+    this.shelfImg = null; this.display = null;
     this.cars = [];
     this.carImgs = [0xc9323a, 0x2c6fb7, 0xf0f0ea, 0x2a2d33, 0xe8b230, 0x46a35a].map((c, i) => PR.makeCar(c, i === 4 ? 1 : 0));
     this.beams = makeBeams();
@@ -647,7 +647,8 @@ export class Floor {
       else if (u.unit === 'arkad') u.img = u.prod ? cabinetSprite(u.prod, this.RES) : null;
       else if (u.frame) u.img = u.frame.grid ? this.renderGrid(u) : u.frame.tower ? this.renderTower(u) : this.renderVitrine(u);
     }
-    this.shelfImg = this.art?.renderDisplay ? this.art.renderDisplay(this) : this.art?.noShelf ? null : this.renderShelf();
+    this.shelfImg = this.art?.noShelf ? null : this.renderShelf();
+    this.display = this.art?.renderDisplay ? this.art.renderDisplay(this) : null;   // { img, x, y } – kyldiskens skålar på disken
   }
 
   // produkter som står framme, hetast först
@@ -908,7 +909,7 @@ export class Floor {
     ctx.globalAlpha = (t % 7) < 0.15 ? 0.35 : 0.95;
     ctx.drawImage(this.open.img, 146 - (this.open.img.width >> 1), 21);
     ctx.globalAlpha = 1;
-    if (this.shelfImg) ctx.drawImage(this.shelfImg, SC.SHELF.x0 - 2, this.art?.renderDisplay ? 26 : 20);
+    if (this.shelfImg) ctx.drawImage(this.shelfImg, SC.SHELF.x0 - 2, 20);
     // klockan (riktig tid)
     const [cx, cy] = SC.CLOCK, now = new Date();
     const hand = (ang, len, col) => {
@@ -975,6 +976,7 @@ export class Floor {
   drawCounter(ctx) {
     const c = this.counter, t = this.t;
     ctx.drawImage(c.img, c.x, c.y);
+    if (this.display) ctx.drawImage(this.display.img, this.display.x, this.display.y);
     // demodatorns rgb-fläktar
     for (const [fx, fy, ph] of this.art?.noDemoPc ? [] : [[386, 101, 0], [386, 114, 120]]) {
       for (let a = 0; a < 8; a++) {
@@ -989,13 +991,14 @@ export class Floor {
     if (!this.art?.noDemoPc) { ctx.fillStyle = css(hsl(t * 120, 0.9, 0.55)); ctx.fillRect(381, 94, 1, 26); }
     // extra kassa (prylen "extra kassadisk")
     if (this.game.fit?.items?.kassa2) {
-      ctx.fillStyle = '#23262b'; ctx.fillRect(337, 104, 18, 13); ctx.fillStyle = '#3c78d8'; ctx.fillRect(338, 105, 16, 10); ctx.fillStyle = '#7fb0f0'; ctx.fillRect(338, 105, 16, 1);
-      ctx.fillStyle = '#dfefff'; ctx.fillRect(340, 107, 7, 1); ctx.fillStyle = '#45b964'; ctx.fillRect(340, 111, 5, 2); ctx.fillStyle = '#2a2d33'; ctx.fillRect(340, 122, 12, 3); ctx.fillStyle = '#3a3d44'; ctx.fillRect(345, 117, 2, 5);
+      const kx = LY.QUEUE[0][0] + 19;
+      ctx.fillStyle = '#23262b'; ctx.fillRect(kx, 104, 18, 13); ctx.fillStyle = '#3c78d8'; ctx.fillRect(kx + 1, 105, 16, 10); ctx.fillStyle = '#7fb0f0'; ctx.fillRect(kx + 1, 105, 16, 1);
+      ctx.fillStyle = '#dfefff'; ctx.fillRect(kx + 3, 107, 7, 1); ctx.fillStyle = '#45b964'; ctx.fillRect(kx + 3, 111, 5, 2); ctx.fillStyle = '#2a2d33'; ctx.fillRect(kx + 3, 122, 12, 3); ctx.fillStyle = '#3a3d44'; ctx.fillRect(kx + 8, 117, 2, 5);
     }
     // färdiga datorer som väntar på upphämtning
     const ready = this.game.customers.filter((x) => x.phase === 'ready').length;
     for (let i = 0; i < Math.min(3, ready); i++) {
-      const bx = 428 + i * 22, by = 98;
+      const bx = LY.PICKUP[0][0] - 25 + i * 22, by = 98;
       if (this.art?.readyItem) { this.art.readyItem(ctx, i, bx, by, this.game.customers.filter((x) => x.phase === 'ready')[i]); continue; }
       ctx.fillStyle = '#17151a'; ctx.fillRect(bx - 1, by - 1, 20, 25);
       ctx.fillStyle = '#c9a36b'; ctx.fillRect(bx, by + 4, 18, 19);

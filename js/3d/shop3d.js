@@ -251,7 +251,7 @@ export class Shop3D {
     this.room.update(dt, fl);
     this.units.update(dt);
     this.people.sync(this.peopleList(), dt);
-    this.units.plates?.(this.plateList());
+    if (this.shop.mealOf) this.units.plates?.(this.plateList());
     this.bench.update(dt);
     this.renderer.info.reset();
     if (this.benchComposer) this.benchComposer.render(); else this.renderer.render(this.scene, this.bench.camera);
@@ -373,7 +373,7 @@ export class Shop3D {
     const g = this.game, out = [];
     let i = 0;
     for (const c of g.customers) {
-      if (c.phase === 'ready' && c.payout) { out.push({ key: 'r' + c.id, x: C.toX(428 + 9 + Math.min(2, i++) * 22), y: 1.04, z: C.toZ(LY.COUNTER.top + 6), stage: 0, meal: c.meal || null }); continue; }
+      if (c.phase === 'ready' && c.payout) { const dc = this.room?.displayCase; out.push({ key: 'r' + c.id, x: C.toX(LY.PICKUP[0][0] - 16 + Math.min(2, i++) * 22), y: dc ? dc.top : 1.04, z: dc ? (dc.z0 + dc.z1) / 2 : C.toZ(LY.COUNTER.top + 6), stage: 0, meal: c.meal || null }); continue; }
       if (c.phase === 'eating' && c._sit && c._spot >= 0) {
         const sp = LY.SPOTS[c._spot]; if (!sp?.plate) continue;
         const stage = c._eatMax ? Math.max(0, Math.min(1, 1 - c._eatT / c._eatMax)) : (c._eat || 0) / 100;

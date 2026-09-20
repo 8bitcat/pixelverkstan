@@ -10,9 +10,11 @@ export const DOOR = { x0: 180, x1: 233, cx: 206, inY: 100 };
 export const SPAWN_X = [-18, 266];   // utanför bildens glas (dolda bakom väggen)
 
 export const COUNTER = { x0: 286, x1: 506, top: 117, front: 129, base: 150, split: 400 };
-export const KEEPER_HOME = [338, 134], KEEPER_PICKUP = [453, 134];
-export const QUEUE = [[318, 176], [318, 210], [318, 244], [318, 278]];
-export const PICKUP = [[453, 176], [453, 210], [453, 244]];
+// kön (BESTÄLL) och luckan (UTLÄMNING): datorbutiken beställer till vänster och hämtar till höger; hamburgerbaren
+// tvärtom (plan.pickupLeft) – kyldisken med luckan ovanpå tar vänstra diskytan och kassan den högra
+export let KEEPER_HOME = [338, 134], KEEPER_PICKUP = [453, 134];
+export let QUEUE = [[318, 176], [318, 210], [318, 244], [318, 278]];
+export let PICKUP = [[453, 176], [453, 210], [453, 244]];
 export const SLOT_DEPTH = { wide: 40, medium: 40, small: 24 };
 export const VIT_DEPTH = 40;
 export const GATES = [179, 233];
@@ -54,6 +56,9 @@ export function setPlan(lokal, plans = undefined) {
   if (plans !== undefined) PLAN_SRC = plans;
   const plan = PLAN_SRC ? (PLAN_SRC[lokal] || PLAN_SRC[3]) : planFor(lokal);
   PLAN = plan;
+  const flip = !!plan.pickupLeft, qx = flip ? 453 : 318, px = flip ? 318 : 453;
+  QUEUE = [176, 210, 244, 278].map((y) => [qx, y]); PICKUP = [176, 210, 244].map((y) => [px, y]);
+  KEEPER_HOME = [flip ? 433 : 338, 134]; KEEPER_PICKUP = [px, 134];
   SLOTS = plan.slots; VITRINES = SLOTS.slice(0, 3);
   HERO = plan.hero || null;
   ROPE = HERO ? { x0: HERO.cx - 66, x1: HERO.cx + 66, back: HERO.base - 62, front: HERO.base + 18 } : null;

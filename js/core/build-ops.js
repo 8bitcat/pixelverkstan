@@ -8,6 +8,7 @@
 //   plug {id, key}         unplugd {id}           psu {on}           power {}
 //   result {success}
 
+// act kan bära part: råvaran som lades på stationen – den ligger sedan där och går att ta med handen
 export function newBuild() {
   return { placed: {}, acts: new Map(), cables: new Map(), errors: 0, time: 0, help: null, phase: 'build', seen: new Set() };
 }
@@ -38,6 +39,7 @@ export function applyBuildOp(shop, order, op) {
       const set = new Set(b.acts.get(op.id) || []);
       set.add(op.i);
       b.acts.set(op.id, set);
+      if (op.part) (b.station ||= {})[op.id] = op.part;
       break;
     }
     case 'cable': if (!b.cables.has(op.id)) b.cables.set(op.id, op.port); break;
@@ -59,6 +61,7 @@ export function serializeBuild(b) {
     placed: Object.fromEntries(Object.entries(b.placed).map(([k, p]) => [k, p.id])),
     acts: [...b.acts].map(([k, s]) => [k, [...s]]),
     cables: [...b.cables],
+    station: { ...(b.station || {}) },
     errors: b.errors, time: b.time, help: b.help, phase: b.phase,
     desk: b.desk ? { plugs: { ...b.desk.plugs }, psuOn: b.desk.psuOn, attempts: { ...b.desk.attempts }, success: b.desk.success } : null,
   };
@@ -69,6 +72,7 @@ export function deserializeBuild(data, shop) {
   for (const [k, id] of Object.entries(data.placed || {})) if (shop.part[id]) b.placed[k] = shop.part[id];
   b.acts = new Map((data.acts || []).map(([k, a]) => [k, new Set(a)]));
   b.cables = new Map(data.cables || []);
+  b.station = { ...(data.station || {}) };
   Object.assign(b, { errors: data.errors || 0, time: data.time || 0, help: data.help ?? null, phase: data.phase || 'build' });
   if (data.desk) b.desk = { plugs: { ...data.desk.plugs }, psuOn: !!data.desk.psuOn, attempts: { ...data.desk.attempts }, success: !!data.desk.success };
   return b;

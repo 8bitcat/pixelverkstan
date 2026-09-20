@@ -53,6 +53,23 @@ export function drawHotspot(ctx, x, y, t, icon, label, small = false) {
   ctx.restore();
 }
 
+// Hand som guppar över det som ligger färdigt på en station och går att ta
+export function drawHand(ctx, x, y, t, label = '') {
+  const dy = Math.sin(t * 4) * 3;
+  ctx.save();
+  ctx.font = `22px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2;
+  ctx.fillText('✋', x, y - 22 + dy);
+  ctx.shadowColor = 'transparent';
+  if (label) {
+    ctx.font = `17px ${FONT}`;
+    const w = ctx.measureText(label).width + 12;
+    ctx.fillStyle = INK; ctx.fillRect(x - w / 2, y - 48 + dy, w, 20);
+    ctx.fillStyle = '#fff'; ctx.fillText(label, x, y - 38 + dy);
+  }
+  ctx.restore();
+}
+
 // Skruvmejsel som snurrar på en punkt
 export function drawScrewdriver(ctx, x, y, t) {
   ctx.save();

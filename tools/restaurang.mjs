@@ -44,12 +44,14 @@ await page.evaluate(() => { const g = PV.game; for (const d of g.deliveries) { d
 await page.waitForTimeout(300);
 const stock = await page.evaluate(() => ({ stock: Object.entries(PV.game.stock).filter(([, n]) => n > 0).length, shown: Object.entries(PV.game.shown).filter(([, n]) => n > 0).length, hasShown: PV.game.hasShown() }));
 ok(stock.stock > 5, `lagret fyllt: ${JSON.stringify(stock)}`);
-const disp = await page.evaluate(() => { PV.floor.sig = null; PV.floor.refreshStock(); const c = PV.floor.shelfImg; if (!c) return null; const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return { w: c.width, h: c.height, painted: n }; });
-ok(disp && disp.painted > 300, `kyldisken visar råvarorna i skålar: ${JSON.stringify(disp)}`);
+const disp = await page.evaluate(() => { PV.floor.sig = null; PV.floor.refreshStock(); const c = PV.floor.display?.img; if (!c) return null; const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return { w: c.width, h: c.height, painted: n }; });
+ok(disp && disp.painted > 300, `kyldisken på disken visar råvarorna i skålar: ${JSON.stringify(disp)}`);
+const lay = await page.evaluate(async () => { const LY = await import('/js/core/floor-layout.js'); return { q: LY.QUEUE[0], p: LY.PICKUP[0], keeper: LY.KEEPER_HOME }; });
+ok(lay.q[0] > 400 && lay.p[0] < 400, `kön vid kassan till höger, luckan ovanpå kyldisken till vänster: ${JSON.stringify(lay)}`);
 // första kunden (tutorial): teleportera till kön och ta emot
 await page.evaluate(() => { const g = PV.game; g.spawnTimer = 0; g.update(0.05, { shopVisible: true }); });
 await page.waitForFunction(() => PV.game.customers.length > 0, null, { timeout: 20000 });
-await page.evaluate(() => { const c = PV.game.customers[0]; c.phase = 'queue'; c.x = 318; c.y = 176; c._path = []; c._tkey = 'q0'; c.moving = false; });
+await page.evaluate(() => { const c = PV.game.customers[0]; c.phase = 'queue'; c.x = 453; c.y = 176; c._path = []; c._tkey = 'q0'; c.moving = false; });
 await page.waitForTimeout(400);
 await page.evaluate(() => { const c = PV.game.queue()[0]; PV.floor.onCustomerClick(c); });
 await page.waitForTimeout(400);
@@ -72,6 +74,20 @@ const drop = await page.evaluate(() => {
   return { rostat, grill: L.actCount(v.b, 'grill'), msg: (v.msg?.html || '').replace(/<[^>]+>/g, '').slice(0, 60) };
 });
 ok(drop.rostat && drop.grill === 1, `brödet släppt på brödrosten rostar, biffen släppt på grillen läggs på: ${JSON.stringify(drop)}`);
+await page.screenshot({ path: OUT + 'rest-4c-hand.png' });
+// ta det rostade brödet från brödrosten med handen (tryck på det, inte i lådan) och lägg det på tallriken
+const pick = await page.evaluate(() => {
+  const v = PV.build, L = v.L, pus = L.pickups(v.b), pu = pus.find((p) => p.id === 'rosta');
+  if (!pu) return { pus: pus.map((p) => p.id) };
+  const r = v.canvas.getBoundingClientRect();
+  const tap = (pt, id) => { const o = { clientX: r.left + pt[0], clientY: r.top + pt[1], pointerId: id, bubbles: true, isPrimary: true }; v.canvas.dispatchEvent(new PointerEvent('pointerdown', o)); v.canvas.dispatchEvent(new PointerEvent('pointerup', o)); };
+  const hint = v.hintText();
+  tap(v.P.proj(...pu.at), 1);
+  const held = v.selected, msg = (v.msg?.html || '').replace(/<[^>]+>/g, '');
+  tap(v.P.proj(...L.SLOT.l0.anchor), 2);
+  return { pus: pus.map((p) => p.id), held, msg, l0: v.b.placed.l0?.id, station: v.b.station, hint: hint.replace(/<[^>]+>/g, '') };
+});
+ok(pick.held && pick.l0 && pick.station?.rosta === pick.l0, `brödet togs från brödrosten med handen och lades på tallriken: ${JSON.stringify(pick)}`);
 // bygg via byggvyns egna funktioner i hjälpens ordning
 const midShot = page.waitForFunction(() => window.__midShot, null, { timeout: 20000 }).then(() => page.screenshot({ path: OUT + 'rest-4b-markering.png' })).catch(() => {});
 const built = await page.evaluate(async () => {

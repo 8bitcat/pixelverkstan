@@ -8,7 +8,7 @@ import { templatesFor, composeBuild, priceFor } from './orders.js';
 import { ERA_LOOK, eraLook, themeFor } from './era.js';
 import { DB } from './menu.js';
 
-export const noShelf = true;     // lagerhyllan ritas statiskt här (kylhyllan) i stället för lådor per kategori
+export const noShelf = true;     // ingen lagerhylla på väggen – råvarorna ligger i kyldisken på disken (renderDisplay)
 export const noPoster = true;    // menytavlan sitter där affischen satt
 export const noDemoPc = true;    // inga rgb-fläktar på disken
 
@@ -86,44 +86,63 @@ function menuBoard(P, lines, lit, style = 'felt') {
   if (digital) { for (let y = y0; y < y0 + h; y += 2) P.hl(x0, y, w, 0x000000, 0.15); P.px(x0 + w - 3, y0 + h - 3, 0x45e06a); }
   if (chalk) { P.hl(x0 - 1, y0 + h + 1, w + 2, 0x8a6a3a); P.rect(x0 + 2, y0 + h - 1, 6, 1, 0xf4f1ea); P.rect(x0 + 10, y0 + h - 1, 4, 1, 0xf0a0c0); }
 }
-// kyldiskens kropp: sockel, rostfri kant, glashuv med reflex, digital termometer, KYLRUM-skylt
-function coldDisplay(P, x0, y0, w, h, items = {}) {
-  const lager = items.lager4 ? 4 : items.lager3 ? 3 : items.lager2 ? 2 : 1;
-  const glassTop = y0 + 4, glassBot = y0 + 34, body = glassBot + 2;
-  // sockel/underskåp
-  for (let y = body; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) P.px(x, y, mix(0xf0f0ec, 0xd8d8d4, (bayer(x, y) - 0.5) * 0.3 + 0.5));
-  P.hl(x0, body, w, 0xffffff); P.rect(x0, y0 + h - 3, w, 3, 0x2a2a30); for (let x = x0 + 3; x < x0 + w - 3; x += 3) P.px(x, y0 + h - 2, 0x4a4a52);
-  P.rect(x0 + 4, body + 4, 14, 5, 0x1a1a1e); text(P, SMALL, '-2', x0 + 6, body + 5, 0xe23b5a);
-  // rostfri hylla där skålarna står (ritas under glaset)
-  P.rect(x0 + 1, glassBot - 2, w - 2, 4, 0xc8ced6); P.hl(x0 + 1, glassBot - 2, w - 2, 0xe8ecf0);
-  // insidan: kallt ljus
-  for (let y = glassTop + 1; y < glassBot - 2; y++) for (let x = x0 + 2; x < x0 + w - 2; x++) P.px(x, y, mix(0xdfeefc, 0xb8d4ec, (y - glassTop) / 30 + (bayer(x, y) - 0.5) * 0.1));
-  P.hl(x0 + 2, glassTop + 1, w - 4, 0xffffff, 0.9);
-  // glasram (svart) och lutande glasfront med reflex
-  P.box(x0, glassTop - 1, w, glassBot - glassTop + 2, 0x2a2a30); P.hl(x0, y0, w, 0x2a2a30); P.hl(x0 + 1, y0 + 1, w - 2, 0x8a8f9c); P.rect(x0, y0 + 1, w, 3, 0x3a3d44);
-  for (let y = glassTop; y < glassBot; y++) { const x = x0 + 4 + ((y * 3) % 9); P.px(x, y, 0xffffff, 0.35); P.px(x + 1, y, 0xffffff, 0.2); }
-  // skylt
-  const txt = ['', 'KYLDISK', 'KYLRUM 2', 'KYLRUM 3', 'RESTAURANGKÖK'][lager], tw = textW(SMALL, txt) + 6;
-  P.rect(x0 + 1, y0 - 8, tw, 7, 0x1b1f2a); P.box(x0 + 1, y0 - 8, tw, 7, 0x3a3f4d); text(P, SMALL, txt, x0 + 4, y0 - 7, 0x7ee8fa);
+// väggen där lagerhyllan satt: fläktkåpa i rostfritt, kakel som stänkskydd och bongskenan med dagens bongar
+function kitchenWall(P, x0, y0, w, h, items = {}) {
+  for (let y = y0 + 16; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) { const g = (x - x0) % 8 === 0 || (y - y0) % 8 === 0; P.px(x, y, g ? 0xc8c4bc : mix(0xf4f1ea, 0xe4e0d8, (bayer(x, y) - 0.5) * 0.3 + 0.5)); }
+  // fläktkåpa med galler, lysrör under och fläktknapp
+  P.rect(x0, y0, w, 14, 0xb0b6c0); P.hl(x0, y0, w, 0xe8ecf0); P.hl(x0, y0 + 13, w, 0x6a7078); P.vl(x0, y0, 14, 0xd8dce2); P.vl(x0 + w - 1, y0, 14, 0x7a8090);
+  for (let x = x0 + 4; x < x0 + w - 4; x += 3) P.px(x, y0 + 11, 0x4a5058);
+  P.rect(x0 + 6, y0 + 14, w - 12, 2, 0xfff4c0); P.hl(x0 + 6, y0 + 16, w - 12, 0xfff4c0, 0.35);
+  P.rect(x0 + w - 12, y0 + 3, 6, 4, 0x2a2d36); P.px(x0 + w - 10, y0 + 4, 0x45e06a);
+  // bongskenan: fler bongar med större kök
+  P.rect(x0 + 2, y0 + 24, w - 4, 2, 0x8a9098); P.hl(x0 + 2, y0 + 24, w - 4, 0xc8ced6);
+  const n = items.lager4 ? 5 : items.lager3 ? 4 : items.lager2 ? 3 : 2;
+  for (let i = 0; i < n; i++) {
+    const bx = x0 + 5 + i * 14;
+    P.rect(bx, y0 + 26, 11, 13, 0xfdfbf4); P.vl(bx + 10, y0 + 26, 13, 0xd8d4cc); P.hl(bx, y0 + 38, 11, 0xd8d4cc); P.px(bx + 5, y0 + 25, 0x2a2d36);
+    for (let r = 0; r < 4; r++) P.rect(bx + 2, y0 + 29 + r * 2, 3 + ((i * 7 + r * 3) % 5), 1, r === 0 ? 0xe23b5a : 0x5a5f6a);
+  }
+}
+// kyldisken på disken (vänstra ytan, ut mot kunderna): rostfri ovansida där tallrikarna ställs fram (luckan),
+// glasfront med kallt ljus och skålarna med råvarorna (renderDisplay ritar dem efter lagret), vit sockel med
+// termometer och UTLÄMNING-skylt. Kunden hämtar tallriken ovanpå disken och betalar där.
+export const DISPLAY = { x0: 288, x1: 398, top: 105, glassTop: 113, glassBot: 139, base: 150 };
+function coldDisplay(P) {
+  const { x0, x1, top, glassTop, glassBot, base } = DISPLAY, w = x1 - x0;
+  // ovansidan (rostfri) med perspektiv
+  for (let y = top; y < glassTop - 1; y++) for (let x = x0; x < x1; x++) P.px(x, y, mix(0xd8dce2, 0xeef0f4, (y - top) / (glassTop - top) + (bayer(x, y) - 0.5) * 0.15));
+  P.hl(x0, top, w, 0xf8fafc); P.hl(x0, glassTop - 2, w, 0x9aa0aa); P.vl(x0, top, glassTop - top, 0xf4f6f8); P.vl(x1 - 1, top, glassTop - top, 0x9aa0aa);
+  // glasram och insidan (kallt ljus, hyllplan mellan raderna)
+  P.rect(x0, glassTop - 1, w, glassBot - glassTop + 2, 0x2a2a30);
+  for (let y = glassTop; y < glassBot; y++) for (let x = x0 + 1; x < x1 - 1; x++) P.px(x, y, mix(0xdfeefc, 0xb8d4ec, (y - glassTop) / (glassBot - glassTop) + (bayer(x, y) - 0.5) * 0.1));
+  P.hl(x0 + 1, glassTop, w - 2, 0xffffff, 0.9);
+  P.hl(x0 + 1, glassTop + 12, w - 2, 0xc8ced6); P.hl(x0 + 1, glassBot - 1, w - 2, 0xc8ced6);
+  // sockel med kompressorgaller, termometer och skylt
+  for (let y = glassBot + 1; y < base; y++) for (let x = x0; x < x1; x++) P.px(x, y, mix(0xf0f0ec, 0xd8d8d4, (bayer(x, y) - 0.5) * 0.3 + 0.5));
+  P.hl(x0, glassBot + 1, w, 0xffffff); P.rect(x0, base - 2, w, 2, 0x2a2a30); for (let x = x0 + 3; x < x1 - 3; x += 3) P.px(x, base - 1, 0x4a4a52);
+  P.rect(x0 + 3, glassBot + 3, 12, 5, 0x1a1a1e); text(P, SMALL, '-2', x0 + 5, glassBot + 4, 0xe23b5a);
+  const txt = 'UTLÄMNING', tw = textW(SMALL, txt) + 6, sx = Math.round((x0 + x1) / 2 - tw / 2) + 6;
+  P.rect(sx, glassBot + 2, tw, 7, 0x16181f); P.box(sx, glassBot + 2, tw, 7, 0x3a3f4d); text(P, SMALL, txt, sx + 3, glassBot + 3, 0xfff6e0);
 }
 // skålarna i kyldisken: en per råvara i lagret (bröd, biffar, ost, grönt, extra, såser), fyllda i råvarans
-// färg – högen växer med antalet. Ritas om när lagret ändras (floor.refreshStock → shelfImg vid SHELF.x0, 20).
+// färg – högen växer med antalet. Ritas om när lagret ändras (floor.refreshStock → floor.display, ritas i drawCounter
+// ovanpå diskbilden, innanför glaset).
 const DISPLAY_CATS = ['brod', 'biff', 'ost', 'gront', 'extra', 'sas'];
 export function renderDisplay(floor) {
-  const g = floor.game, S = floor.constructor?.SHELF || null;
-  const W = 82, H = 40, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = floor.game;
+  const W = DISPLAY.x1 - DISPLAY.x0 - 2, H = DISPLAY.glassBot - DISPLAY.glassTop, c = document.createElement('canvas'); c.width = W; c.height = H;
   const ctx = c.getContext('2d'), P = ctxPix(ctx);
   const parts = floor.owned().filter((p) => DISPLAY_CATS.includes(p.cat)).map((p) => ({ p, n: g.stockFree(p.id) })).filter((x) => x.n > 0)
-    .sort((a, b) => DISPLAY_CATS.indexOf(a.p.cat) - DISPLAY_CATS.indexOf(b.p.cat) || b.n - a.n).slice(0, 8);
+    .sort((a, b) => DISPLAY_CATS.indexOf(a.p.cat) - DISPLAY_CATS.indexOf(b.p.cat) || b.n - a.n).slice(0, 10);
   parts.forEach(({ p, n }, i) => {
-    const col = i % 4, row = Math.floor(i / 4), bx = 2 + col * 20, by = 8 + row * 16;
+    const col = i % 5, row = Math.floor(i / 5), bx = 2 + col * 21, by = row * 13;
     // skålen (vit, rund) med kant
-    P.rect(bx + 1, by + 3, 16, 6, 0xf6f3ec); P.hl(bx + 2, by + 2, 14, 0xffffff); P.hl(bx + 1, by + 9, 16, 0xc8c4bc); P.px(bx, by + 4, 0xf6f3ec); P.px(bx, by + 8, 0xc8c4bc); P.px(bx + 17, by + 4, 0xf6f3ec); P.px(bx + 17, by + 8, 0xc8c4bc);
-    // högen: fler bitar ju mer som finns (1–5 rader)
-    const L = p.look || {}, base = hex(L.color, 0xc8a060), rows = Math.min(5, 1 + Math.floor(Math.log2(Math.max(1, n))));
+    P.rect(bx + 1, by + 7, 17, 5, 0xf6f3ec); P.hl(bx + 2, by + 6, 15, 0xffffff); P.hl(bx + 1, by + 11, 17, 0xc8c4bc); P.px(bx, by + 8, 0xf6f3ec); P.px(bx, by + 11, 0xc8c4bc); P.px(bx + 18, by + 8, 0xf6f3ec); P.px(bx + 18, by + 11, 0xc8c4bc);
+    // högen: fler bitar ju mer som finns (1–4 rader)
+    const L = p.look || {}, base = hex(L.color, 0xc8a060), rows = Math.min(4, 1 + Math.floor(Math.log2(Math.max(1, n))));
     const shape = L.shape;
     for (let r = 0; r < rows; r++) {
-      const y = by + 6 - r * 2, w = 12 - r * 2, x = bx + 3 + r;
+      const y = by + 8 - r * 2, w = 13 - r * 2, x = bx + 3 + r;
       for (let k = 0; k < w; k++) {
         const jitter = hash(k * 7 + r * 13, p.id.length + r, 5);
         const cc = shape === 'patty' ? (jitter > 0.8 ? hex(L.dark, 0x4a2016) : base) : shape === 'leaf' ? (jitter > 0.7 ? hex(L.edge, base) : base) : shape === 'slice' ? (k % 3 === 1 ? hex(L.inner, base) : base) : shape === 'bun' ? (jitter > 0.85 ? hex(L.crust, base) : base) : shape === 'sauce' ? base : jitter > 0.8 ? mix(base, 0xffffff, 0.35) : base;
@@ -133,15 +152,17 @@ export function renderDisplay(floor) {
     }
     // antal
     const label = String(n), tw = textW(SMALL, label) + 2;
-    ctx.fillStyle = '#17151a'; ctx.fillRect(bx + 18 - tw, by + 9, tw, 6); ctxText(ctx, SMALL, label, bx + 19 - tw, by + 9, '#f4efe2');
+    ctx.fillStyle = '#17151a'; ctx.fillRect(bx + 19 - tw, by + 8, tw, 6); ctxText(ctx, SMALL, label, bx + 20 - tw, by + 8, '#f4efe2');
   });
-  return c;
+  // glasets reflexer ovanpå
+  for (let y = 0; y < H; y++) for (const o of [3, 43, 83]) { P.px(o + y, y, 0xffffff, 0.28); P.px(o + y + 1, y, 0xffffff, 0.14); }
+  return { img: c, x: DISPLAY.x0 + 1, y: DISPLAY.glassTop };
 }
 export function paintWallDecor(P, c) {
   const { items, WALL, SHELF: S, menuLines: lines, theme, year } = c, era = eraLook(year || 1990);
   WALL.neonPlate(P);
-  // kyldisken: rostfri sockel, glasfront och skålar med råvarorna (skålarna ritas dynamiskt efter lagret, renderDisplay)
-  coldDisplay(P, S.x0 - 3, 22, S.x1 - S.x0 + 6, 60, items);
+  // köksväggen där lagerhyllan satt: fläktkåpa, kakel och bongskena (kyldisken står på disken – counterItems)
+  kitchenWall(P, S.x0 - 3, 22, S.x1 - S.x0 + 6, 60, items);
   WALL.ac(P, items);
   menuBoard(P, lines, !!items.menytavla, era.board);
   WALL.clock(P); WALL.tv(P); WALL.extinguisher(P);
@@ -197,34 +218,34 @@ export function makeBackCabinet(items = {}, year = 1990) {
 
 // ---------- Sakerna på disken ----------
 export function counterItems(P, C, year, items = {}) {
-  // kassan: mekanisk (till 1979), elektronisk med lysdioder (till 2004), pekskärm (2005–)
+  // vänstra ytan: kyldisken med luckan (utlämning) ovanpå
+  coldDisplay(P);
+  // högra ytan: kassan – mekanisk (till 1979), elektronisk med lysdioder (till 2004), pekskärm (2005–)
+  const kx = 436;
   if (year < 1980) {
-    P.rect(300, 108, 20, 16, 0x2a2d33); P.hl(300, 108, 20, 0x5a5f6a); P.vl(300, 108, 16, 0x4a4f5a);
-    P.rect(303, 103, 14, 6, 0xf4f1ea); P.box(303, 103, 14, 6, 0x8a6a24); P.rect(305, 105, 4, 2, 0x2a2d33); P.rect(311, 105, 4, 2, 0x2a2d33);
-    for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) P.px(302 + c * 3, 112 + r * 3, r === 2 && c === 4 ? 0xe0392e : 0xd8dce0);
-    P.rect(300, 121, 20, 3, 0x8a6a24); P.hl(300, 121, 20, 0xd8b24a); P.rect(308, 122, 4, 1, 0x2a2d33);
+    P.rect(kx, 108, 20, 16, 0x2a2d33); P.hl(kx, 108, 20, 0x5a5f6a); P.vl(kx, 108, 16, 0x4a4f5a);
+    P.rect(kx + 3, 103, 14, 6, 0xf4f1ea); P.box(kx + 3, 103, 14, 6, 0x8a6a24); P.rect(kx + 5, 105, 4, 2, 0x2a2d33); P.rect(kx + 11, 105, 4, 2, 0x2a2d33);
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) P.px(kx + 2 + c * 3, 112 + r * 3, r === 2 && c === 4 ? 0xe0392e : 0xd8dce0);
+    P.rect(kx, 121, 20, 3, 0x8a6a24); P.hl(kx, 121, 20, 0xd8b24a); P.rect(kx + 8, 122, 4, 1, 0x2a2d33);
   } else if (year < 2005) {
-    P.rect(300, 110, 20, 14, 0xd8d0b8); P.hl(300, 110, 20, 0xf0ece0); P.vl(319, 110, 14, 0xa8a090);
-    P.rect(302, 112, 16, 4, 0x1a2a1a); P.hl(303, 113, 9, 0x45e06a); P.px(314, 113, 0x45e06a); P.px(316, 113, 0x45e06a);
-    for (let r = 0; r < 2; r++) for (let c = 0; c < 6; c++) P.px(302 + c * 3, 118 + r * 2, 0x5a5f6a);
-    P.rect(300, 122, 20, 2, 0x8a8478);
+    P.rect(kx, 110, 20, 14, 0xd8d0b8); P.hl(kx, 110, 20, 0xf0ece0); P.vl(kx + 19, 110, 14, 0xa8a090);
+    P.rect(kx + 2, 112, 16, 4, 0x1a2a1a); P.hl(kx + 3, 113, 9, 0x45e06a); P.px(kx + 14, 113, 0x45e06a); P.px(kx + 16, 113, 0x45e06a);
+    for (let r = 0; r < 2; r++) for (let c = 0; c < 6; c++) P.px(kx + 2 + c * 3, 118 + r * 2, 0x5a5f6a);
+    P.rect(kx, 122, 20, 2, 0x8a8478);
   } else {
-    P.rect(304, 122, 12, 3, 0x2a2d33); P.rect(309, 116, 2, 6, 0x3a3d44);
-    P.rect(301, 104, 18, 13, 0x23262b); P.rect(302, 105, 16, 10, 0x3c78d8); P.hl(302, 105, 16, 0x7fb0f0);
-    P.rect(304, 107, 7, 1, 0xdfefff); P.rect(304, 109, 10, 1, 0x9fc7f0); P.rect(304, 111, 5, 2, 0x45b964); P.rect(311, 111, 5, 2, 0xe8b230);
+    P.rect(kx + 4, 122, 12, 3, 0x2a2d33); P.rect(kx + 9, 116, 2, 6, 0x3a3d44);
+    P.rect(kx + 1, 104, 18, 13, 0x23262b); P.rect(kx + 2, 105, 16, 10, 0x3c78d8); P.hl(kx + 2, 105, 16, 0x7fb0f0);
+    P.rect(kx + 4, 107, 7, 1, 0xdfefff); P.rect(kx + 4, 109, 10, 1, 0x9fc7f0); P.rect(kx + 4, 111, 5, 2, 0x45b964); P.rect(kx + 11, 111, 5, 2, 0xe8b230);
   }
-  if (year >= 1995) { P.rect(324, 116, 7, 9, 0x2a2d33); P.rect(325, 117, 5, 3, 0x6ad26a); P.hl(325, 121, 5, 0x5a5f6a); P.hl(325, 123, 5, 0x5a5f6a); }
-  // en bricka med burgare, pommes och läsk
-  traySprite(P, 340, 121, 42);
-  burgerSprite(P, 343, 112, true); friesSprite(P, 358, 109); cupSprite(P, 372, 106, 0xf4f1ea, 0xc92a2a);
+  if (year >= 1995) { P.rect(kx + 24, 116, 7, 9, 0x2a2d33); P.rect(kx + 25, 117, 5, 3, 0x6ad26a); P.hl(kx + 25, 121, 5, 0x5a5f6a); P.hl(kx + 25, 123, 5, 0x5a5f6a); }
+  // bordsställ med menyn vid kassan
+  P.rect(420, 113, 11, 11, 0xf4f1ea); P.vl(430, 113, 11, 0xb8b4aa); P.rect(422, 115, 7, 2, 0xe8b230); P.rect(422, 118, 7, 1, 0x2a2d36); P.rect(422, 120, 5, 1, 0x2a2d36); P.rect(422, 122, 6, 1, 0x2a2d36);
   // sugrörshållare och servetter
-  P.rect(388, 112, 6, 12, 0xd8dce0); P.hl(388, 112, 6, 0xf4f6f8); P.vl(393, 112, 12, 0x8a9098);
-  P.rect(389, 108, 1, 4, 0xe0392e); P.rect(391, 107, 1, 5, 0xf4f1ea); P.rect(393, 109, 1, 3, 0x3a78d8);
-  napkins(P, 398, 124);
-  // bordsställ med menyn
-  P.rect(440, 113, 11, 11, 0xf4f1ea); P.vl(450, 113, 11, 0xb8b4aa); P.rect(442, 115, 7, 2, 0xe8b230); P.rect(442, 118, 7, 1, 0x2a2d36); P.rect(442, 120, 5, 1, 0x2a2d36); P.rect(442, 122, 6, 1, 0x2a2d36);
-  // ketchup och senap vid luckan
-  bottle(P, 488, 124, 0xc92a2a); bottle(P, 495, 124, 0xe8b820);
+  P.rect(474, 112, 6, 12, 0xd8dce0); P.hl(474, 112, 6, 0xf4f6f8); P.vl(479, 112, 12, 0x8a9098);
+  P.rect(475, 108, 1, 4, 0xe0392e); P.rect(477, 107, 1, 5, 0xf4f1ea); P.rect(479, 109, 1, 3, 0x3a78d8);
+  napkins(P, 484, 124);
+  // ketchup och senap
+  bottle(P, 494, 124, 0xc92a2a); bottle(P, 501, 124, 0xe8b820);
 }
 
 // ---------- Montrar: läskkyl och dessertdisk (innehållet ritas av floor.js via frame.grid) ----------
@@ -455,6 +476,7 @@ export function carrySprite(ctx, x, y, dir = 'down', seed = 0, meal = null) {
 // tallrik som väntar på att hämtas vid luckan (den byggda måltiden om kunden har en)
 export function readyItem(ctx, i, bx, by, c = null) {
   const P = ctxPix(ctx);
+  by -= 8;   // tallrikarna står ovanpå kyldisken (DISPLAY.top), inte på diskens bänkskiva
   ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(bx - 1, by + 23, 22, 2);
   if (c?.meal) mealSprite(P, bx + 9, by + 21, c.meal, 0, true);
   else { plateRows(P, bx - 2, by + 15, 22); burgerSprite(P, bx, by + 8, i % 2 === 0); cupSprite(P, bx + 13, by + 5, i % 3 === 1 ? 0xf2c8d8 : 0xf4f1ea, 0xc92a2a); }

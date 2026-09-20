@@ -27,8 +27,8 @@ await page.evaluate(() => {
     const o = g.shop.generateOrder(g, [names[i]]); if (!o) continue;
     const c = g.spawn(o); c.patience = 9999; c.meal = g.shop.mealOf(c.order);
     if (i < 2) { const seat = PV.floor.pickSeat(c); c.phase = 'eating'; c._spot = seat; c._eatMax = 200; c._eatT = 200 - i * 60; }
-    else if (i === 2) { c.phase = 'eating'; c._carry = true; c._eatMax = 200; c._eatT = 200; c.x = 453; c.y = 200; }
-    else { c.phase = 'ready'; c.x = 453; c.y = 176; c.payout = { total: 90, price: 80, tip: 10, xp: 0, stars: 3 }; }
+    else if (i === 2) { c.phase = 'eating'; c._carry = true; c._eatMax = 200; c._eatT = 200; c.x = 318; c.y = 200; }
+    else { c.phase = 'ready'; c.x = 318; c.y = 176; c.payout = { total: 90, price: 80, tip: 10, xp: 0, stars: 3 }; }
   }
   for (let k = 0; k < 200; k++) PV.floor.update(0.05);
 });

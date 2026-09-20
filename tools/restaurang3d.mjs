@@ -35,7 +35,7 @@ const bigOrder = () => page.evaluate(() => {
   if (!best) return null;
   const c = g.spawn(best);
   for (const it of c.order.items) g.stock[it.part] = (g.stock[it.part] || 0) + 2;
-  c.phase = 'queue'; c.x = 318; c.y = 176; c.patience = 9999;
+  c.phase = 'queue'; c.x = 453; c.y = 176; c.patience = 9999;
   const o = g.accept(c);
   if (!o || !o.id) return { err: 'accept misslyckades' };
   o.guided = true;

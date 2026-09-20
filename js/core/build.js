@@ -234,7 +234,11 @@ export class BuildView {
     if (this.phase === 'desk') return this.finale?.hintText() || '';
     const s = this.nextStep();
     if (!s) return '';
-    if (s.kind === 'slot') return `Dra <b>${esc(s.label)}</b> till <b>${esc(this.L.SLOT[s.id].name.toLowerCase())}</b> (gul markering).`;
+    if (s.kind === 'slot') {
+      const held = this.partEntries().find((e) => e.key === s.entryKey)?.part, pu = held && this.L.pickups?.(this.b).find((p) => p.part?.id === held.id);
+      if (pu) return `Ta <b>${esc(s.label)}</b> från ${esc(pu.from)} och lägg på <b>${esc(this.L.SLOT[s.id].name.toLowerCase())}</b>.`;
+      return `Dra <b>${esc(s.label)}</b> till <b>${esc(this.L.SLOT[s.id].name.toLowerCase())}</b> (gul markering).`;
+    }
     if (s.kind === 'act') { const a = this.L.ACTION[s.id]; return `Tryck på ${a.icon} för att <b>${esc(a.name.toLowerCase())}</b>.`; }
     if (s.kind === 'cable') { const c = this.L.CABLE[s.id]; return `Dra kabeln <b>${esc(c.name)}</b> till uttaget <b>${esc(c.wants.map(this.L.portLabel).join(' / '))}</b>.`; }
     return this.T.doneHint;
@@ -263,8 +267,8 @@ export class BuildView {
     this.say(`${esc(part.name)} ligger i lådan igen.`, 'info');
     this.refresh();
   }
-  doAction(a, i) {
-    this.op({ t: 'act', id: a.id, i });
+  doAction(a, i, part = null) {
+    this.op({ t: 'act', id: a.id, i, ...(part ? { part: part.id } : {}) });
     // skruvdragaren tar alla skruvar i samma moment
     if (a.icon === '🪛' && this.game.fit?.items?.skruvdragare) for (let j = 0; j < a.points.length; j++) if (j !== i) this.op({ t: 'act', id: a.id, i: j });
     const set = this.L.actSet(this.b, a.id);
@@ -356,6 +360,20 @@ export class BuildView {
     }
     return best;
   }
+  // det som ligger färdigt på en station (rostat bröd, stekt biff, friterade pommes, tappad mugg) tas med handen
+  // – tryck eller dra från stationen, inte via lådan
+  pickupAt(pt) {
+    if (this.phase !== 'build' || !this.L.pickups) return null;
+    const tray = this.partEntries();
+    let best = null, bd = this.help ? 36 : 28;
+    for (const pu of this.L.pickups(this.b)) {
+      const entry = tray.find((e) => e.part?.id === pu.part?.id);
+      if (!entry) continue;
+      const [x, y] = D.proj(this, ...pu.at), d = Math.hypot(x - pt[0], y - pt[1]);
+      if (d < bd) { bd = d; best = { pu, entry }; }
+    }
+    return best;
+  }
   portsOnScreen() {
     const b = this.b;
     return this.L.availablePorts(b).map((k) => ({ key: k, pt: D.proj(this, ...this.L.portPos(k, b)), label: this.L.portLabel(k), busy: this.L.portBusy(k, b) }));
@@ -385,7 +403,7 @@ export class BuildView {
     const hit = this.slotAt(pt, entry.part);
     if (hit?.slot && this.b.placed[hit.slot.id]) { const free = this.L.slotsFor(entry.part).find((s) => !this.b.placed[s.id]); if (free) hit.slot = free; }
     // släpp på en station (brödrost, grill, fritös, dryckesmaskin …) = utför handgreppet
-    if (!hit || hit.wrong) { const act = this.actionAt(pt, entry.part); if (act) return this.doAction(act.a, act.i); }
+    if (!hit || hit.wrong) { const act = this.actionAt(pt, entry.part); if (act) return this.doAction(act.a, act.i, entry.part); }
     if (!hit) return this.say(this.help ? 'Släpp delen på den gula markeringen.' : 'Släpp delen där den ska sitta.', 'err');
     if (hit.wrong) {
       const right = this.L.slotsFor(entry.part)[0];
@@ -449,7 +467,7 @@ export class BuildView {
     $('#drag-ghost').classList.add('hidden');
     if (!d.moved) {
       this.selected = this.selected === d.entry.key ? null : d.entry.key;
-      if (this.selected) this.say(`Tryck där <b>${esc(d.entry.name)}</b> ska ${d.entry.kind === 'part' ? 'sitta' : 'kopplas in'}.`, 'info');
+      if (this.selected) this.say(d.station ? `Du tog <b>${esc(d.entry.name)}</b> från ${esc(d.station.from)}. Tryck där den ska ligga.` : `Tryck där <b>${esc(d.entry.name)}</b> ska ${d.entry.kind === 'part' ? 'sitta' : 'kopplas in'}.`, 'info');
       U.renderTray(this);
       return;
     }
@@ -657,8 +675,12 @@ export class BuildView {
   onPtrDown(e) {
     if (!this.order || modalOpen()) return;
     if (this.phase === 'desk') return this.onCanvasDown(e);
+    if (!this.selected && this.ptrs.size === 0) {
+      const hit = this.pickupAt(this.local(e));
+      if (hit) { this.drag = { entry: hit.entry, x0: e.clientX, y0: e.clientY, moved: false, station: hit.pu }; e.preventDefault(); return; }
+    }
     this.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY });
-    this.canvas.setPointerCapture?.(e.pointerId);
+    try { this.canvas.setPointerCapture?.(e.pointerId); } catch { /* syntetiska pekare (tester) saknar aktiv pointer */ }
     this.gesture = { moved: false, pinch: this.ptrs.size >= 2 ? null : undefined };
   }
   onPtrMove(e) {
@@ -667,7 +689,8 @@ export class BuildView {
     const p = this.ptrs.get(e.pointerId);
     if (!p) {
       const over = this.order && this.b.help !== null && this.phase === 'build' && this.actionAt(this.hover);
-      this.canvas.style.cursor = over ? 'pointer' : (this.userCam ? 'grab' : '');
+      const take = !over && this.order && this.b.help !== null && !this.selected && this.pickupAt(this.hover);
+      this.canvas.style.cursor = take ? 'grab' : over ? 'pointer' : (this.userCam ? 'grab' : '');
       return;
     }
     const dx = e.clientX - p.x, dy = e.clientY - p.y;
@@ -732,6 +755,14 @@ export class BuildView {
           D.drawHotspot(ctx, x, y, this.t, first ? a.icon : '', first && isNext ? a.name : '', !first || a.points.length > 1);
           first = false;
         });
+      }
+    }
+    if (this.phase === 'build' && this.L.pickups && !entry) {
+      const tray = this.partEntries();
+      for (const pu of this.L.pickups(this.b)) {
+        if (!tray.some((e) => e.part?.id === pu.part?.id)) continue;
+        const [x, y] = D.proj(this, ...pu.at);
+        D.drawHand(ctx, x, y, this.t, this.help ? `Ta ${pu.name}` : '');
       }
     }
     if (this.flash) D.drawHighlight(ctx, this, this.flash.slot, this.t * 3, '#45b964');

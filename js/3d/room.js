@@ -170,25 +170,41 @@ export function buildRoom(scene, ctx) {
 
   // disken (röd panel + mörk skiva) och skåpet bakom
   const cx0 = C.toX(LY.COUNTER.x0), cx1 = C.toX(LY.COUNTER.x1), cz1 = C.ZC + 0.08, cz0 = 1.54;   // gångbandet bakom disken är z 1.14–1.5
+  // hamburgerbaren: kyldisken med luckan ovanpå tar vänstra ytan (glaset och brickorna byggs i units.js efter lagret), kassan den högra
+  const rest = !!shop.kitchen3d, sx = rest ? C.toX(LY.COUNTER.split) : cx0;
   const panel = A.pbr('wood_table_001', { repeat: [1.8, 0.5], color: new THREE.Color(theme.counter || '#9e1b22').multiplyScalar(1.6), roughness: 0.5 });
-  slab(g, cx0, cx1, 0.08, 0.98, cz0, cz1, panel, { pick: { type: 'counter' } });
-  slab(g, cx0, cx1, 0, 0.08, cz0 + 0.05, cz1 - 0.05, paintMat(0x1a1a1c, 0.6), { cast: false });
-  slab(g, cx0 - 0.04, cx1 + 0.04, 0.98, 1.04, cz0 - 0.04, cz1 + 0.06, A.pbr('dark_wood', { repeat: [2, 0.3], roughness: 0.35 }));
-  // sida mot dörren
-  slab(g, cx0 - 0.02, cx0, 0.08, 0.98, cz0, cz1, panel);
-  // kassaapparaten vid BESTÄLL och kortterminal vid UTLÄMNING
-  const qx = C.toX(LY.QUEUE[0][0]), px = C.toX(LY.PICKUP[0][0]);
+  slab(g, sx, cx1, 0.08, 0.98, cz0, cz1, panel, { pick: { type: 'counter' } });
+  slab(g, sx, cx1, 0, 0.08, cz0 + 0.05, cz1 - 0.05, paintMat(0x1a1a1c, 0.6), { cast: false });
+  slab(g, sx - 0.04, cx1 + 0.04, 0.98, 1.04, cz0 - 0.04, cz1 + 0.06, A.pbr('dark_wood', { repeat: [2, 0.3], roughness: 0.35 }));
+  if (rest) {
+    const steel = metalMat(0xc8ced6, 0.35);
+    slab(g, cx0, sx - 0.08, 0.06, 0.88, cz0, cz1, paintMat(0xf0f0ec, 0.45), { pick: { type: 'counter' } });   // vit sockel
+    slab(g, cx0, sx - 0.08, 0, 0.06, cz0 + 0.04, cz1 - 0.04, paintMat(0x1a1a1c, 0.6), { cast: false });
+    slab(g, cx0 - 0.01, sx - 0.07, 0.88, 0.9, cz0 - 0.01, cz1 + 0.01, steel, { cast: false });
+    out.displayCase = { x0: cx0, x1: sx - 0.08, z0: cz0, z1: cz1, y: 0.9, top: 1.3 };
+  } else slab(g, cx0 - 0.02, cx0, 0.08, 0.98, cz0, cz1, panel);   // sida mot dörren
+  // kassaapparaten vid BESTÄLL och kortterminalen vid UTLÄMNING (i hamburgerbaren bredvid kassan)
+  const qx = C.toX(LY.QUEUE[0][0]), px = rest ? C.toX(LY.QUEUE[0][0]) - 0.45 : C.toX(LY.PICKUP[0][0]);
   const reg = A.instance(A.get('CashRegister_01'), { fit: { h: 0.42 } });
   if (reg) { reg.position.set(qx + 0.02, 1.04, (cz0 + cz1) / 2); reg.rotation.y = Math.PI; g.add(reg); }
   slab(g, px - 0.06, px + 0.06, 1.04, 1.07, (cz0 + cz1) / 2 - 0.09, (cz0 + cz1) / 2 + 0.09, paintMat(0x202226, 0.4));
   slab(g, px - 0.05, px + 0.05, 1.07, 1.075, (cz0 + cz1) / 2 - 0.06, (cz0 + cz1) / 2 + 0.02, new THREE.MeshBasicMaterial({ color: 0x6fe3ff }));
   chainSign(g, 'BESTÄLL', qx, 2.25, cz1 + 0.15, 1.1, 0.3, '#2f8f46');
-  chainSign(g, 'UTLÄMNING', px, 2.25, cz1 + 0.15, 1.3, 0.3, '#2c6fb7');
+  chainSign(g, 'UTLÄMNING', C.toX(LY.PICKUP[0][0]), 2.25, cz1 + 0.15, 1.3, 0.3, '#2c6fb7');
   // skåpen längs väggen bakom disken (lådhurtsar) + hylla ovanpå
   // arbetsbänken (byggläget i 3D) står mot framväggen under högra fönstret, till höger om skåpen
   const bw = 1.75, bd = 0.95, bh = 0.96, bx1 = Math.min(X1 - 0.3, cx1 - 0.05), bx0 = bx1 - bw, bz0 = 0.03, bz1 = bz0 + bd;   // skrivbordet i finalen (1,5 × 0,6 m) ska få plats
   const cab = A.get('drawer_cabinet');
-  if (cab) {
+  if (rest) {
+    // rostfria underskåp med luckor, handtag och sparksockel – köksbänken (units.js kitchen) står ovanpå
+    const steel = metalMat(0xc8ced6, 0.35), kx1 = bx0 - 0.15, d = 0.62;
+    slab(g, cx0 + 0.1, kx1, 0.1, 0.88, 0.02, d, steel);
+    slab(g, cx0 + 0.1, kx1, 0, 0.1, 0.06, d - 0.04, paintMat(0x2a2b2e, 0.5), { cast: false });
+    slab(g, cx0 + 0.08, kx1 + 0.02, 0.88, 0.9, 0, d + 0.02, steel, { cast: false });
+    for (let x = cx0 + 0.7; x < kx1 - 0.2; x += 0.6) slab(g, x - 0.004, x + 0.004, 0.14, 0.86, d - 0.005, d + 0.001, paintMat(0x6a7078, 0.4), { cast: false });
+    for (let x = cx0 + 0.4; x < kx1 - 0.1; x += 0.6) slab(g, x - 0.06, x + 0.06, 0.74, 0.76, d, d + 0.03, metalMat(0x9aa0aa, 0.3), { cast: false });
+    out.cabinetTop = { y: 0.9, x0: cx0 + 0.1, x1: kx1, z: d / 2 + 0.01 };
+  } else if (cab) {
     const cw = A.modelSize(cab).x || 0.8, n = Math.max(1, Math.floor((bx0 - 0.15 - (cx0 + 0.1)) / cw));
     let first = null;
     for (let i = 0; i < n; i++) { const c = A.instance(cab); c.position.set(cx0 + 0.1 + cw * (i + 0.5), 0, A.modelSize(cab).z / 2 + 0.02); g.add(c); first ||= c; }
@@ -241,23 +257,24 @@ export function buildRoom(scene, ctx) {
 
   // ---------- Arbetsbänken: här byggs datorerna i 3D-läget (kameran låses över bänken) ----------
   {
-    const top = A.pbr('wood_table_001', { repeat: [1.3, 0.75], color: 0xd2b088, roughness: 0.5 });
+    const top = rest ? metalMat(0xd0d5dc, 0.28) : A.pbr('wood_table_001', { repeat: [1.3, 0.75], color: 0xd2b088, roughness: 0.5 });
     slab(g, bx0, bx1, bh - 0.05, bh, bz0, bz1, top, { pick: { type: 'bench' } });
-    const leg = metalMat(0x2a2d33, 0.45);
+    const leg = rest ? metalMat(0xb8bec8, 0.35) : metalMat(0x2a2d33, 0.45);
     for (const lx of [bx0 + 0.06, bx1 - 0.06]) for (const lz of [bz0 + 0.06, bz1 - 0.06]) slab(g, lx - 0.025, lx + 0.025, 0, bh - 0.05, lz - 0.025, lz + 0.025, leg);
-    slab(g, bx0 + 0.04, bx1 - 0.04, 0.16, 0.19, bz0 + 0.06, bz1 - 0.06, A.pbr('plywood', { repeat: [0.7, 0.4], color: 0xcdb78f }), { cast: false });
-    // kartonger på hyllan under
-    const cb = A.get('cardboard_box_01');
+    slab(g, bx0 + 0.04, bx1 - 0.04, 0.16, 0.19, bz0 + 0.06, bz1 - 0.06, rest ? metalMat(0xc8ced6, 0.35) : A.pbr('plywood', { repeat: [0.7, 0.4], color: 0xcdb78f }), { cast: false });
+    // kartonger på hyllan under (inte i köket)
+    const cb = rest ? null : A.get('cardboard_box_01');
     if (cb) for (const [kx, kz, ry, sz] of [[bx0 + 0.32, bz0 + 0.42, 0.2, 0.42], [bx0 + 0.85, bz0 + 0.4, -0.35, 0.36], [bx1 - 0.3, bz0 + 0.45, 0.9, 0.3]]) { const k = A.instance(cb, { fit: { w: sz }, rotY: ry }); if (k) { k.position.set(kx, 0.19, kz); g.add(k); } }
     // verktygstavla på väggen under fönstret, med skylt och några verktyg
     const pbY0 = bh + 0.08, pbY1 = Math.max(pbY0 + 0.12, Math.min(winR.y0 - 0.03, bh + 0.36));
-    slab(g, bx0, bx1, pbY0, pbY1, 0.005, 0.025, A.pbr('plywood', { repeat: [1.3, 0.3], color: 0xc4ad82 }), { cast: false });
+    slab(g, bx0, bx1, pbY0, pbY1, 0.005, 0.025, rest ? metalMat(0xc8ced6, 0.3) : A.pbr('plywood', { repeat: [1.3, 0.3], color: 0xc4ad82 }), { cast: false });   // i köket: rostfritt stänkskydd
     { const sg = signBoard(shop.text?.benchSign || 'ARBETSBÄNK', 0.56, 0.13, { bg: '#f5a142', thick: 0.02, twoSided: false }); sg.position.set(bx0 + 0.34, (pbY0 + pbY1) / 2, 0.026); g.add(sg); }
     const toolCols = [0xd23b3b, 0x2f6fb7, 0xf5a142, 0x2f8f46, 0x17151a];
     for (let i = 0; i < (shop.floorArt ? 0 : 4); i++) { const x = bx0 + 0.78 + i * 0.17; slab(g, x - 0.006, x + 0.006, pbY0 + 0.03, pbY1 - 0.09, 0.025, 0.037, metalMat(0xb8bcc2, 0.35), { cast: false }); slab(g, x - 0.014, x + 0.014, pbY1 - 0.1, pbY1 - 0.03, 0.025, 0.05, paintMat(toolCols[i], 0.5), { cast: false }); }
-    // antistatmatta, skruvburk och en kaffekopp
-    slab(g, bx0 + 0.08, bx1 - 0.08, bh, bh + 0.006, bz0 + 0.08, bz1 - 0.08, paintMat(0x2b3138, 0.95), { cast: false, pick: { type: 'bench' } });
-    { const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.09, 14), glassMat(0xe8f0f4, 0.8)); jar.position.set(bx0 + 0.12, bh + 0.045, bz0 + 0.1); g.add(jar); const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.047, 0.047, 0.015, 14), paintMat(0xd23b3b, 0.5)); lid.position.set(bx0 + 0.12, bh + 0.097, bz0 + 0.1); g.add(lid); }
+    // antistatmatta, skruvburk och en kaffekopp (i köket: bara koppen och en ketchupflaska)
+    if (!rest) slab(g, bx0 + 0.08, bx1 - 0.08, bh, bh + 0.006, bz0 + 0.08, bz1 - 0.08, paintMat(0x2b3138, 0.95), { cast: false, pick: { type: 'bench' } });
+    if (rest) { const kb = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.024, 0.14, 12), paintMat(0xc92a2a, 0.45)); kb.position.set(bx0 + 0.12, bh + 0.07, bz0 + 0.1); kb.castShadow = true; g.add(kb); }
+    else { const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.09, 14), glassMat(0xe8f0f4, 0.8)); jar.position.set(bx0 + 0.12, bh + 0.045, bz0 + 0.1); g.add(jar); const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.047, 0.047, 0.015, 14), paintMat(0xd23b3b, 0.5)); lid.position.set(bx0 + 0.12, bh + 0.097, bz0 + 0.1); g.add(lid); }
     { const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.034, 0.09, 14), paintMat(0xf4f1ea, 0.4)); cup.position.set(bx1 - 0.14, bh + 0.045, bz1 - 0.14); cup.castShadow = true; g.add(cup); }
     // bänklampa (svängarm med spot) i högra bakre hörnet
     const lampMat = metalMat(0x2c2f35, 0.35), lx = bx1 - 0.16, lz = bz0 + 0.14;

@@ -379,8 +379,13 @@ export class Units {
     // läskmaskin med tre kranar
     slab(g, 0.1, 0.6, 0.03, 0.55, -0.22, 0.12, paintMat(0x9aa0aa, 0.5)); slab(g, 0.12, 0.58, 0.4, 0.52, 0.12, 0.13, paintMat(0x2c6fb7, 0.4), { cast: false });
     [0xc92a2a, 0xf0902a, 0x4aa84a].forEach((c, i) => slab(g, 0.18 + i * 0.14, 0.22 + i * 0.14, 0.2, 0.3, 0.12, 0.2, paintMat(c, 0.4)));
-    // kyldisken: rostfri sockel, glashuv och brickor med råvarorna i lagret (högen växer med antalet)
+    // fritös med två korgar
+    slab(g, 0.75, 1.2, 0.03, 0.42, -0.25, 0.15, steel); for (const x of [0.81, 1.01]) { slab(g, x, x + 0.14, 0.42, 0.45, -0.2, 0.05, dark, { cast: false }); slab(g, x + 0.06, x + 0.08, 0.45, 0.62, -0.05, -0.03, dark, { cast: false }); }
+    // brödrost (bandrost) med två fack och röd knapp
+    if (W > 1.9) { slab(g, 1.32, 1.68, 0.03, 0.26, -0.22, 0.14, metalMat(0xb8bec8, 0.35)); for (const z of [-0.14, 0.0]) slab(g, 1.36, 1.64, 0.26, 0.27, z, z + 0.05, dark, { cast: false }); slab(g, 1.6, 1.64, 0.1, 0.14, 0.14, 0.15, paintMat(0xe0392e, 0.4), { cast: false }); }
+    /* (kyldisken står på disken ut mot kunderna – displayCase) */
     const dx0 = 0.7, dx1 = Math.min(W - 0.9, 1.45);
+    if (false) {
     slab(g, dx0, dx1, 0.03, 0.14, -0.28, 0.2, paintMat(0xf0f0ec, 0.5));
     slab(g, dx0, dx1, 0.14, 0.16, -0.28, 0.2, steel, { cast: false });
     const cats = ['brod', 'biff', 'ost', 'gront', 'extra', 'sas'];
@@ -395,11 +400,39 @@ export class Units {
     for (const x of [dx0, dx1 - 0.01]) slab(g, x, x + 0.01, 0.16, 0.5, -0.28, 0.2, glassMat(0xe4eef2, 0.9), { cast: false });
     slab(g, dx0, dx1, 0.5, 0.52, -0.29, 0.21, paintMat(0x2a2a30, 0.5), { cast: false });   // ram upptill
     slab(g, dx0, dx1, 0.16, 0.52, -0.29, -0.28, glassMat(0xe4eef2, 0.9), { cast: false });
-    // fritös med två korgar
-    if (W > 2.3) { slab(g, 1.55, 2.0, 0.03, 0.42, -0.25, 0.15, steel); for (const x of [1.61, 1.81]) { slab(g, x, x + 0.14, 0.42, 0.45, -0.2, 0.05, dark, { cast: false }); slab(g, x + 0.06, x + 0.08, 0.45, 0.62, -0.05, -0.03, dark, { cast: false }); } }
+    }
     // grillen med två biffar
     const gx = Math.max(1.9, W - 0.8);
     if (W > gx + 0.6) { slab(g, gx, gx + 0.7, 0.03, 0.2, -0.28, 0.2, dark); for (const x of [gx + 0.12, gx + 0.4]) slab(g, x, x + 0.22, 0.2, 0.24, -0.15, 0.07, paintMat(0x6e3a26, 0.8)); }
+    this.group.add(g);
+  }
+  // kyldisken på disken (vänstra ytan, ut mot kunderna): glashuv, brickor med råvarorna i lagret (högen växer
+  // med antalet) och rostfri skiva ovanpå där tallrikarna ställs fram (luckan). Sockeln byggs i room.js.
+  displayCase() {
+    const dc = this.ctx.room?.displayCase;
+    if (!dc) return;
+    const g = new THREE.Group(); g.position.set(dc.x0, dc.y, dc.z0);
+    const W = dc.x1 - dc.x0, D = dc.z1 - dc.z0, H = dc.top - dc.y, steel = metalMat(0xc8ced6, 0.35), glass = glassMat(0xe4eef2, 0.9);
+    slab(g, 0, W, 0, 0.02, 0, D, steel, { cast: false });   // rostfri botten
+    const cats = ['brod', 'biff', 'ost', 'gront', 'extra', 'sas'];
+    const goods = this.floor.owned().filter((p) => cats.includes(p.cat)).map((p) => ({ p, n: this.ctx.game.stockFree(p.id) })).filter((x) => x.n > 0).sort((a, b) => cats.indexOf(a.p.cat) - cats.indexOf(b.p.cat) || b.n - a.n).slice(0, 10);
+    const cols = 5, cw = (W - 0.1) / cols - 0.03, td = Math.min(0.2, D / 2 - 0.04);
+    goods.forEach(({ p, n }, i) => {
+      const col = i % cols, row = Math.floor(i / cols), x = 0.05 + col * ((W - 0.1) / cols), z = row === 0 ? D - td - 0.03 : 0.03;
+      slab(g, x, x + cw, 0.02, 0.06, z, z + td, paintMat(0xf6f3ec, 0.4), { cast: false });   // skål/bricka
+      const h = 0.015 + Math.min(4, 1 + Math.floor(Math.log2(Math.max(1, n)))) * 0.014;
+      slab(g, x + 0.015, x + cw - 0.015, 0.06, 0.06 + h, z + 0.02, z + td - 0.02, paintMat(hexOf(p.look?.color, 0xc8a060), 0.85), { cast: false });   // högen
+    });
+    // glas: front mot kunderna och gavlar; bak bara en låg kant så att man når in från köket
+    slab(g, 0, W, 0.02, H - 0.04, D - 0.01, D, glass, { cast: false });
+    for (const x of [0, W - 0.01]) slab(g, x, x + 0.01, 0.02, H - 0.04, 0, D, glass, { cast: false });
+    slab(g, 0, W, 0.02, 0.1, 0, 0.01, steel, { cast: false });
+    // svart ram och rostfri skiva ovanpå (luckan – tallrikarna ställs här)
+    slab(g, 0, W, H - 0.05, H - 0.04, 0, D, paintMat(0x2a2a30, 0.5), { cast: false });
+    slab(g, -0.02, W + 0.02, H - 0.04, H, -0.02, D + 0.02, steel);
+    // termometer på sockeln
+    slab(g, 0.06, 0.2, -0.1, -0.05, D - 0.002, D + 0.006, paintMat(0x1a1a1e, 0.4), { cast: false });
+    slab(g, 0.08, 0.14, -0.085, -0.065, D + 0.006, D + 0.008, new THREE.MeshBasicMaterial({ color: 0xe23b5a }), { cast: false });
     this.group.add(g);
   }
   // matborden (restaurangen): bordsskiva på fot, två stolar bakom, hänglampa i epokens stil
@@ -472,6 +505,7 @@ export class Units {
     this.clear();
     this.boxCount = 0;
     this.backCabinet();
+    this.displayCase();
     this.tables();
     for (const u of this.floor.unitList || []) {
       if (u.empty) this.empty(u);

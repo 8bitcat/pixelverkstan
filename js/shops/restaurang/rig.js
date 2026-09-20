@@ -92,6 +92,19 @@ function makeRig(order) {
   // lagren tas i ordning: bara nästa lediga plats i stapeln för den här sortens råvara (så ligger inte gula rutor över hela burgaren)
   const slotsFor = (part) => { const all = S.filter((s) => s.cat === part.cat && (!s.accept || s.accept(part))); const stack = all.filter((s) => s.k !== undefined); const next = stack.find((s) => !rig.lastB?.placed?.[s.id]); return [...(next ? [next] : []), ...all.filter((s) => s.k === undefined)]; };
   // släpp råvaran på stationen = handgreppet: bröd på brödrosten, biff på grillen, pommes i fritösen, mugg vid dryckesmaskinen
+  // det som ligger färdigt på stationerna och går att ta med handen: rostat bröd på brödrosten, stekt biff på
+  // grillen, friterade pommes i korgen, tappad mugg vid maskinen (råvaran som lades på minns i b.station)
+  const pickups = (b) => {
+    rig.lastB = b;
+    const st = b.station || {}, out = [];
+    const partOf = (id, slot, cat) => DB.part[st[id]] || slot?.part || DB.parts.find((p) => p.cat === cat);
+    if (S[0] && actDone(b, 'rosta') && !b.placed.l0) out.push({ id: 'rosta', part: partOf('rosta', S[0], 'brod'), at: [K.toaster[0] + 2, K.toaster[1] + 2, 2.4], name: 'brödet', from: 'brödrosten' });
+    const fb = S.find((s) => s.cat === 'biff');
+    if (fb && actDone(b, 'grill') && !b.placed[fb.id]) out.push({ id: 'grill', part: partOf('grill', fb, 'biff'), at: [K.grill[0] + 2.75, K.grill[1] + 3, 1.4], name: 'biffen', from: 'grillen' });
+    if (fried && actDone(b, 'fritera') && !b.placed.pommes) out.push({ id: 'fritera', part: DB.part[st.fritera] || sidePart, at: [K.fryer[0] + 3.3, K.fryer[1] + 2.3, 2.6], name: 'pommesen', from: 'fritöskorgen' });
+    if (poured && actDone(b, 'tappa') && !b.placed.dryck) out.push({ id: 'tappa', part: DB.part[st.tappa] || drinkPart, at: [K.tower[0] + 2.2, K.tower[1] + 3.2, 2.2], name: 'muggen', from: 'dryckesmaskinen' });
+    return out.filter((p) => p.part);
+  };
   const dropAction = (part, a) => (a.id === 'rosta' && part.cat === 'brod') || (a.id === 'grill' && part.cat === 'biff') || (a.id === 'fritera' && part.cat === 'tillbehor' && isFried(part)) || (a.id === 'tappa' && part.cat === 'dryck' && isPoured(part));
   function canPlace(slot, part, b) {
     rig.lastB = b;
@@ -149,7 +162,7 @@ function makeRig(order) {
     drawPlate(R, K.plate[0], K.plate[1] + dv, K.plate[2], K.plate[3], era, 0);
     drawToaster(R, K.toaster[0], K.toaster[1], 0, actDone(b, 'rosta') && !b.placed.l0);
     const fb = firstBiff ? S.find((s) => s.cat === 'biff') : null;
-    const pattyPart = fb ? (b.placed[fb.id] || fb.part || DB.parts.find((p) => p.cat === 'biff')) : null;
+    const pattyPart = fb ? (b.placed[fb.id] || DB.part[b.station?.grill] || fb.part || DB.parts.find((p) => p.cat === 'biff')) : null;
     drawGrill(R, K.grill[0], K.grill[1], 0, pattyPart, fb && !b.placed[fb.id] ? actCount(b, 'grill') : 0);
     drawFryer(R, K.fryer[0], K.fryer[1], 0, era, b.placed.pommes ? 0 : actCount(b, 'fritera'), fried);
     drawDrinkTower(R, K.tower[0], K.tower[1], 0, era, poured && actDone(b, 'tappa') && !b.placed.dryck, drinkPart);
@@ -172,7 +185,7 @@ function makeRig(order) {
   Object.assign(rig, {
     VIEW, MAX_K, CONN, connectorIcon, order, year: order.year, layers, r, cu, cv,
     SLOTS: S, SLOT, ACTIONS: A, ACTION, CABLES, CABLE, STEPS, PORTS,
-    actSet, actCount, actDone, missingReq, slotsFor, dropAction, canPlace, canRemove, onRemove, wattNeed, actionReady,
+    actSet, actCount, actDone, missingReq, slotsFor, dropAction, pickups, canPlace, canRemove, onRemove, wattNeed, actionReady,
     portPos, portType, availablePorts, portLabel, portBusy, cableConn, cableNeeded, cableReady, cableOk, cableFrom, canConnect,
     SCREW_OF, screwStatus, standCheck, fact, drawScene, drawCables,
   });

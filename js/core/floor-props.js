@@ -2,7 +2,7 @@
 // Varje funktion returnerar { img, x, y } (scenkoordinater för övre vänstra hörnet)
 // eller, för montrar, separata lager under/över innehållet.
 import { Pix, hex, mul, mix, hash, bayer, SMALL, BIG, textW, text } from './floor-pix.js';
-import { COUNTER, SOFA, ARMCHAIR, TABLE, ROPE } from './floor-layout.js';
+import { COUNTER, SOFA, ARMCHAIR, TABLE, ROPE, QUEUE } from './floor-layout.js';
 
 // ---------- Museimonter (bordsmonter med glashuv) ----------
 export const VIT = { GH: 16, D: 40, BH: 20, PL: 3 };
@@ -457,8 +457,9 @@ export function makeCounter(theme, art = null, year = 1990, items = {}) {
     text(P, BIG, label, px0 + 5, py0 + 4, 0xfff6e0);
     P.hl(px0 + 3, py0 + 12, w - 6, hex(theme && theme.neon, 0x7ee8fa), 0.7);
   };
-  plate('BESTÄLL', 360);
-  plate('UTLÄMNING', (sp + x1) / 2);
+  const flip = QUEUE[0][0] > sp;   // hamburgerbaren: kön till höger, luckan till vänster
+  plate('BESTÄLL', flip ? (sp + x1) / 2 : 360);
+  plate('UTLÄMNING', flip ? 343 : (sp + x1) / 2);
   // saker på disken – verksamhetens egna, annars datorbutikens
   if (art?.counterItems) art.counterItems(P, COUNTER, year, items);
   else {

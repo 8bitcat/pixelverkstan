@@ -28,6 +28,9 @@ const first = (cat, used) => order.items.find((it, k) => it.cat === cat && !used
 ok(!L.canPlace(L.SLOT.l0, P[order.items[0].part], b).ok, 'underbrödet kräver rostning: ' + L.canPlace(L.SLOT.l0, P[order.items[0].part], b).msg);
 applyBuildOp(shop, order, { t: 'act', id: 'rosta', i: 0 });
 ok(L.canPlace(L.SLOT.l0, P[order.items[0].part], b).ok, 'rostat bröd får läggas');
+ok(L.pickups(b).some((p) => p.id === 'rosta' && p.part?.cat === 'brod' && p.from === 'brödrosten'), 'det rostade brödet ligger på brödrosten och går att ta med handen');
+applyBuildOp(shop, order, { t: 'act', id: 'rosta', i: 0, part: order.items[0].part });
+ok(b.station?.rosta === order.items[0].part && L.pickups(b)[0].part.id === order.items[0].part, 'stationen minns vilken råvara som lades på');
 applyBuildOp(shop, order, { t: 'place', slot: 'l0', part: order.items[0].part });
 const biffSlot = L.SLOTS.find((s) => s.cat === 'biff'), biff = P[order.items.find((i) => i.cat === 'biff').part];
 ok(!L.canPlace(biffSlot, biff, b).ok, 'biffen kräver grill: ' + L.canPlace(biffSlot, biff, b).msg);

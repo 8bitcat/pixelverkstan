@@ -258,7 +258,10 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   kylen under) → efterrätten sist. Råvaran kan **släppas direkt på stationen** (brödet på
   brödrosten, biffen på grillen, pommesen i fritösen, muggen vid maskinen) – det utför
   handgreppet, i hjälpläget likaväl som i proffsläget. Bara nästa lager i stapeln markeras, med
-  en ring i stället för en fylld ruta så att burgaren syns. Inget säljs över disk och det finns inga hyllor eller montrar
+  en ring i stället för en fylld ruta så att burgaren syns. **Det som ligger färdigt på en station
+  tas med handen**: tryck på eller dra från det rostade brödet på brödrosten, biffen på grillen,
+  pommesen i korgen och muggen vid maskinen – inte via lådan. En hand guppar över det som går att
+  ta, och stationen minns vilken råvara som lades på (`b.station`, följer med i co-op). Inget säljs över disk och det finns inga hyllor eller montrar
   i restaurangen: allt görs i köket. Köksutrustningen följer epoken (krom på femtiotalet,
   rostfritt i kedjan, svart stål 2016). Fakta om Maillard, kärntemperaturer, dubbelfritering
   m.m. i guiden.
@@ -266,7 +269,7 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   (dra i bilden) och jobbar vid köksbänken bakom dig med din egen kamera: klicka på brödrosten,
   grillen, fritösen, dryckesmaskinen och brickan, gå runt med W A S D. Lådan med råvaror och
   checklistan ligger ovanpå bilden (`shop.kitchen3d`, `view3d.enterKitchen`, bänken med
-  `free`-kamera).
+  `free`-kamera). Bänk, underskåp och stänkskydd är i rostfritt stål.
 - **Servering** (`serve.js`): burgaren byggs på en tallrik; med 🍽️ Ställ på disken glider
   tallriken (med pommes, dryck och efterrätt) bort till luckan med värmelamporna. Kunden
   hämtar den där, säger sitt omdöme (beror på tid och kladd) och betalar, bär tallriken till
@@ -289,10 +292,15 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   cylindrar), smält ost som droppar, delad korv, hyvlad parmesan, ringlade såser, pommes med
   topping, slushkupol, tapiokapärlor, mjukglass i strut, dammsugare, banana split.
   `tools/restaurang-ikoner.mjs` ritar alla ikoner i ett ark per kategori (`tools/out/rest-ikoner-*.png`).
-- **Lokalen** (`floor-art.js`, `floor-plans.js`): helt egen inredning – en **kyldisk med glasfront**
-  på köksväggen där råvarorna i lagret ligger i skålar (bröd, biffar, ost, grönt, extra, såser i sina
-  egna färger; högen växer med antalet, ritas om när lagret ändras – även i 3D på köksbänken),
-  menytavla med årets priser, rostfri köksbänk med läskmaskin, milkshakemaskin,
+- **Lokalen** (`floor-art.js`, `floor-plans.js`): helt egen inredning. Disken har två ytor: till
+  vänster en **kyldisk med glasfront ut mot kunderna** där råvarorna i lagret ligger i skålar (bröd,
+  biffar, ost, grönt, extra, såser i sina egna färger; högen växer med antalet och ritas om när
+  lagret ändras) med **luckan (utlämning) ovanpå** – tallrikarna ställs fram på kyldiskens rostfria
+  skiva och kunden hämtar dem där; till höger kassan (BESTÄLL) med kortterminal, menyställ, sugrör
+  och servetter. Kön står alltså till höger och luckan till vänster (`plan.pickupLeft` speglar
+  `QUEUE`/`PICKUP` i `floor-layout.js`; datorbutiken är oförändrad). Samma i 3D: glasdisk med
+  brickor på diskens vänstra yta och tallrikarna ovanpå. På köksväggen där lagerhyllan satt sitter
+  fläktkåpa, kakel och bongskenan. Dessutom menytavla med årets priser, rostfri köksbänk med läskmaskin, milkshakemaskin,
   fritös och grill, kassa efter epok, bricka och sugrör på disken, läskkyl och dessertdisk som
   montrar, jukebox, såsbar och lekhörna. **Epoken bestämmer stilen:** femtiotalsdiner (turkos,
   svartvitt golv, kromborden med röda stolar, konlampor), sextiotal, grillkiosk (brunt trä,
