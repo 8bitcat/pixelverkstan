@@ -6,7 +6,8 @@
 import { Pix, mix, mul, hash, bayer, hex, SMALL, BIG, textW, text, css, ctxText } from '../../core/floor-pix.js';
 import { templatesFor, composeBuild, priceFor } from './orders.js';
 import { ERA_LOOK, eraLook, themeFor } from './era.js';
-import { DB } from './menu.js';
+import { DB, layerHeight, bunTopHeight } from './menu.js';
+import { drawLayer } from './art.js';
 
 export const noShelf = true;     // ingen lagerhylla på väggen – råvarorna ligger i kyldisken på disken (renderDisplay)
 export const noPoster = true;    // menytavlan sitter där affischen satt
@@ -246,6 +247,25 @@ export function counterItems(P, C, year, items = {}) {
   napkins(P, 484, 124);
   // ketchup och senap
   bottle(P, 494, 124, 0xc92a2a); bottle(P, 501, 124, 0xe8b820);
+}
+
+// ---------- Råvarorna i kyldiskens kantiner (3D) ----------
+// En stapel per sort med lika många som finns i lagret (upp till 6 i högen, resten i en andra hög bredvid) –
+// ligger det en biff i kylen syns en biff. Samma voxelgrafik som på arbetsbänken (drawLayer). R är bänkens
+// lådsamlare (u, v i byggenheter, z uppåt), cu/cv kantinens mitt, r stapelns radie.
+export function drawDisplayStack(R, part, n, cu, cv, r) {
+  const shape = part.look?.shape, total = Math.max(0, Math.min(n, 12)), piles = [Math.min(total, 6), Math.max(0, total - 6)];
+  piles.forEach((k, pi) => {
+    if (!k) return;
+    const u = piles[1] ? cu + (pi ? 1 : -1) * r * 1.05 : cu;
+    let z = 0;
+    for (let i = 0; i < k; i++) {
+      if (shape === 'sauce' || shape === 'drizzle') { drawLayer(R, part, { at: [u, cv, z], r: r * 1.15, id: 0 }); z += 0.35; continue; }
+      const top = shape === 'bun';
+      drawLayer(R, part, { at: [u, cv, z], r, id: 0, top, bottom: false });
+      z += top ? bunTopHeight(part) * 0.85 : Math.max(0.3, layerHeight(part));
+    }
+  });
 }
 
 // ---------- Montrar: läskkyl och dessertdisk (innehållet ritas av floor.js via frame.grid) ----------

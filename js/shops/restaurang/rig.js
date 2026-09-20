@@ -100,7 +100,8 @@ function makeRig(order) {
     const partOf = (id, slot, cat) => DB.part[st[id]] || slot?.part || DB.parts.find((p) => p.cat === cat);
     if (S[0] && actDone(b, 'rosta') && !b.placed.l0) out.push({ id: 'rosta', part: partOf('rosta', S[0], 'brod'), at: [K.toaster[0] + 2, K.toaster[1] + 2, 2.4], name: 'brödet', from: 'brödrosten' });
     const fb = S.find((s) => s.cat === 'biff');
-    if (fb && actDone(b, 'grill') && !b.placed[fb.id]) out.push({ id: 'grill', part: partOf('grill', fb, 'biff'), at: [K.grill[0] + 2.75, K.grill[1] + 3, 1.4], name: 'biffen', from: 'grillen' });
+    // biffen tas först när den är kryddad – saltet har samma klickyta på grillen
+    if (fb && actDone(b, 'grill') && (!ACTION.salt || actDone(b, 'salt')) && !b.placed[fb.id]) out.push({ id: 'grill', part: partOf('grill', fb, 'biff'), at: [K.grill[0] + 2.75, K.grill[1] + 3, 1.4], name: 'biffen', from: 'grillen' });
     if (fried && actDone(b, 'fritera') && !b.placed.pommes) out.push({ id: 'fritera', part: DB.part[st.fritera] || sidePart, at: [K.fryer[0] + 3.3, K.fryer[1] + 2.3, 2.6], name: 'pommesen', from: 'fritöskorgen' });
     if (poured && actDone(b, 'tappa') && !b.placed.dryck) out.push({ id: 'tappa', part: DB.part[st.tappa] || drinkPart, at: [K.tower[0] + 2.2, K.tower[1] + 3.2, 2.2], name: 'muggen', from: 'dryckesmaskinen' });
     return out.filter((p) => p.part);

@@ -34,6 +34,24 @@ class Recorder {
   idAt() { return 0; }
 }
 
+// Fristående voxelgrupp: samma lådor → 3D-lådor med atlas som på bänken, men med alla sidor (man kan gå
+// runt den) och egen skala – t.ex. råvarorna i kyldiskens kantiner. render(drawFn) ritar om, group hängs in i scenen.
+export function makeVoxels({ ppu = PPU, unit = U } = {}) {
+  const v = {
+    group: new THREE.Group(), rec: new Recorder(), cache: new Map(), meshes: [], atlas: null, atlasData: null, atlasCanvas: null, atlasSize: null,
+    filter: null, ppu, allFaces: true, bench: null, stats: { boxes: 0, faces: 0, atlas: [0, 0], ms: 0, cached: 0 },
+    mats: {
+      opaque: new THREE.MeshStandardMaterial({ roughness: 0.78, metalness: 0.02, alphaTest: 0.5, side: THREE.DoubleSide }),
+      glass: new THREE.MeshStandardMaterial({ roughness: 0.15, metalness: 0.1, transparent: true, depthWrite: false, side: THREE.DoubleSide }),
+    },
+    clearMeshes() { Bench3D.prototype.clearMeshes.call(this); },
+    render(drawFn) { Bench3D.prototype.renderWith.call(this, drawFn); return this.stats; },
+    dispose() { this.clearMeshes(); this.atlas?.dispose(); this.mats.opaque.dispose(); this.mats.glass.dispose(); },
+  };
+  v.group.name = 'voxels'; v.group.scale.setScalar(unit);
+  return v;
+}
+
 // sidans mått i enheter: [bredd, höjd]
 function faceSize(b, face) {
   if (face === 'top') return [b.u1 - b.u0, b.v1 - b.v0];
@@ -263,21 +281,23 @@ export class Bench3D {
     rec.boxes.forEach((box, i) => {
       if (this.filter && !this.filter(box)) return;
       const thin = box.z1 - box.z0 < 0.02;
-      for (const face of ['top', 'left', 'right']) {
+      // (allFaces: även baksidan och bortre sidan, för saker man kan gå runt – de delar textur med framsidorna)
+      for (const face of (this.allFaces ? ['top', 'left', 'right', 'back', 'far'] : ['top', 'left', 'right'])) {
         if (face !== 'top' && thin) continue;
-        const [W, H] = faceSize(box, face);
+        const rf = face === 'back' ? 'left' : face === 'far' ? 'right' : face;
+        const [W, H] = faceSize(box, rf);
         if (W <= 0 || H <= 0) continue;
-        const key = faceKey(box, face, W, H);
+        const key = faceKey(box, rf, W, H);
         let ras = this.cache.get(key) || fresh.get(key);
         if (ras) cached++;
-        else { ras = rasterFace(box, face, W, H, this.ppu); if (!ras.any) ras = null; fresh.set(key, ras); }
+        else { ras = rasterFace(box, rf, W, H, this.ppu); if (!ras.any) ras = null; fresh.set(key, ras); }
         if (!ras) continue;
-        faces.push({ box, face, W, H, ras, i, glass: box.alpha < 1 });
+        faces.push({ box, face, rf, W, H, ras, i, glass: box.alpha < 1 });
       }
     });
     // cachen innehåller bara det som syns just nu (plus det nya)
     const next = new Map();
-    for (const f of faces) next.set(faceKey(f.box, f.face, f.W, f.H), f.ras);
+    for (const f of faces) next.set(faceKey(f.box, f.rf, f.W, f.H), f.ras);
     this.cache = next;
     // packa i en atlas (hyllpackning, högsta först)
     const order = [...faces].sort((a, c) => c.ras.h - a.ras.h);
@@ -324,12 +344,14 @@ export class Bench3D {
         let P, N;
         if (f.face === 'top') { const z = b.z1 + lift; P = [b.u0, z, b.v0, b.u1, z, b.v0, b.u1, z, b.v1, b.u0, z, b.v1]; N = [0, 1, 0]; }
         else if (f.face === 'left') { const v = b.v1 + lift; P = [b.u0, b.z1, v, b.u1, b.z1, v, b.u1, b.z0, v, b.u0, b.z0, v]; N = [0, 0, 1]; }
+        else if (f.face === 'back') { const v = b.v0 - lift; P = [b.u1, b.z1, v, b.u0, b.z1, v, b.u0, b.z0, v, b.u1, b.z0, v]; N = [0, 0, -1]; }
+        else if (f.face === 'far') { const u = b.u0 - lift; P = [u, b.z1, b.v1, u, b.z1, b.v0, u, b.z0, b.v0, u, b.z0, b.v1]; N = [-1, 0, 0]; }
         else { const u = b.u1 + lift; P = [u, b.z1, b.v0, u, b.z1, b.v1, u, b.z0, b.v1, u, b.z0, b.v0]; N = [1, 0, 0]; }
         pos.set(P, k * 12);
         for (let m = 0; m < 4; m++) nor.set(N, k * 12 + m * 3);
         uv.set([u0, v0, u1, v0, u1, v1, u0, v1], k * 8);
         const o = k * 4;
-        if (f.face === 'right') idx.set([o, o + 1, o + 2, o, o + 2, o + 3], k * 6);
+        if (f.face === 'right' || f.face === 'far') idx.set([o, o + 1, o + 2, o, o + 2, o + 3], k * 6);
         else idx.set([o, o + 2, o + 1, o, o + 3, o + 2], k * 6);
         ids.push(b.id, b.id);
       });

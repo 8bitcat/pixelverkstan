@@ -261,7 +261,9 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   en ring i stället för en fylld ruta så att burgaren syns. **Det som ligger färdigt på en station
   tas med handen**: tryck på eller dra från det rostade brödet på brödrosten, biffen på grillen,
   pommesen i korgen och muggen vid maskinen – inte via lådan. En hand guppar över det som går att
-  ta, och stationen minns vilken råvara som lades på (`b.station`, följer med i co-op). Inget säljs över disk och det finns inga hyllor eller montrar
+  ta, och stationen minns vilken råvara som lades på (`b.station`, följer med i co-op). Biffen går
+  att ta först när den är saltad (saltet har samma klickyta), och en handling som är redo vinner
+  alltid över plockning. Inget säljs över disk och det finns inga hyllor eller montrar
   i restaurangen: allt görs i köket. Köksutrustningen följer epoken (krom på femtiotalet,
   rostfritt i kedjan, svart stål 2016). Fakta om Maillard, kärntemperaturer, dubbelfritering
   m.m. i guiden.
@@ -280,7 +282,9 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   äts upp bit för bit. Pixelfigurerna har egna poser för att bära tallriken (armarna fram) och
   äta (händerna vid munnen). I 3D sjunker gästen ner på stolen och tuggar, tallrikarna byggs av
   samma lager, och gästerna spelar riktiga Mixamo-klipp: Stand To Sit, Sitting Idle, Sitting
-  Talking (tuggorna), Sitting Drinking, Sit To Stand och Carrying (tallriken). Klippen exporteras
+  Talking (tuggorna), Sitting Drinking, Sit To Stand och Carrying (tallriken). På stolarna lyfts
+  figuren så att stussen vilar på sitsen (höftbenet mäts i sittposen) – barn och mindre figurer
+  sitter annars genom stolen. Klippen exporteras
   från Mixamo på X Bot (Without Skin, FBX Binary, 30 fps) till `assets/3d/mixamo/anim/` och
   konverteras med `node tools/mixamo-anim.mjs` till små glb-filer i `assets/3d/anim/` (manifest med
   nycklar sit/sitIdle/eat/drink/stand/carry); `people.js` lägger dem på alla figurer med samma
@@ -298,8 +302,11 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   lagret ändras) med **luckan (utlämning) ovanpå** – tallrikarna ställs fram på kyldiskens rostfria
   skiva och kunden hämtar dem där; till höger kassan (BESTÄLL) med kortterminal, menyställ, sugrör
   och servetter. Kön står alltså till höger och luckan till vänster (`plan.pickupLeft` speglar
-  `QUEUE`/`PICKUP` i `floor-layout.js`; datorbutiken är oförändrad). Samma i 3D: glasdisk med
-  brickor på diskens vänstra yta och tallrikarna ovanpå. På köksväggen där lagerhyllan satt sitter
+  `QUEUE`/`PICKUP` i `floor-layout.js`; datorbutiken är oförändrad). Samma i 3D: glasdisk på diskens
+  vänstra yta med **glaslock** så att man ser ner i den, rostfria kantiner och råvarorna ritade med
+  bänkens voxelgrafik (`makeVoxels` i `bench.js` + `floor-art.drawDisplayStack`): de staplas efter
+  lagret, en biff syns som en biff, sex som sex (upp till sex i högen, resten i en hög bredvid);
+  tallrikarna står ovanpå locket. På köksväggen där lagerhyllan satt sitter
   fläktkåpa, kakel och bongskenan. Dessutom menytavla med årets priser, rostfri köksbänk med läskmaskin, milkshakemaskin,
   fritös och grill, kassa efter epok, bricka och sugrör på disken, läskkyl och dessertdisk som
   montrar, jukebox, såsbar och lekhörna. **Epoken bestämmer stilen:** femtiotalsdiner (turkos,

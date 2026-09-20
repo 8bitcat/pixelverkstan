@@ -34,7 +34,7 @@ const bigOrder = () => page.evaluate(() => {
   for (let i = 0; i < 60; i++) { const o = g.shop.generateOrder(g, ['Nils']); if (!o || o.product || !o.items.every((it) => it.part)) continue; if (!best || o.items.length > best.items.length) best = o; }
   if (!best) return null;
   const c = g.spawn(best);
-  for (const it of c.order.items) g.stock[it.part] = (g.stock[it.part] || 0) + 2;
+  for (const it of c.order.items) { g.stock[it.part] = (g.stock[it.part] || 0) + 2; g.shown[it.part] = g.stock[it.part]; }
   c.phase = 'queue'; c.x = 453; c.y = 176; c.patience = 9999;
   const o = g.accept(c);
   if (!o || !o.id) return { err: 'accept misslyckades' };
@@ -72,6 +72,8 @@ await page.waitForFunction(() => PV.view3d?.ready, null, { timeout: 240000 });
 console.log(`laddade 3D på ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 await page.waitForTimeout(1500);
 ok(await page.evaluate(() => !!PV.view3d.room.bench && !!PV.view3d.bench), 'arbetsbänken finns i rummet');
+const dv = await page.evaluate(() => PV.view3d.units.displayVox?.stats || null);
+ok(dv && dv.boxes > 0 && dv.faces > 0, `kyldiskens råvaror ritas som voxlar i kantinerna: ${JSON.stringify(dv)}`);
 await page.evaluate(() => { const v = PV.view3d, b = v.room.bench; v.setPose(b.stand[0], b.stand[1], 0, -0.72); });
 await waitFrames(2);
 await shot('3-rum');

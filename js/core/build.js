@@ -676,7 +676,7 @@ export class BuildView {
     if (!this.order || modalOpen()) return;
     if (this.phase === 'desk') return this.onCanvasDown(e);
     if (!this.selected && this.ptrs.size === 0) {
-      const hit = this.pickupAt(this.local(e));
+      const pt = this.local(e), hit = this.actionAt(pt) ? null : this.pickupAt(pt);   // en handling som är redo vinner över plockning
       if (hit) { this.drag = { entry: hit.entry, x0: e.clientX, y0: e.clientY, moved: false, station: hit.pu }; e.preventDefault(); return; }
     }
     this.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY });

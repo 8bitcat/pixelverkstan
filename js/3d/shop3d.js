@@ -251,7 +251,7 @@ export class Shop3D {
     this.room.update(dt, fl);
     this.units.update(dt);
     this.people.sync(this.peopleList(), dt);
-    if (this.shop.mealOf) this.units.plates?.(this.plateList());
+    if (this.game.shop.mealOf) this.units.plates?.(this.plateList());
     this.bench.update(dt);
     this.renderer.info.reset();
     if (this.benchComposer) this.benchComposer.render(); else this.renderer.render(this.scene, this.bench.camera);
@@ -395,7 +395,7 @@ export class Shop3D {
       const want = c.order?.title || c.order?.want || '';
       const mood = c.phase === 'leaving' ? (c.mood === 'angry' ? ' 😠' : c.mood === 'happy' ? ' 😊' : '') : '';
       const label = cl ? (want ? `${c.name}: ${want}` : c.name) : say(c) || (c.phase === 'ready' ? c.name + ' hämtar' : c.phase === 'leaving' && mood ? c.name + mood : '');
-      out.push({ key, x, z, y: c._sit ? -0.42 : 0, sit: !!c._sit, eat: c.phase === 'eating' && !!c._sit, carry: !!c._carry && !c._sit, yaw: c.moving ? yaw : C.yawOf(c.dir), moving: c.moving, kid: !!c.look?.kid, name: c.name, color: c.look?.shirt || '#7ea0c8', look: c.look, label, labelColor: cl ? '#f5c542' : c.mood === 'angry' ? '#e23b5a' : '#7ee8fa', mark: cl });
+      out.push({ key, x, z, y: c._sit ? -0.42 : 0, seatTop: seat?.table !== undefined ? (LY.TABLES[seat.table]?.booth ? 0.45 : 0.46) : undefined, sit: !!c._sit, eat: c.phase === 'eating' && !!c._sit, carry: !!c._carry && !c._sit, yaw: c.moving ? yaw : C.yawOf(c.dir), moving: c.moving, kid: !!c.look?.kid, name: c.name, color: c.look?.shirt || '#7ea0c8', look: c.look, label, labelColor: cl ? '#f5c542' : c.mood === 'angry' ? '#e23b5a' : '#7ee8fa', mark: cl });
       seen.add(key);
     }
     for (const pl of fl.players) {

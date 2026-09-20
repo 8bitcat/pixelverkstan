@@ -6,6 +6,7 @@ import * as A from './assets.js';
 import * as C from './coords.js';
 import { boxArt, coverArt, plate, boxGeo, canvasTex } from './textures.js';
 import { slab, glassMat, metalMat, paintMat, signBoard, neonSign } from './room.js';
+import { makeVoxels, U as BENCH_U } from './bench.js';
 import * as LY from '../core/floor-layout.js';
 import * as WK from '../core/floor-walk.js';
 import { consoleSprite, coverSprite, marqueeText, attractFrame, ATTRACT_FOR_ENGINE } from '../shops/dator/art-products.js';
@@ -406,30 +407,35 @@ export class Units {
     if (W > gx + 0.6) { slab(g, gx, gx + 0.7, 0.03, 0.2, -0.28, 0.2, dark); for (const x of [gx + 0.12, gx + 0.4]) slab(g, x, x + 0.22, 0.2, 0.24, -0.15, 0.07, paintMat(0x6e3a26, 0.8)); }
     this.group.add(g);
   }
-  // kyldisken på disken (vänstra ytan, ut mot kunderna): glashuv, brickor med råvarorna i lagret (högen växer
-  // med antalet) och rostfri skiva ovanpå där tallrikarna ställs fram (luckan). Sockeln byggs i room.js.
+  // kyldisken på disken (vänstra ytan, ut mot kunderna): glasfront, gavlar och glaslock så att man ser ner i den,
+  // rostfria kantiner med råvarorna i lagret ritade med bänkens voxelgrafik (staplade – en biff syns som en biff,
+  // sex som sex) och tallrikarna ovanpå locket (luckan). Sockeln byggs i room.js.
   displayCase() {
     const dc = this.ctx.room?.displayCase;
     if (!dc) return;
     const g = new THREE.Group(); g.position.set(dc.x0, dc.y, dc.z0);
-    const W = dc.x1 - dc.x0, D = dc.z1 - dc.z0, H = dc.top - dc.y, steel = metalMat(0xc8ced6, 0.35), glass = glassMat(0xe4eef2, 0.9);
+    const W = dc.x1 - dc.x0, D = dc.z1 - dc.z0, H = dc.top - dc.y, steel = metalMat(0xc8ced6, 0.35), glass = glassMat(0xe4eef2, 0.9), pan = metalMat(0xd8dde3, 0.3);
     slab(g, 0, W, 0, 0.02, 0, D, steel, { cast: false });   // rostfri botten
     const cats = ['brod', 'biff', 'ost', 'gront', 'extra', 'sas'];
     const goods = this.floor.owned().filter((p) => cats.includes(p.cat)).map((p) => ({ p, n: this.ctx.game.stockFree(p.id) })).filter((x) => x.n > 0).sort((a, b) => cats.indexOf(a.p.cat) - cats.indexOf(b.p.cat) || b.n - a.n).slice(0, 10);
-    const cols = 5, cw = (W - 0.1) / cols - 0.03, td = Math.min(0.2, D / 2 - 0.04);
+    const cols = 5, cellW = (W - 0.08) / cols, cw = cellW - 0.03, td = Math.min(0.21, D / 2 - 0.03), unit = BENCH_U * 0.85;
+    const art = this.shop.floorArt, vox = art?.drawDisplayStack ? (this.displayVox ||= makeVoxels({ unit, ppu: 10 })) : null;
+    const stacks = [];
     goods.forEach(({ p, n }, i) => {
-      const col = i % cols, row = Math.floor(i / cols), x = 0.05 + col * ((W - 0.1) / cols), z = row === 0 ? D - td - 0.03 : 0.03;
-      slab(g, x, x + cw, 0.02, 0.06, z, z + td, paintMat(0xf6f3ec, 0.4), { cast: false });   // skål/bricka
-      const h = 0.015 + Math.min(4, 1 + Math.floor(Math.log2(Math.max(1, n)))) * 0.014;
-      slab(g, x + 0.015, x + cw - 0.015, 0.06, 0.06 + h, z + 0.02, z + td - 0.02, paintMat(hexOf(p.look?.color, 0xc8a060), 0.85), { cast: false });   // högen
+      const col = i % cols, row = Math.floor(i / cols), x = 0.04 + col * cellW, z = row === 0 ? D - td - 0.02 : 0.02;
+      // kantin (GN-bleck): rostfri botten och låga kanter
+      slab(g, x, x + cw, 0.02, 0.028, z, z + td, pan, { cast: false });
+      for (const [a, b, c, d] of [[x, x + cw, z, z + 0.006], [x, x + cw, z + td - 0.006, z + td], [x, x + 0.006, z, z + td], [x + cw - 0.006, x + cw, z, z + td]]) slab(g, a, b, 0.028, 0.085, c, d, pan, { cast: false });
+      if (vox) stacks.push({ p, n, cu: (x + cw / 2) / unit, cv: (z + td / 2) / unit, r: Math.min(cw * 0.22, td * 0.4) / unit });
+      else { const h = 0.01 + Math.min(6, n) * 0.012; slab(g, x + 0.03, x + cw - 0.03, 0.028, 0.028 + h, z + 0.03, z + td - 0.03, paintMat(hexOf(p.look?.color, 0xc8a060), 0.85), { cast: false }); }
     });
-    // glas: front mot kunderna och gavlar; bak bara en låg kant så att man når in från köket
-    slab(g, 0, W, 0.02, H - 0.04, D - 0.01, D, glass, { cast: false });
-    for (const x of [0, W - 0.01]) slab(g, x, x + 0.01, 0.02, H - 0.04, 0, D, glass, { cast: false });
+    if (vox) { vox.render((R) => { for (const s of stacks) art.drawDisplayStack(R, s.p, s.n, s.cu, s.cv, s.r); }); vox.group.position.set(0, 0.028, 0); g.add(vox.group); }
+    // glas: front mot kunderna, gavlar och lock; bak bara en låg kant så att man når in från köket
+    slab(g, 0, W, 0.02, H - 0.02, D - 0.01, D, glass, { cast: false });
+    for (const x of [0, W - 0.01]) slab(g, x, x + 0.01, 0.02, H - 0.02, 0, D, glass, { cast: false });
     slab(g, 0, W, 0.02, 0.1, 0, 0.01, steel, { cast: false });
-    // svart ram och rostfri skiva ovanpå (luckan – tallrikarna ställs här)
-    slab(g, 0, W, H - 0.05, H - 0.04, 0, D, paintMat(0x2a2a30, 0.5), { cast: false });
-    slab(g, -0.02, W + 0.02, H - 0.04, H, -0.02, D + 0.02, steel);
+    slab(g, 0, W, H - 0.02, H, 0, D, glass, { cast: false });   // glaslocket – tallrikarna ställs ovanpå
+    for (const [a, b, c, d] of [[-0.02, W + 0.02, -0.02, 0.01], [-0.02, W + 0.02, D - 0.01, D + 0.02], [-0.02, 0.01, 0, D], [W - 0.01, W + 0.02, 0, D]]) slab(g, a, b, H - 0.03, H, c, d, steel, { cast: false });   // rostfri ram
     // termometer på sockeln
     slab(g, 0.06, 0.2, -0.1, -0.05, D - 0.002, D + 0.006, paintMat(0x1a1a1e, 0.4), { cast: false });
     slab(g, 0.08, 0.14, -0.085, -0.065, D + 0.006, D + 0.008, new THREE.MeshBasicMaterial({ color: 0xe23b5a }), { cast: false });

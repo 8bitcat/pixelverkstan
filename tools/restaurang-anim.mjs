@@ -47,12 +47,12 @@ await page.evaluate(() => { const v = PV.view3d; v.setPose(2.6, 3.2, 0.9, -0.25)
 for (let i = 0; i < 12; i++) { await waitFrames(3); await page.evaluate(() => { for (let k = 0; k < 10; k++) PV.floor.update(0.05); }); }
 const act = await page.evaluate(() => {
   const P = PV.view3d.people, out = [];
-  for (const c of PV.game.customers) { const ac = P.actors.get('c' + c.id); out.push({ n: c.name, ph: c.phase, sit: !!c._sit, carry: !!c._carry, moving: c.moving, cur: ac?.cur, has: ac ? Object.keys(ac.actions || {}).filter((k) => ['sitIdle', 'eat', 'carry'].includes(k)) : [], y: ac ? +ac.g.position.y.toFixed(2) : null, char: ac?.char || 'xbot' }); }
+  for (const c of PV.game.customers) { const ac = P.actors.get('c' + c.id); out.push({ n: c.name, ph: c.phase, sit: !!c._sit, carry: !!c._carry, moving: c.moving, cur: ac?.cur, has: ac ? Object.keys(ac.actions || {}).filter((k) => ['sitIdle', 'eat', 'carry'].includes(k)) : [], y: ac ? +ac.g.position.y.toFixed(2) : null, hips: ac ? (() => { let b = null; ac.g.traverse((o) => { if (!b && o.isBone && /Hips$/.test(o.name)) b = o; }); return b ? +b.getWorldPosition(b.position.clone()).y.toFixed(2) : null; })() : null, char: ac?.char || 'xbot' }); }
   return out;
 });
 console.log('3D', JSON.stringify(act));
 ok(act.filter((a) => a.sit).every((a) => ['sitIdle', 'eat', 'drink'].includes(a.cur)), 'de som sitter spelar sitt-/ätklipp');
-ok(act.filter((a) => a.sit).every((a) => a.y === 0), 'ingen nedsänkning när riktiga sittklipp finns');
+ok(act.filter((a) => a.sit).every((a) => a.y >= 0 && a.y < 0.3 && a.hips >= 0.5), 'stussen vilar på sitsen: höften ≥ 0,5 m, figuren lyfts vid behov (inte nedsänkt genom stolen)');
 const carrier = act.find((a) => a.carry && a.moving);
 ok(!carrier || carrier.cur === 'carry', `den som bär tallriken spelar bärklippet (${carrier ? carrier.cur : 'står stilla'})`);
 await page.screenshot({ path: OUT + 'rest-anim-1.png', timeout: 180000 });

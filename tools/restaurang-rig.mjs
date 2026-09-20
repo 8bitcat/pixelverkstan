@@ -39,8 +39,10 @@ applyBuildOp(shop, order, { t: 'act', id: 'grill', i: 0 });
 ok(!L.actDone(b, 'grill') && L.actCount(b, 'grill') === 1, 'första tryck: biffen ligger på (1/2)');
 applyBuildOp(shop, order, { t: 'act', id: 'grill', i: 1 });
 ok(!L.canPlace(biffSlot, biff, b).ok, 'kryddning krävs: ' + L.canPlace(biffSlot, biff, b).msg);
+ok(!L.pickups(b).some((p) => p.id === 'grill'), 'biffen går inte att ta från grillen innan den är kryddad (saltet har samma klickyta)');
 applyBuildOp(shop, order, { t: 'act', id: 'salt', i: 0 });
 ok(L.canPlace(biffSlot, biff, b).ok, 'stekt och kryddad biff får läggas');
+ok(L.pickups(b).some((p) => p.id === 'grill' && p.part?.cat === 'biff'), 'kryddad biff går att ta från grillen med handen');
 const top = L.SLOTS.filter((s) => s.cat === 'brod').at(-1);
 ok(!L.canPlace(top, P[order.items[0].part], b).ok, 'toppbrödet kräver lagren under: ' + L.canPlace(top, P[order.items[0].part], b).msg);
 // fel sort på toppen

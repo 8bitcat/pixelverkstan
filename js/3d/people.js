@@ -338,6 +338,12 @@ export class People {
           ac.cur = want;
         }
         ac.mixer.update(dt);
+        // på stol: lyft figuren så att stussen vilar på sitsen (höftbenet mäts i sittposen) – annars sitter
+        // mindre figurer och barn genom stolen; utan stolshöjd (soffan) står figuren på golvet som förut
+        if (a.sit && hasSit && a.seatTop !== undefined) {
+          const hb = ac.hips || (ac.hips = findBone(ac.g, /Hips$/));
+          if (hb) { ac.g.updateMatrixWorld(true); const hy = hb.getWorldPosition(new THREE.Vector3()).y - ac.g.position.y; const want = Math.max(0, a.seatTop + 0.09 - hy); ac.lift = ac.lift === undefined ? want : ac.lift + (want - ac.lift) * Math.min(1, dt * 6); ac.g.position.y += ac.lift; }
+        } else ac.lift = undefined;
       }
       this.setLabel(ac, a.label, a.labelColor, a.big);
       this.setMark(ac, a.mark);
