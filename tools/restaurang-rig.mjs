@@ -57,6 +57,15 @@ for (const s of L.SLOTS) {
 ok(Object.keys(b.placed).length === L.SLOTS.length, `alla ${L.SLOTS.length} lager på plats (${L.STEPS.join(' ')})`);
 ok(!L.canRemove(L.SLOT.l1, b).ok, 'ett lager mitt i kan inte tas bort: ' + L.canRemove(L.SLOT.l1, b).msg);
 ok(L.standCheck(b).length === 0, 'standCheck ok');
+{ // måltiden äts upp tugga för tugga (3D-tallrikarna): volymen ovanför tallriken krymper för varje steg
+  const meal = { layers: L.SLOTS.filter((x) => x.k !== undefined).map((x) => b.placed[x.id].id), pommes: b.placed.pommes?.id || null, dryck: b.placed.dryck?.id || null, dessert: b.placed.dessert?.id || null, tray: true, year: order.year };
+  const rigMod = await import('../js/shops/restaurang/rig.js');
+  const vol = (eaten) => { const bx = []; rigMod.drawMeal({ box: (...a) => bx.push(a) }, meal, { eaten }); return { n: bx.length, v: +bx.filter((q) => q[4] >= -0.01).reduce((s, q) => s + (q[1] - q[0]) * (q[3] - q[2]) * (q[5] - q[4]), 0).toFixed(1) }; };
+  const steps = [0, 0.1, 0.3, 0.5, 0.7, 0.9, 1].map(vol);
+  ok(steps.every((x, i) => !i || x.v <= steps[i - 1].v) && steps[1].v < steps[0].v && steps[3].v < steps[1].v && steps[0].v > steps.at(-1).v * 4, `kunden tar tuggor: volymen på tallriken ${steps.map((x) => x.v).join(' → ')}`);
+  const last = []; rigMod.drawMeal({ box: (...a) => last.push(a) }, meal, { eaten: 1 });
+  ok(last.length < steps[0].n * 0.5, `när allt är uppätet ligger bara bricka, tallrik och smulor kvar (${last.length} lådor mot ${steps[0].n} för hela måltiden)`);
+}
 let boxes = 0; const R = { k: 16, hz: 13, ox: 0, oy: 0, defaultId: 0, box: () => boxes++, proj: (u, v, z) => [u - v, (u + v) / 2 - z] };
 L.drawScene(R, b, {}); ok(boxes > 10, `drawScene ritar ${boxes} lådor`);
 // varje obligatoriskt lager i ett recept ska ha ingredienser i sortimentet redan från menyns första år

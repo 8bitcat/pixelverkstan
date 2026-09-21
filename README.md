@@ -287,6 +287,12 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   block) – ingen fysikmotor. Föremålen ritas av riggen med samma voxlar som på bänken
   (`shop.carryKit(order)` → `rig.drawTrayScene(R, b, { only })`, bänkens rastercache återanvänds).
   I 2D är flödet som förr: 🍽️ Ställ på disken, brickan lyfts ur bild och kunden hämtar vid luckan.
+- **Kunden tar tuggor (3D)**: måltiden på luckan, i kundens händer och på bordet är samma voxlar som i
+  köket (`rig.drawMeal(R, meal, { eaten })`, ritad ur `c.meal`), inte en förenklad tallrik. Medan gästen
+  äter skärs runda tuggor ur burgaren från gästens sida – genom alla lager, så att snittytan visar bröd,
+  biff och ost – tio tuggor tills bara smulor är kvar; pommesen sjunker i fickan och efterrätten äts sist.
+  Tuggorna görs av en lådsamlare som klipper lådorna (`biteClip`) och behåller texturens läge; bara de
+  ytor som ändras rastreras om.
 - **Köket öppnas utan frysning**: första gången bänken ritades i 3D kompilerade webbläsaren om
   shaders i flera sekunder. Tre orsaker, alla åtgärdade: bänkens byggljus kom och gick med bänken,
   och antalet ljus ingår i shadernas nyckel, så *alla* material i butiken byggdes om (ljuset ligger

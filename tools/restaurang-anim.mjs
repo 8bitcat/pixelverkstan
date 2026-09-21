@@ -69,13 +69,24 @@ const carried = await page.evaluate(() => {
   v.people.sync(v.peopleList(), 0.016);
   v.units.plates(v.plateList());
   const e = v.units.plateMap.get('h' + c.id);
-  const out = { hand: hp ? { x: +hp.x.toFixed(2), y: +hp.y.toFixed(2), z: +hp.z.toFixed(2) } : null, plate: e ? { y: +e.g.position.y.toFixed(2), kids: e.g.children.length } : null };
+  const out = { hand: hp ? { x: +hp.x.toFixed(2), y: +hp.y.toFixed(2), z: +hp.z.toFixed(2) } : null, plate: e ? { y: +e.g.position.y.toFixed(2), kids: e.vox ? e.vox.stats.boxes : e.g.children.length } : null };
   c._sit = was.sit; c._carry = was.carry;
   return out;
 });
 console.log('bärande', JSON.stringify(carried));
 ok(carried.plate && carried.plate.y > 0.7 && carried.plate.kids > 1, `tallriken ligger i händerna på den som bär ut den: ${JSON.stringify(carried)}`);
 ok(!!carried.hand, 'handens plats hittas i figuren (tallriken följer armarna)');
+// kunden tar tuggor: måltiden på bordet är samma voxlar som i köket och blir mindre för varje tugga
+const bites = await page.evaluate(() => {
+  const v = PV.view3d, c = PV.game.customers.find((x) => x._sit && x.phase === 'eating' && x.meal);
+  if (!c) return null;
+  const at = (left) => { c._eatT = c._eatMax * left; v.units.plates(v.plateList()); const e = v.units.plateMap.get('e' + c.id); return { boxes: e.vox ? e.vox.stats.boxes : -1, stage: +(1 - left).toFixed(1), rot: +e.g.rotation.y.toFixed(2) }; };
+  const out = [at(1), at(0.7), at(0.4), at(0.05)];
+  c._eatT = c._eatMax * 0.5; v.units.plates(v.plateList());
+  return { name: c.name, layers: c.meal.layers.length, out };
+});
+console.log('tuggor', JSON.stringify(bites));
+ok(bites && bites.out[0].boxes > 100 && bites.out[3].boxes < bites.out[0].boxes * 0.6 && bites.out[1].boxes !== bites.out[0].boxes, `kunden äter ur samma voxelburgare som byggdes: ${bites?.out.map((x) => x.boxes).join(' → ')} lådor`);
 const carrier = act.find((a) => a.carry && a.moving);
 ok(!carrier || carrier.cur === 'carry', `den som bär tallriken spelar bärklippet (${carrier ? carrier.cur : 'står stilla'})`);
 await page.screenshot({ path: OUT + 'rest-anim-1.png', timeout: 180000 });

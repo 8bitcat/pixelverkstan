@@ -435,7 +435,7 @@ export class Shop3D {
         const sp = LY.SPOTS[c._spot]; if (!sp?.plate) continue;
         const stage = c._eatMax ? Math.max(0, Math.min(1, 1 - c._eatT / c._eatMax)) : (c._eat || 0) / 100;
         // tallriken står närmare gästen än i 2D (gästen sitter bak på stolen) så att hon äter från den
-        out.push({ key: 'e' + c.id, x: C.toX(sp.plate[0]), y: 0.76, z: C.toZ(sp.plate[1]) - 0.2, stage: Math.round(stage * 10) / 10, meal: c.meal || null, yaw: Math.PI });
+        out.push({ key: 'e' + c.id, x: C.toX(sp.plate[0]), y: 0.76, z: C.toZ(sp.plate[1]) - 0.2, stage: Math.round(stage * 10) / 10, meal: c.meal || null, yaw: this.game.shop.drawMeal ? 0 : Math.PI });   // voxelmåltiden: tuggorna tas från kundens sida (−z)
       }
     }
     return out;

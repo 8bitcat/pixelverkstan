@@ -33,8 +33,11 @@ export default {
     const stack = L.SLOTS.filter((s) => s.k !== undefined);
     const layers = stack.map((s) => placed[s.id]?.id || s.part?.id).filter(Boolean);
     const side = (id, cat) => placed[id]?.id || order.items.find((it) => it.cat === cat)?.part || null;
-    return { layers, pommes: side('pommes', 'tillbehor'), dryck: side('dryck', 'dryck'), dessert: side('dessert', 'dessert'), tray: true };
+    return { layers, pommes: side('pommes', 'tillbehor'), dryck: side('dryck', 'dryck'), dessert: side('dessert', 'dessert'), tray: true, year: order.year };
   },
+  // 3D: måltiden ritas med kökets voxlar där den står (luckan, händerna, bordet) och äts upp tugga för tugga
+  drawMeal: rig.drawMeal,
+  mealAnchor: rig.mealAnchor,
   judge,                            // kundens omdöme om en bricka (tid, kladd, golv) – används när den lämnas för hand i 3D
   // 3D: brickan och det som står på den som egna föremål man kan ta, bära, ställa ner och kasta.
   // Varje del ritas av riggen (samma voxlar som på bänken) kring sin egen fot; måtten är i byggenheter.

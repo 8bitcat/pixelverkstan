@@ -25,6 +25,80 @@ export const TRAY_PARTS = { tray: { at: [(K.tray[0] + K.tray[1]) / 2, (K.tray[2]
 export const isFried = (p) => ['fries', 'nuggets', 'ringbasket'].includes(p?.look?.shape);
 export const isPoured = (p) => p?.look?.shape === 'cup' && !p.look.bottle && !p.look.can && !p.look.box;
 
+// ---------- Måltiden som eget föremål: på luckan, i kundens händer och på bordet (3D) ----------
+// Samma bricka och samma voxlar som i köket, ritad ur kundens måltid (shop.mealOf). `eaten` 0..1: kunden tar
+// tuggor ur burgaren från sin sida (−v), pommesen sjunker i fickan och efterrätten äts sist. När sista
+// tuggan är tagen ligger bara smulor kvar på tallriken.
+const BITES = [[0, -1], [-0.75, -0.7], [0.75, -0.7], [0, -0.35], [-0.95, -0.05], [0.95, -0.05], [0, 0.3], [-0.7, 0.65], [0.7, 0.65], [0, 0.95]];
+const GRID = 0.25;
+const snap = (x) => Math.round(x / GRID) * GRID;
+// lådsamlare som skär bort runda tuggor (cirklar i u/v, genom hela höjden) ur allt som ritas genom den
+function biteClip(R, bites) {
+  const P = Object.create(R);
+  P.box = (u0, u1, v0, v1, z0, z1, tex, id, opt) => {
+    const hit = bites.filter((b) => u1 > b.u - b.r && u0 < b.u + b.r && v1 > b.v - b.r && v0 < b.v + b.r);
+    if (!hit.length) return R.box(u0, u1, v0, v1, z0, z1, tex, id, opt);
+    const W0 = u1 - u0, H0 = v1 - v0;
+    // texturen ska ligga kvar där den låg: bitarna får samma koordinater som den hela lådan hade
+    const piece = (a, b, va, vb) => {
+      if (b - a < 0.02) return;
+      const du = a - u0, dv = va - v0;
+      R.box(a, b, va, vb, z0, z1, (f, x, y, w, h) => (f === 'top' ? tex(f, x + du, y + dv, W0, H0) : f === 'left' ? tex(f, x + du, y, W0, h) : tex(f, x + dv, y, H0, h)), id, opt);
+    };
+    for (let va = v0; va < v1 - 1e-9; va += GRID) {
+      const vb = Math.min(v1, va + GRID), vm = (va + vb) / 2;
+      let segs = [[u0, u1]];
+      for (const b of hit) {
+        const d = vm - b.v; if (Math.abs(d) >= b.r) continue;
+        const hw = Math.sqrt(b.r * b.r - d * d), a = snap(b.u - hw), c = snap(b.u + hw);
+        segs = segs.flatMap(([s, e]) => (c <= s || a >= e ? [[s, e]] : [[s, Math.max(s, a)], [Math.min(e, c), e]]));
+      }
+      for (const [s, e] of segs) piece(s, e, va, vb);
+    }
+  };
+  return P;
+}
+// lådsamlare som kapar allt ovanför en höjd (pommesen som tar slut, efterrätten som äts upp)
+function heightClip(R, draw, z0, keep, left) {
+  const boxes = [], P = Object.create(R);
+  P.box = (...a) => boxes.push(a);
+  draw(P);
+  const top = boxes.reduce((m, b) => Math.max(m, b[5]), z0), cut = z0 + Math.max(keep, (top - z0) * left);
+  for (const b of boxes) { if (b[4] >= cut - 1e-6) continue; b[5] = Math.min(b[5], cut); R.box(...b); }
+}
+export function drawMeal(R, meal, { eaten = 0 } = {}) {
+  const era = eraLook(meal.year || 1990), part = (id) => DB.part[id];
+  if (meal.tray) drawTray(R, K.tray[0], K.tray[1], K.tray[2], K.tray[3], era, TRAY_Z, 0);
+  drawPlate(R, K.plate[0], K.plate[1], K.plate[2], K.plate[3], era, 0, 0);
+  const layers = (meal.layers || []).map(part).filter(Boolean), [cu, cv] = K.burger;
+  const r = burgerRadius(layers[0]);
+  const n = Math.min(BITES.length, Math.floor(eaten / 0.075 + 1e-6));
+  if (layers.length && n < BITES.length) {
+    const B = n ? biteClip(R, BITES.slice(0, n).map(([x, y]) => ({ u: cu + x * r, v: cv + y * r, r: r * 0.55 }))) : R;
+    let z = 0;
+    layers.forEach((p, i) => {
+      const top = i > 0 && i === layers.length - 1 && p.cat === 'brod';
+      drawLayer(B, p, { id: 0, at: [cu, cv, z], r, top, bottom: i === 0 });
+      z += top ? bunTopHeight(p) : layerHeight(p);
+    });
+  } else if (layers.length) {
+    // smulor och en klick sås där burgaren låg
+    const crumb = parseInt(String(layers[0].look?.color || '#d9a55d').replace('#', ''), 16);
+    [[-0.9, -0.3], [0.5, -0.8], [1.1, 0.4], [-0.3, 0.9], [0.1, 0.1], [-1.3, 0.5]].forEach(([x, y], i) => R.box(cu + x, cu + x + 0.3, cv + y, cv + y + 0.3, 0, 0.15, () => (i % 3 === 2 ? 0xb8402a : crumb), 0, { noEdges: true }));
+  }
+  const side = (id, Kp, keep, left) => {
+    const p = part(id); if (!p) return;
+    if (left >= 0.999) drawSide(R, p, { id: 0, at: [Kp[0], Kp[1], TRAY_Z] });
+    else heightClip(R, (Q) => drawSide(Q, p, { id: 0, at: [Kp[0], Kp[1], TRAY_Z] }), TRAY_Z, keep, left);
+  };
+  const clamp = (x) => Math.max(0, Math.min(1, x));
+  if (meal.pommes) side(meal.pommes, K.basket, isFried(part(meal.pommes)) ? 2.05 : 0.35, 1 - clamp((eaten - 0.1) / 0.7));
+  if (meal.dryck) side(meal.dryck, K.cup, 0, 1);
+  if (meal.dessert) side(meal.dessert, K.dessert, 0.3, 1 - clamp((eaten - 0.7) / 0.25));
+}
+// var måltidens fot ligger (enheter): brickans mitt, eller tallrikens om den serverades utan bricka
+export const mealAnchor = (meal) => (meal?.tray ? TRAY_PARTS.tray.at : [K.plate[0], K.plate[1], TRAY_Z]);
+
 const CACHE = new WeakMap();
 export function resetRig(order) { CACHE.delete(order); }
 export function rigFor(order) {

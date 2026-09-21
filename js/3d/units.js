@@ -483,15 +483,31 @@ export class Units {
       seen.add(p.key);
       const sig = p.stage + ':' + (p.meal ? p.meal.layers.join(',') + p.meal.pommes + p.meal.dryck + p.meal.dessert : '');
       let e = this.plateMap.get(p.key);
-      if (!e || e.sig !== sig) {
-        if (e) { this.plateGroup.remove(e.g); e.g.traverse((o) => o.geometry?.dispose()); }
+      const voxel = !!(this.shop.drawMeal && p.meal);
+      if (voxel) {
+        // samma voxlar som i köket: ritas om när kunden tagit en tugga (texturatlas och material återanvänds)
+        if (!e || !e.vox) {
+          if (e) { this.plateGroup.remove(e.g); e.g.traverse((o) => o.geometry?.dispose()); }
+          const g = new THREE.Group(), vox = makeVoxels({ unit: BENCH_U, ppu: 16 });
+          g.add(vox.group);
+          e = { g, vox, sig: null };
+          this.plateMap.set(p.key, e); this.plateGroup.add(g);
+        }
+        if (e.sig !== sig) {
+          const a = this.shop.mealAnchor ? this.shop.mealAnchor(p.meal) : [0, 0, 0];
+          e.vox.group.position.set(-a[0] * BENCH_U, -a[2] * BENCH_U, -a[1] * BENCH_U);
+          e.vox.render((R) => this.shop.drawMeal(R, p.meal, { eaten: p.stage }));
+          e.sig = sig;
+        }
+      } else if (!e || e.sig !== sig) {
+        if (e) { this.plateGroup.remove(e.g); e.vox?.dispose(); e.g.traverse((o) => o.geometry?.dispose()); }
         e = { g: this.makePlate(p), sig };
         this.plateMap.set(p.key, e); this.plateGroup.add(e.g);
       }
       e.g.position.set(p.x, p.y, p.z);
       e.g.rotation.y = p.yaw || 0;
     }
-    for (const [k, e] of this.plateMap) if (!seen.has(k)) { this.plateGroup.remove(e.g); e.g.traverse((o) => o.geometry?.dispose()); this.plateMap.delete(k); }
+    for (const [k, e] of this.plateMap) if (!seen.has(k)) { this.plateGroup.remove(e.g); if (e.vox) e.vox.dispose(); else e.g.traverse((o) => o.geometry?.dispose()); this.plateMap.delete(k); }
   }
   // en tallrik: lagren i måltidens ordning och färger, pommes och mugg (mindre ju mer som ätits)
   makePlate(p) {
@@ -576,7 +592,7 @@ export class Units {
     this.syncBoxes(dt);
   }
   pickTargets() { return [...this.pickables, ...[...this.boxes.values()].map((b) => b.m)]; }
-  dispose() { this.clear(); this.scene.remove(this.group); this.scene.remove(this.boxGroup); if (this.plateGroup) { this.scene.remove(this.plateGroup); this.plateGroup = null; this.plateMap = null; } this.displayVox?.dispose(); this.displayVox = null; }
+  dispose() { this.clear(); this.scene.remove(this.group); this.scene.remove(this.boxGroup); if (this.plateGroup) { for (const e of this.plateMap.values()) e.vox?.dispose(); this.scene.remove(this.plateGroup); this.plateGroup = null; this.plateMap = null; } this.displayVox?.dispose(); this.displayVox = null; }
 }
 
 export const MODELS_UNITS = ['sofa_02', 'modern_arm_chair_01', 'coffee_table_round_01', 'potted_plant_02', 'cardboard_box_01', 'plastic_crate_02', 'standing_chalkboard_01', 'gamepad', 'gaming_console', 'steel_frame_shelves_01', 'wooden_display_shelves_01', 'WetFloorSign_01'];
