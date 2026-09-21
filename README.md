@@ -467,6 +467,7 @@ node tools/restaurang.mjs                # hamburgerbaren i webbläsaren: meny �
 node tools/restaurang3d.mjs              # hamburgerbaren i 3D: stor burgare i 2D-köket, köket på bänken, brickan i händerna, ställ ner, kasta, spill, servera vid bordet, fånga ett kast
 node tools/restaurang-ikoner.mjs         # ritar alla ingrediensers ikoner i ark per kategori (rest-ikoner-*.png)
 node tools/restaurang-golv.mjs           # restaurangens golv genom epokerna med fyllda montrar, automater och gäster som äter (rest-golv-<år>.png)
+node tools/kok-farger.mjs                # 3D-köket ser rätt ut: grafikkortets felmeddelanden fångas och bilden jämförs med en nybyggd textur (atlasen växer när lager läggs på)
 node tools/kok-laddtid.mjs               # hur fort köket öppnas i 2D och 3D: tid till första bild, låst sida, nya shaderprogram
 node tools/restaurang-platser.mjs        # sittplatserna som kapacitet: fulla bord → nekad beställning → kö → inga nya kunder; stolen hålls under hämtning; alla stolar nåbara i alla lokaler
 node tools/flimmer.mjs                   # 3D-bilden ska stå stilla: mäter hur mycket som ändras mellan två bildrutor och vid en halv mm kamerarörelse
