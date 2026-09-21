@@ -82,11 +82,16 @@ for (let guard = 0; guard < 40; guard++) {
   if (!got) { console.log('  (utanför bild)', step.name, pt.map(Math.round)); continue; }
   const want = [parseInt(step.color.slice(1, 3), 16), parseInt(step.color.slice(3, 5), 16), parseInt(step.color.slice(5, 7), 16)];
   const atlas = await page.evaluate(() => PV.view3d.bench.stats.atlas);
-  rows.push({ lager: step.name, form: step.shape, vill: step.color, fick: '#' + got.map((x) => x.toString(16).padStart(2, '0')).join(''), nyans: Math.round(hueDiff(hue(got), hue(want))), atlas: atlas.join('×') });
+  const sv = ([r, g, b]) => { const mx = Math.max(r, g, b) / 255, mn = Math.min(r, g, b) / 255; return [mx ? (mx - mn) / mx : 0, mx]; };
+  const [sG, vG] = sv(got), [sW, vW] = sv(want);
+  rows.push({ lager: step.name, form: step.shape, vill: step.color, fick: '#' + got.map((x) => x.toString(16).padStart(2, '0')).join(''), nyans: Math.round(hueDiff(hue(got), hue(want))), dS: +(sG - sW).toFixed(2), dV: +(vG - vW).toFixed(2), atlas: atlas.join('×') });
 }
-for (const r of rows) console.log(`  ${r.lager.padEnd(28)} ${r.form.padEnd(7)} vill ${r.vill}  fick ${r.fick}  nyansskillnad ${String(r.nyans).padStart(3)}°  atlas ${r.atlas}`);
+for (const r of rows) console.log(`  ${r.lager.padEnd(28)} ${r.form.padEnd(7)} vill ${r.vill}  fick ${r.fick}  nyans ${String(r.nyans).padStart(3)}°  mättnad ${r.dS > 0 ? '+' : ''}${r.dS}  ljushet ${r.dV > 0 ? '+' : ''}${r.dV}  atlas ${r.atlas}`);
 // Säkrast: bilden efter alla storleksändringar ska vara likadan som när texturen byggs upp från noll.
 const CLIP = { x: 280, y: 70, width: 990, height: 590 };
+// gästerna i bakgrunden rör sig mellan bilderna – göm dem, och låt den gröna bekräftelsepilen hinna försvinna
+await page.evaluate(() => { PV.view3d.people.group.visible = false; });
+await page.waitForTimeout(1200); await waitFrames(3);
 const shotA = (await page.screenshot({ clip: CLIP, timeout: 180000 })).toString('base64');
 await page.screenshot({ path: 'D:/GamesProjects/pixelverkstan/tools/out/kok-farger.png', timeout: 180000 });
 await page.evaluate(() => { const b = PV.view3d.bench; b.atlas.dispose(); b.atlas = null; b.atlasSize = null; b.cache = new Map(); PV.build.dirty = true; });
@@ -104,6 +109,9 @@ const diff = await page.evaluate(async ([a, b]) => {
 console.log(`bilden efter ${new Set(rows.map((r) => r.atlas)).size} atlasstorlekar mot en nybyggd textur: ${diff} % av pixlarna skiljer sig`);
 ok(rows.length >= 2, `mätte ${rows.length} heltäckande lager`);
 ok(rows.filter((r) => r.form === 'patty').every((r) => r.nyans <= 35), `biffarna har sin egen färg i bilden (${rows.filter((r) => r.form === 'patty').map((r) => r.nyans + '°').join(', ')})`);
+// rätt färgskala: biffar och toppbröd (heltäckande, tydliga färger) ska visas i sin egen färg, inte urblekta
+{ const solid = rows.filter((r) => r.form === 'patty' || (r.form === 'bun' && r !== rows[0])), mS = solid.reduce((a, r) => a + Math.abs(r.dS), 0) / (solid.length || 1), mV = solid.reduce((a, r) => a + Math.abs(r.dV), 0) / (solid.length || 1);
+  ok(solid.length > 0 && mS <= 0.12 && mV <= 0.12, `ingredienserna har rätt färgskala i 3D (medelfel mättnad ${mS.toFixed(2)}, ljushet ${mV.toFixed(2)} – urblekt var 0,35 / 0,17)`); }
 ok(new Set(rows.map((r) => r.atlas)).size > 1, 'texturatlasen ändrade storlek under bygget (det är då felet kan uppstå)');
 ok(diff < 1.5, `texturerna sitter rätt även efter att atlasen vuxit (${diff} % skillnad mot nybyggd textur)`);
 ok(gl.length === 0, `inga felmeddelanden från grafikkortet${gl.length ? ': ' + gl.slice(0, 3).join(' | ') : ''}`);

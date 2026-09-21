@@ -267,6 +267,14 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   i restaurangen: allt görs i köket. Köksutrustningen följer epoken (krom på femtiotalet,
   rostfritt i kedjan, svart stål 2016). Fakta om Maillard, kärntemperaturer, dubbelfritering
   m.m. i guiden.
+- **Rätt färgskala i 3D**: pixelgrafiken ska ha samma färger i 3D som i 2D. Tre saker blekte ur den: filmisk
+  tonmappning (ACES) som avmättar och ljusar upp, bloom från vita ytor i solljus som la ett dis över allt intill
+  (maten på den rostfria bänken såg genomskinlig ut), och att voxlarnas färg helt styrdes av lamporna. Nu:
+  `NeutralToneMapping` (exponering 1,3), bloom bara för det som verkligen lyser (tröskel 1,2: neon, glödlampor),
+  och voxlarna – bänken, kyldisken, brickan, tallrikarna – lyser till knappt hälften av sig själva
+  (`OWN_COLOR` i `bench.js`: samma textur som `emissiveMap`) och skuggas av resten. Uppmätt i 3D-köket mot
+  ingrediensernas egna färger: fel i mättnad 0,35 → 0,07 och i ljushet 0,17 → 0,03; lokalens medelmättnad
+  0,35 → 0,48 utan utbrända ytor. `tools/kok-farger.mjs` håller koll på det.
 - **Stillastående bild**: 3D-vyn får inte flimra. Skyltfönstren och kyldisken gjorde det: glas med
   `transmission` ritar om allt bakom rutan varje bildruta, och kontaktskuggorna (GTAO) "kokade" vid
   kanter. Montrarnas glas använder därför `paneMat` (genomskinligt utan transmission), AO har kortare

@@ -50,7 +50,9 @@ export class Shop3D {
   async init(onProgress = () => {}) {
     const r = this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: 'high-performance' });
     r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
-    r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.15;
+    // Neutral tonmappning: den filmiska (ACES) avmättar och ljusar upp – pixelgrafikens färger blev bleka
+    // (en biff #7a3a26 visades som #cca494). Neutral behåller färgskalan och pressar bara ihop högdagrarna.
+    r.toneMapping = THREE.NeutralToneMapping; r.toneMappingExposure = 1.3;   // samma ljus i lokalen som förr (medelljus ca 0,35)
     r.info.autoReset = false;
     r.outputColorSpace = THREE.SRGBColorSpace;
     A.setAnisotropy(Math.min(8, r.capabilities.getMaxAnisotropy()));
@@ -149,7 +151,9 @@ export class Shop3D {
       gtao.blendIntensity = 0.65;
       comp.addPass(gtao); comp.gtao = gtao; this.gtao = gtao;   // sparad för finjustering och flimmertestet
     }
-    comp.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.28, 0.55, 0.96));   // högre tröskel: solkanter blinkade i bloomen
+    // bara det som verkligen lyser (neon, glödlampor) får sken: vita ytor i solljus låg över den gamla tröskeln
+    // och la ett vitt dis över allt intill – maten på den rostfria bänken såg genomskinlig ut
+    comp.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.22, 0.55, 1.2));
     comp.addPass(new OutputPass());
     comp.addPass(new SMAAPass(w * dpr, h * dpr));
     return comp;

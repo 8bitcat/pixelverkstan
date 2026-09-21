@@ -263,7 +263,7 @@ export function buildRoom(scene, ctx) {
 
   // ---------- Arbetsbänken: här byggs datorerna i 3D-läget (kameran låses över bänken) ----------
   {
-    const top = rest ? metalMat(0xd0d5dc, 0.28) : A.pbr('wood_table_001', { repeat: [1.3, 0.75], color: 0xd2b088, roughness: 0.5 });
+    const top = rest ? metalMat(0xb4bac2, 0.5) : A.pbr('wood_table_001', { repeat: [1.3, 0.75], color: 0xd2b088, roughness: 0.5 });
     slab(g, bx0, bx1, bh - 0.05, bh, bz0, bz1, top, { pick: { type: 'bench' } });
     const leg = rest ? metalMat(0xb8bec8, 0.35) : metalMat(0x2a2d33, 0.45);
     for (const lx of [bx0 + 0.06, bx1 - 0.06]) for (const lz of [bz0 + 0.06, bz1 - 0.06]) slab(g, lx - 0.025, lx + 0.025, 0, bh - 0.05, lz - 0.025, lz + 0.025, leg);

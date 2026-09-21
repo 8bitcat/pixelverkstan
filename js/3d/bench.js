@@ -18,6 +18,11 @@ const PPU = 32;                                // texturpixlar per enhet (max)
 const MAX_FACE = 560 * 560;                    // pixlar per sida (stora ytor får lägre upplösning)
 const ATLAS_W = 2048;
 const PAD = 2;
+// Pixelgrafiken ska ha sina egna färger oavsett lampor: drygt hälften av färgen lyser av sig själv
+// (samma textur som emissiveMap) och resten belyses, så att formerna fortfarande skuggas. Uppmätt mot
+// ingrediensernas färger i 3D-köket: fel i mättnad 0,35 → 0,01 och i ljushet 0,17 → 0,01.
+// (envMapIntensity lågt: speglingen av himlen la vitt ovanpå färgen och drog ner mättnaden)
+const OWN_COLOR = { color: 0x7c7c7c, emissive: 0xffffff, emissiveIntensity: 0.47, envMapIntensity: 0.2 };   // avvägt mot exponeringen 1,3
 const DIR_LOCAL = new THREE.Vector3(Math.cos(ELEV) / Math.SQRT2, Math.sin(ELEV), Math.cos(ELEV) / Math.SQRT2);   // mot kameran, i bänkens koordinater
 
 // Samlar in lådorna som rig.drawScene ritar – samma gränssnitt som core/raster.js
@@ -41,7 +46,7 @@ export function makeVoxels({ ppu = PPU, unit = U } = {}) {
     group: new THREE.Group(), rec: new Recorder(), cache: new Map(), meshes: [], atlas: null, atlasData: null, atlasCanvas: null, atlasSize: null,
     filter: null, ppu, allFaces: true, bench: null, stats: { boxes: 0, faces: 0, atlas: [0, 0], ms: 0, cached: 0 },
     mats: {
-      opaque: new THREE.MeshStandardMaterial({ roughness: 0.78, metalness: 0.02, alphaTest: 0.5, side: THREE.DoubleSide }),
+      opaque: new THREE.MeshStandardMaterial({ roughness: 0.78, metalness: 0.02, alphaTest: 0.5, side: THREE.DoubleSide, ...OWN_COLOR }),
       glass: new THREE.MeshStandardMaterial({ roughness: 0.15, metalness: 0.1, transparent: true, depthWrite: false, side: THREE.DoubleSide }),
     },
     clearMeshes() { Bench3D.prototype.clearMeshes.call(this); },
@@ -116,7 +121,7 @@ export class Bench3D {
     view3d.scene.add(this.key, this.keyTarget);
     this.key.target = this.keyTarget;
     this.mats = {
-      opaque: new THREE.MeshStandardMaterial({ roughness: 0.78, metalness: 0.02, alphaTest: 0.5, side: THREE.FrontSide }),
+      opaque: new THREE.MeshStandardMaterial({ roughness: 0.78, metalness: 0.02, alphaTest: 0.5, side: THREE.FrontSide, ...OWN_COLOR }),
       glass: new THREE.MeshStandardMaterial({ roughness: 0.15, metalness: 0.1, transparent: true, depthWrite: false, side: THREE.FrontSide }),
     };
     // finalen: levande texturer (skärm, sidofönster) och sladdar
@@ -343,6 +348,7 @@ export class Bench3D {
       this.atlas.magFilter = THREE.NearestFilter; this.atlas.minFilter = THREE.LinearMipmapLinearFilter;
       this.atlas.anisotropy = 4; this.atlas.generateMipmaps = true;
       this.mats.opaque.map = this.atlas; this.mats.glass.map = this.atlas;
+      this.mats.opaque.emissiveMap = this.atlas;
       this.mats.opaque.needsUpdate = true; this.mats.glass.needsUpdate = true;
     }
     this.atlas.needsUpdate = true;
