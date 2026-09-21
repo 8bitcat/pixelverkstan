@@ -368,15 +368,15 @@ export function drawDessert(R, part, cu, cv, z0, id) {
 }
 
 // ---------- Köket runt burgaren ----------
-export function drawTray(R, u0, u1, v0, v1, id = 0) {
-  const red = 0xc9322a;
-  R.box(u0, u1, v0, v1, -0.35, 0, (f, x, y, W, Hh) => {
+export function drawTray(R, u0, u1, v0, v1, era = null, z1 = 0, id = 0) {
+  const red = era?.trim ?? 0xc9322a;
+  R.box(u0, u1, v0, v1, z1 - 0.35, z1, (f, x, y, W, Hh) => {
     if (f === 'top') {
       const e = Math.min(x, W - x, y, Hh - y);
       if (e < 0.35) return shade(red, 1.15);
-      if (e < 0.55) return shade(red, 0.8);
-      // smörpapper i mitten
-      if (x > 1.5 && x < W - 1.5 && y > 1 && y < Hh - 1) return hash(x * 2 | 0, y * 2 | 0) > 0.93 ? 0xe8e0d0 : 0xf4efe4;
+      if (e < 0.6) return shade(red, 0.78);
+      // brickunderlägg i papper
+      if (x > 1.4 && x < W - 1.4 && y > 1.1 && y < Hh - 1.1) return hash(x * 2 | 0, y * 2 | 0) > 0.93 ? 0xe8e0d0 : 0xf4efe4;
       return red;
     }
     return y < 0.1 ? shade(red, 1.1) : shade(red, 0.8);
@@ -488,9 +488,9 @@ export function drawDrinkTower(R, u0, v0, id, era, filled = false, drink = null)
 
 // ---------- Tallriken och luckan ----------
 // oval tallrik: vit med en rand i epokens färg och en lätt upphöjd kant
-export function drawPlate(R, cu, cv, rx, ry, era, id = 0) {
+export function drawPlate(R, cu, cv, rx, ry, era, id = 0, dz = 0) {
   const trim = era?.trim ?? 0xc92a2a, white = 0xf6f3ec;
-  disc(R, cu, cv, -0.3, 0, rx, (f, x, y, W, Hh, d) => (f === 'top' ? (d > 0.96 ? shade(white, 0.85) : d > 0.86 ? trim : d > 0.8 ? shade(white, 0.92) : hash(x * 2 | 0, y * 2 | 0) > 0.94 ? shade(white, 0.96) : white) : shade(white, 0.8)), id, { ry });
+  disc(R, cu, cv, -0.3 + dz, dz, rx, (f, x, y, W, Hh, d) => (f === 'top' ? (d > 0.96 ? shade(white, 0.85) : d > 0.86 ? trim : d > 0.8 ? shade(white, 0.92) : hash(x * 2 | 0, y * 2 | 0) > 0.94 ? shade(white, 0.96) : white) : shade(white, 0.8)), id, { ry });
 }
 // luckan/serveringsdisken: rostfri hylla med värmelampor där färdiga tallrikar ställs
 export function drawPass(R, u0, u1, v0, v1, era, id = 0) {

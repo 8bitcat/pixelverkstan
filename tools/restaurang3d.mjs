@@ -109,22 +109,101 @@ await shot('5-kok3d-burgare');
 await page.evaluate(() => { PV.build.zoomBy(1.8); }); await waitFrames(2); await page.waitForTimeout(200);
 await shot('6-kok3d-zoom');
 await page.evaluate(() => PV.build.zoomFit());
-// servera i 3D
-await page.click('#build-boot'); await page.waitForTimeout(500);
-const fin = await page.evaluate(() => ({ phase: PV.build.phase, desk: PV.build.gl.info().desk, faces: PV.build.gl.info().faces, hint: PV.build.finale.hintText() }));
-ok(fin.phase === 'desk' && fin.faces > 0, `serveringen i 3D: ${JSON.stringify(fin)}`);
-await waitFrames(3); await page.waitForTimeout(300);
-await shot('7-servering3d');
-await page.evaluate(() => { const f = PV.build.finale; f.onPointerDown([f.serveBtn[0] + 10, f.serveBtn[1] + 10]); });
-try { await page.waitForFunction(() => PV.game.orders.length === 0 || PV.build.finale.run?.done, null, { timeout: 180000 }); } /* SwiftShader ritar långsamt – animationen tar realtid */ catch (e) { const dbg = await page.evaluate(() => { const f = PV.build.finale; return { run: f.run && { t: f.run.t, done: f.run.done }, btn: f.serveBtn, success: f.d.success, phase: PV.build.phase, cw: PV.build.cw, help: PV.build.b.help, screen: document.body.dataset.screen, t: f.t }; }); ok(false, 'servering i 3D blev inte klar: ' + JSON.stringify(dbg)); }
-await page.waitForTimeout(300);
-await shot('8-omdome3d');
-await page.waitForFunction(() => document.body.dataset.screen === 'shop', null, { timeout: 240000 }); await page.waitForTimeout(600);   /* SwiftShader: tallriken glider i realtid */
-const after = await page.evaluate(() => ({ screen: document.body.dataset.screen, mode: PV.view3d.mode, kitchen: !!PV.view3d.kitchen, modal: document.querySelector('#modal h2')?.textContent, gl: !!PV.build.gl }));
-ok(after.screen === 'shop' && after.mode === 'walk' && !after.gl && !after.kitchen && /disken|nöjd/i.test(after.modal || ''), `tillbaka i restaurangen efter servering: ${JSON.stringify(after)}`);
-await page.evaluate(() => { const b = [...document.querySelectorAll('#modal .btn')].find((x) => /butiken|ok|stäng|klar/i.test(x.textContent)); b?.click(); });
-await waitFrames(2); await page.waitForTimeout(300);
-await shot('9-tillbaka');
+// ---- servera i 3D: brickan blir ett föremål i händerna och bärs ut till kunden ----
+const before = await page.evaluate(() => ({ money: PV.game.money, orders: PV.game.orders.length }));
+// klicka på den färdiga brickan i köket (inte på Servera-knappen) – den hamnar i händerna
+const hint3d = await page.evaluate(() => PV.build.hintText().replace(/<[^>]+>/g, ''));
+ok(/Klicka på brickan/.test(hint3d), `hjälpen i 3D-köket: "${hint3d}"`);
+await page.evaluate(() => {
+  const v = PV.build, r = v.canvas.getBoundingClientRect(), pt = v.P.proj(...v.L.SLOT.l0.anchor);
+  const o = { clientX: r.left + pt[0], clientY: r.top + pt[1], pointerId: 7, bubbles: true, isPrimary: true };
+  v.canvas.dispatchEvent(new PointerEvent('pointerdown', o)); v.canvas.dispatchEvent(new PointerEvent('pointerup', o));
+});
+await page.waitForTimeout(600);
+const carried = await page.evaluate(() => { const c = PV.view3d.carry, h = c.held; return { screen: document.body.dataset.screen, kitchen: !!PV.view3d.kitchen, gl: !!PV.build.gl, held: h?.kind, kids: h ? [...h.kids].map((k) => k.kind).sort() : [], phase: PV.game.orders[0]?.build?.phase, orders: PV.game.orders.length }; });
+ok(carried.screen === 'shop' && !carried.kitchen && carried.held === 'tray' && carried.kids.includes('burger') && carried.phase === 'desk' && carried.orders === before.orders, `Servera i 3D: brickan hamnar i händerna med allt på: ${JSON.stringify(carried)}`);
+await waitFrames(3);
+await page.evaluate(() => PV.view3d.setPose(PV.view3d.pos.x, PV.view3d.pos.z, Math.PI, -0.35));
+await waitFrames(3);
+await shot('7-brickan-i-handerna');
+const inHand = await page.evaluate(() => { const v = PV.view3d, h = v.carry.held; return { d: +Math.hypot(h.pos.x - v.pos.x, h.pos.z - v.pos.z).toFixed(2), y: +h.pos.y.toFixed(2), text: v.carry.hoverText() }; });
+ok(inHand.d > 0.4 && inHand.d < 1 && inHand.y > 0.6 && inHand.y < 1.5 && /bär|Ställ|släpp/i.test(inHand.text), `brickan hålls framför kroppen: ${JSON.stringify(inHand)}`);
+// ställ ner den på arbetsbänken och ta upp den igen (fysiken får gå några steg)
+const stepPhys = (n = 90) => page.evaluate((n) => { for (let i = 0; i < n; i++) PV.view3d.carry.update(1 / 60); }, n);
+await page.evaluate(() => { const v = PV.view3d, c = v.carry, b = v.room.bench; c.setDown(c.held, { x: (b.x0 + b.x1) / 2, y: b.y, z: (b.z0 + b.z1) / 2 }); });
+await stepPhys(60);
+const onBench = await page.evaluate(() => { const c = PV.view3d.carry, t = [...c.props.values()].find((p) => p.kind === 'tray'); return { rest: t.rest, on: t.on?.kind, y: +t.pos.y.toFixed(2), held: c.held?.kind || null }; });
+ok(onBench.rest && onBench.on === 'bench' && !onBench.held, `brickan ställd på arbetsbänken: ${JSON.stringify(onBench)}`);
+// kasta: håll brickan, sväng med kameran och släpp – den flyger, landar hårt och tappar allt
+const thrown = await page.evaluate(() => {
+  const v = PV.view3d, c = v.carry, t = [...c.props.values()].find((p) => p.kind === 'tray');
+  // kunden ställs i ett hörn: ett kast som träffar rätt kund fångas nämligen (det prövas längre ner)
+  for (const cu of PV.game.customers) { cu.x = 40; cu.y = 440; cu._path = []; }
+  c.take(t);
+  v.setPose(1.5, 4.2, 0, 0.1);
+  for (let i = 0; i < 10; i++) { v.yaw -= 0.11; c.update(1 / 60); }
+  const speed = +c.handVel().length().toFixed(1);
+  const p = c.throwHeld();
+  const v0 = +p.vel.length().toFixed(1);
+  for (let i = 0; i < 400; i++) c.update(1 / 60);
+  const all = [...c.props.values()];
+  return { speed, v0, held: c.held?.kind || null, trayRest: t.rest, trayOn: t.on?.kind, kids: t.kids.size, loose: all.filter((x) => x.kind !== 'tray' && !x.parent).map((x) => ({ k: x.kind, rest: x.rest, floor: x.floor, y: +x.pos.y.toFixed(2) })) };
+});
+ok(thrown.speed > 1.5 && thrown.v0 > 2 && !thrown.held && thrown.trayRest && thrown.kids === 0 && thrown.loose.length >= 1 && thrown.loose.every((x) => x.rest), `svängen med musen kastar brickan, den landar och allt far av: ${JSON.stringify(thrown)}`);
+await waitFrames(2); await shot('8-kastad');
+// kunden sitter vid ett bord och väntar; en ofullständig bricka tas inte emot
+const refuse = await page.evaluate(() => {
+  const g = PV.game, v = PV.view3d, c = v.carry, o = g.orders[0], cu = g.customers.find((x) => x.id === o.customerId);
+  const seat = PV.floor.pickSeat(cu); cu.phase = 'waiting'; cu._spot = seat;
+  for (let k = 0; k < 400; k++) PV.floor.update(0.05);
+  const t = c.trayOf(o.id);
+  const okd = c.deliver(t, cu, { direct: true });
+  return { sit: !!cu._sit, table: PV.floor.constructor ? true : true, delivered: okd, yell: cu._yell?.text || '', orders: g.orders.length };
+});
+ok(refuse.sit && !refuse.delivered && /Var är/.test(refuse.yell) && refuse.orders === before.orders, `en bricka där maten saknas tas inte emot: ${JSON.stringify(refuse)}`);
+// plocka upp allt från golvet, ställ tillbaka på brickan, bär ut och ställ på kundens bord
+const served = await page.evaluate(() => {
+  const g = PV.game, v = PV.view3d, c = v.carry, o = g.orders[0], cu = g.customers.find((x) => x.id === o.customerId);
+  const t = c.trayOf(o.id);
+  for (const p of [...c.props.values()]) if (p.kind !== 'tray' && !p.parent) { c.take(p); c.release(); c.attach(p, t); }
+  const complete = c.complete(t).length === 0;
+  c.take(t);
+  const tables = c.surfaces().filter((s) => s.kind === 'table'), s = tables.find((x) => x.table === (PV.floor ? (window.__t = null, undefined) : undefined)) || tables[0];
+  const spot = cu._spot, tableIx = spot >= 0 ? (PV.floor && (() => { let ix = -1; c.surfaces().forEach((x) => { if (x.kind === 'table' && c.customerAt(x.table, o.id)) ix = x.table; }); return ix; })()) : -1;
+  const target = tables.find((x) => x.table === tableIx);
+  c.setDown(t, { x: (target.x0 + target.x1) / 2, y: target.y, z: (target.z0 + target.z1) / 2 });
+  for (let i = 0; i < 120; i++) c.update(1 / 60);
+  for (let k = 0; k < 10; k++) PV.floor.update(0.05);
+  return { complete, tableIx, orders: g.orders.length, props: c.props.size, phase: cu.phase, sit: !!cu._sit, money: g.money, meal: !!cu.meal?.tray, say: typeof cu.say === 'string' ? cu.say : '' };
+});
+ok(served.complete && served.orders === before.orders - 1 && served.props === 0 && served.phase === 'eating' && served.sit && served.money > before.money && served.meal, `brickan ställd på kundens bord: serverat, betalt och kunden äter på plats: ${JSON.stringify(served)}`);
+ok(/golvet/.test(served.say), `maten hade legat på golvet – kunden märker det: "${served.say}"`);
+await page.evaluate(() => PV.view3d.setPose(1.2, 3.4, 1.6, -0.2));
+await waitFrames(4); await page.waitForTimeout(300);
+await shot('9-serverat');
+// en ny beställning: kasta brickan rakt på kunden – den fångas och räknas som serverad
+const o3 = await bigOrder();
+const caught = await page.evaluate(async (id) => {
+  const g = PV.game, v = PV.view3d, c = v.carry, o = g.orders.find((x) => x.id === id), L = g.shop.layout.rigFor(o);
+  // bygg klart utan byggvyn: alla platser och handgrepp
+  const { applyBuildOp } = await import('./js/core/build-ops.js');
+  applyBuildOp(g.shop, o, { t: 'mode', help: true });
+  for (const a of L.ACTIONS) a.points.forEach((_, i) => applyBuildOp(g.shop, o, { t: 'act', id: a.id, i }));
+  for (const s of L.SLOTS) { const part = s.part || g.shop.part[o.items.find((it) => it.cat === s.cat)?.part]; if (part) applyBuildOp(g.shop, o, { t: 'place', slot: s.id, part: part.id }); }
+  applyBuildOp(g.shop, o, { t: 'phase', v: 'desk' });
+  const money = g.money, cu = g.customers.find((x) => x.id === o.customerId);
+  cu.phase = 'waiting'; cu.x = 256; cu.y = 300; cu._path = []; cu._spot = -1;
+  const t = c.spawnOrder(o, { held: true });
+  const C = await import('./js/3d/coords.js');
+  const tx = C.toX(cu.x), tz = C.toZ(cu.y);
+  v.setPose(tx, tz + 2.2, 0, 0); c.update(1 / 60);
+  const p = c.release(new (t.vel.constructor)(0, 1.6, -4.2)); p.thrown = true;
+  for (let i = 0; i < 200 && g.orders.includes(o); i++) c.update(1 / 60);
+  for (let k = 0; k < 10; k++) PV.floor.update(0.05);
+  return { built: Object.keys(o.build.placed).length, served: !g.orders.includes(o), money: g.money - money, phase: cu.phase, props: c.props.size, say: typeof cu.say === 'string' ? cu.say : '' };
+}, o3.id);
+ok(caught.served && caught.money > 0 && caught.props === 0 && /kast/i.test(caught.say), `en bricka som kastas till rätt kund fångas och räknas som serverad: ${JSON.stringify(caught)}`);
+
 console.log(errors.length ? 'FEL:\n' + errors.join('\n') : 'Inga fel.');
 await browser.close();
 process.exit(errors.length ? 1 : 0);

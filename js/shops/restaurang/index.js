@@ -6,7 +6,7 @@ import * as orders from './orders.js';
 import * as upgrades from './upgrades.js';
 import * as products from './products.js';
 import { iconCanvas } from './art.js';
-import { Serving } from './serve.js';
+import { Serving, judge } from './serve.js';
 import * as floorArt from './floor-art.js';
 import { PLANS as FLOOR_PLANS } from './floor-plans.js';
 
@@ -33,7 +33,19 @@ export default {
     const stack = L.SLOTS.filter((s) => s.k !== undefined);
     const layers = stack.map((s) => placed[s.id]?.id || s.part?.id).filter(Boolean);
     const side = (id, cat) => placed[id]?.id || order.items.find((it) => it.cat === cat)?.part || null;
-    return { layers, pommes: side('pommes', 'tillbehor'), dryck: side('dryck', 'dryck'), dessert: side('dessert', 'dessert') };
+    return { layers, pommes: side('pommes', 'tillbehor'), dryck: side('dryck', 'dryck'), dessert: side('dessert', 'dessert'), tray: true };
+  },
+  judge,                            // kundens omdöme om en bricka (tid, kladd, golv) – används när den lämnas för hand i 3D
+  // 3D: brickan och det som står på den som egna föremål man kan ta, bära, ställa ner och kasta.
+  // Varje del ritas av riggen (samma voxlar som på bänken) kring sin egen fot; måtten är i byggenheter.
+  carryKit(order) {
+    const L = rig.rigFor(order), b = order.build, P = rig.TRAY_PARTS;
+    if (!b) return null;
+    const parts = [{ kind: 'tray', ...P.tray }];
+    if (b.placed.l0) parts.push({ kind: 'burger', ...P.burger });
+    for (const k of ['pommes', 'dryck', 'dessert']) if (b.placed[k]) parts.push({ kind: k, ...P[k] });
+    const names = { tray: 'brickan', burger: 'burgaren', pommes: (b.placed.pommes?.name || 'tillbehöret').toLowerCase(), dryck: (b.placed.dryck?.name || 'drycken').toLowerCase(), dessert: (b.placed.dessert?.name || 'efterrätten').toLowerCase() };
+    return { parts: parts.map((p) => ({ ...p, name: names[p.kind], draw: (R) => L.drawTrayScene(R, b, { only: p.kind }) })) };
   },
   kitchen3d: true,                  // i 3D byggs burgaren i köket bakom disken med fri kamera – ingen låst byggbild
   fit: upgrades,
@@ -94,7 +106,7 @@ export default {
     pro: 'Proffsläge! Inga markeringar. Släpp brödet på brödrosten, biffen på grillen (två gånger: lägg på och vänd), salta, pommesen i fritösen och muggen vid dryckesmaskinen – och bygg lagren på tallriken i beställningens ordning.',
     dragHint: 'Dra ingredienserna från lådan till brickan.',
     standBtn: '🍽️ Servera', openBtn: '🔙 Tillbaka till köket', standStep: '🍽️ Ställ tallriken på disken', testHead: 'Servering',
-    builtHint: 'Allt är på tallriken! Tryck på 🍽️ Servera.', doneHint: 'Allt är klart! Tryck på <b>🍽️ Servera</b> och ställ tallriken på disken.',
+    builtHint: 'Allt står på brickan! Tryck på 🍽️ Servera.', doneHint: 'Allt är klart! Tryck på <b>🍽️ Servera</b> och ställ brickan på disken.', doneHint3d: 'Allt är klart! <b>Klicka på brickan</b> för att ta den och bär ut den till kunden.',
     notAllIn: 'Allt är inte på tallriken än.', checklistFirst: 'Gör klart checklistan först (bröd, grill och lager).',
     backMsg: 'Tallriken står på arbetsytan igen.', emptyTray: 'Lådan är tom.',
     resultTitle: '🎉 Tallriken står på disken!', pickup: (name) => `${name} hämtar tallriken vid luckan och betalar.`,

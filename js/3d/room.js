@@ -186,6 +186,7 @@ export function buildRoom(scene, ctx) {
     slab(g, cx0 - 0.01, sx - 0.07, 0.88, 0.9, cz0 - 0.01, cz1 + 0.01, steel, { cast: false });
     out.displayCase = { x0: cx0, x1: sx - 0.08, z0: cz0, z1: cz1, y: 0.9, top: 1.3 };
   } else slab(g, cx0 - 0.02, cx0, 0.08, 0.98, cz0, cz1, panel);   // sida mot dörren
+  out.counter = { y: 1.04, x0: sx - 0.04, x1: cx1 + 0.04, z0: cz0 - 0.04, z1: cz1 + 0.06 };   // diskens skiva (ställa saker på, js/3d/carry.js)
   // kassaapparaten vid BESTÄLL och kortterminalen vid UTLÄMNING (i hamburgerbaren bredvid kassan)
   const qx = C.toX(LY.QUEUE[0][0]), px = rest ? C.toX(LY.QUEUE[0][0]) - 0.45 : C.toX(LY.PICKUP[0][0]);
   const reg = A.instance(A.get('CashRegister_01'), { fit: { h: 0.42 } });

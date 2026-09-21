@@ -5,7 +5,7 @@ import { Raster } from './raster.js';
 import * as D from './build-draw.js';
 import * as U from './build-ui.js';
 import { modalOpen, closeModal, openPartPicker } from './ui.js';
-import { applyBuildOp, newBuild } from './build-ops.js';
+import { applyBuildOp, newBuild, starsFor } from './build-ops.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = U.esc;
@@ -86,7 +86,7 @@ export class BuildView {
     if (o.t === 'mode' && this.choosingMode) { this.choosingMode = false; closeModal(); this.start(); return; }
     if (o.t === 'phase') {
       this.selected = null;
-      if (o.v === 'desk') this.finale?.enter();
+      if (o.v === 'desk') this.finale?.enter(true);   // en kompis tryckte på Servera
       else { this.say(this.T.backMsg, 'info'); this.gl?.attach(this); }
     }
     if (o.t === 'power' && this.phase === 'desk') this.finale?.pressPower(true);
@@ -241,7 +241,7 @@ export class BuildView {
     }
     if (s.kind === 'act') { const a = this.L.ACTION[s.id]; return `Tryck på ${a.icon} för att <b>${esc(a.name.toLowerCase())}</b>.`; }
     if (s.kind === 'cable') { const c = this.L.CABLE[s.id]; return `Dra kabeln <b>${esc(c.name)}</b> till uttaget <b>${esc(c.wants.map(this.L.portLabel).join(' / '))}</b>.`; }
-    return this.T.doneHint;
+    return this.gl && this.hooks.carryOut && this.T.doneHint3d ? this.T.doneHint3d : this.T.doneHint;
   }
 
   // ---------- Handlingar ----------
@@ -325,13 +325,7 @@ export class BuildView {
     this.refresh();
   }
   finish(result) {
-    const b = this.b;
-    const target = 60 + 30 * this.order.items.length;
-    let stars = 1;
-    if (b.errors <= 1 && b.time <= target) stars = 3;
-    else if (b.errors <= 4 && b.time <= target * 1.8) stars = 2;
-    stars = Math.max(1, stars - (result.warnings?.length || 0));
-    if (this.order.guided) stars = 3;
+    const b = this.b, stars = starsFor(this.order, result.warnings);
     this.hooks.onDone(this.order, { stars, time: b.time, errors: b.errors, help: b.help, warnings: result.warnings || [] });
   }
 
@@ -433,6 +427,8 @@ export class BuildView {
     let id;
     if (this.gl) id = this.gl.idAt(pt[0], pt[1]);
     else { if (this.renderDue) this.render(); id = this.R.idAt(pt[0] / this.buf.px, pt[1] / this.buf.px, 1); }
+    // 3D-köket: klick på den färdiga brickan (eller på maten) = ta den och bär ut den
+    if (this.gl && this.hooks.carryOut && this.L.TRAY_ID && this.isBuilt() && (id === this.L.TRAY_ID || this.L.SLOTS.some((s) => s.n === id)) && !this.steps().some((s) => !s.done)) return this.topAction();
     const slot = this.L.SLOTS.find((s) => s.n === id);
     if (slot && this.b.placed[slot.id]) {
       const p = this.b.placed[slot.id];

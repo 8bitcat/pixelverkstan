@@ -5,6 +5,7 @@ import { Floor } from './core/floor.js';
 import { BuildView } from './core/build.js';
 import * as UI from './core/ui.js';
 import { runCommand } from './core/session.js';
+import { starsFor } from './core/build-ops.js';
 import { SPOTS as WALK_SPOTS } from './core/floor-walk.js';
 import { SHOPKEEPER, portrait } from './core/people.js';
 import { Net, cleanCode } from './core/net.js';
@@ -26,6 +27,8 @@ const hooks3d = {
   onBoxClick: (d) => floor?.onBoxClick?.(d),
   onStaff: () => UI.openStaff(game),
   onBench: () => benchMenu(),
+  onServe: (order, info) => serveOrder(order, info),   // brickan lämnades till kunden, på bordet eller på disken (js/3d/carry.js)
+  openOrderId: () => build?.order?.id ?? null,
   modalOpen: () => UI.modalOpen(),
   toast: (t, k = '') => UI.toast(t, k),
 };
@@ -238,6 +241,16 @@ function setupGame(shopModule, opts) {
     onOp: (order, op) => { if (coop instanceof CoopHost) coop.localOp(order, op); else if (coop) coop.op(order, op); },
     onCursor: (data) => { if (coop instanceof CoopHost) coop.localCursor(data); else if (coop) coop.cursor(data); },
     onExit: () => { leaveWorkshop(); show('shop'); },
+    // 3D-köket: den färdiga brickan blir ett föremål i händerna (remote = en kompis tryckte: den ställs på disken)
+    carryOut: (order, remote = false) => {
+      if (!is3d() || !game.shop.kitchen3d || !view3d?.carry) return false;
+      build.order = null;
+      leaveWorkshop();
+      show('shop');
+      view3d.carry.spawnOrder(order, { held: !remote });
+      if (!remote) UI.toast(`🍽️ Brickan är klar – bär ut den till ${order.name}! Klicka på kunden, eller ställ den på bordet eller disken.`, 'good');
+      return true;
+    },
     onDone: (order, result) => {
       const payout = act('complete', { orderId: order.id, result });
       build.order = null;
@@ -336,6 +349,11 @@ async function startMirrorInner(m) {
 function openBuild(order) {
   if (!game.orders.includes(order)) return;
   if (order.service) { act('doService', { orderId: order.id }); return; }   // tjänst: utförs från kortet
+  // 3D-köket: en färdig bricka byggs inte om – den står framme och ska bäras ut
+  if (is3d() && game.shop.kitchen3d && view3d?.carry && order.build?.phase === 'desk') {
+    view3d.carry.spawnOrder(order);
+    return UI.toast(`🍽️ Brickan till ${order.name} är klar – ta den och bär ut den.`, '');
+  }
   const go = (o) => {
     if (!game.orders.includes(o)) return;
     // avataren går in i verkstaden
@@ -351,6 +369,15 @@ function openBuild(order) {
   };
   if (coop instanceof CoopClient) coop.openBuild(order, go);
   else go(order);
+}
+// Brickan lämnades för hand i 3D: direkt till kunden / på kundens bord (direct) eller på disken (kunden hämtar).
+function serveOrder(order, { direct = true, thrown = false, warnings = [] } = {}) {
+  if (!game.orders.includes(order)) return;
+  const j = game.shop.judge ? game.shop.judge(order, warnings) : { warnings, verdict: '' };
+  const b = order.build || {}, stars = starsFor(order, j.warnings);
+  const verdict = thrown && !j.warnings.length ? 'Snyggt kast! 😄' : j.verdict;
+  const payout = act('complete', { orderId: order.id, result: { stars, time: b.time || 0, errors: b.errors || 0, help: b.help, warnings: j.warnings, direct, verdict } });
+  UI.toast(`${'⭐'.repeat(stars)} ${order.name}: ${verdict}`, j.warnings.length ? '' : 'good');
 }
 function leaveWorkshop() {
   const me = floor?.localPlayer();

@@ -13,6 +13,17 @@ export function newBuild() {
   return { placed: {}, acts: new Map(), cables: new Map(), errors: 0, time: 0, help: null, phase: 'build', seen: new Set() };
 }
 
+// Stjärnor för ett färdigt bygge: tid och misstag, minus en per anmärkning. Guidad kund ger alltid tre.
+export function starsFor(order, warnings = []) {
+  const b = order.build || { errors: 0, time: 0 };
+  const target = 60 + 30 * order.items.length;
+  let stars = 1;
+  if (b.errors <= 1 && b.time <= target) stars = 3;
+  else if (b.errors <= 4 && b.time <= target * 1.8) stars = 2;
+  stars = Math.max(1, stars - (warnings?.length || 0));
+  return order.guided ? 3 : stars;
+}
+
 export function rigOf(shop, order) {
   return shop.layout.rigFor ? shop.layout.rigFor(order) : shop.layout;
 }

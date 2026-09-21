@@ -497,6 +497,10 @@ export class Units {
   makePlate(p) {
     const white = paintMat(0xf6f3ec, 0.4), bun = paintMat(0xd9a55d, 0.7), patty = paintMat(0x6e3a26, 0.8), cup = paintMat(0xf4f1ea, 0.5);
     const g = new THREE.Group();
+    if (p.meal?.tray) {   // serverat på bricka: den står under tallriken, muggen och pommesen
+      const look = this.shop.floorArt?.eraLook?.(this.year), col = typeof look?.trim === 'number' ? look.trim : 0xc9322a;
+      const tray = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.008, 0.26), paintMat(col, 0.55)); tray.position.set(0.035, -0.004, 0.005); tray.castShadow = true; g.add(tray);
+    }
     const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.012, 20), white); plate.position.y = 0.006; plate.castShadow = true; g.add(plate);
     const part = (id) => this.shop.part?.[id];
     const meal = p.meal;

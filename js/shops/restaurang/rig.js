@@ -3,7 +3,7 @@
 // läggs i fickan och drycken på brickan. Samma API som datorbutikens rigg (core/build.js
 // pratar bara med riggen), men utan kablar och uttag.
 import { DB, layerHeight, bunTopHeight, burgerRadius, BURGER_CATS, CATS } from './menu.js';
-import { drawPlate, drawPass, drawToaster, drawGrill, drawLayer, drawSide, drawFryer, drawDrinkTower } from './art.js';
+import { drawPlate, drawTray, drawToaster, drawGrill, drawLayer, drawSide, drawFryer, drawDrinkTower } from './art.js';
 import { eraLook } from './era.js';
 
 export const VIEW = { w: 872, h: 504, k: 16, hz: 13, ox: 400, oy: 80 };
@@ -12,9 +12,15 @@ export const CONN = {};
 export const connectorIcon = (conn, W = 40, H = 30) => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c; };
 
 // var sakerna står (enheter): brödrost och grill till vänster, brickan till höger
-export const K = { toaster: [0.5, 1], grill: [0.5, 8.5], fryer: [-4.5, 15], tower: [24, 17], plate: [13, 8, 8, 5.8], pass: [3, 17, 23, 21.5], burger: [13, 8], basket: [19.5, 3.5], cup: [24.5, 11.5], dessert: [26.5, 6.5] };
-// vid servering glider tallriken (med allt på) från arbetsytan till luckan
-export const SLIDE_DV = (K.pass[1] + K.pass[3]) / 2 - K.plate[1];
+// (brödrost och grill står en aning längre åt vänster än förr för att ge plats åt brickan)
+export const K = { toaster: [-1, 1], grill: [-1, 8.5], fryer: [-4.5, 15], tower: [24, 17], tray: [4.7, 30, 1, 15], plate: [13, 8, 8, 5.8], burger: [13, 8], basket: [19.5, 3.5], cup: [24.5, 11.5], dessert: [26.5, 6.5] };
+// brickans ovansida ligger strax under arbetsytan (tallriken är nedsänkt lika mycket) – allt annat står på den
+export const TRAY_Z = -0.3;
+export const TRAY_ID = 900;   // brickans egen träff-id: i 3D klickar man på den färdiga brickan för att ta den
+// 2D-serveringen: brickan lyfts ur bild när den bärs ut
+export const LIFT_DZ = 26;
+// delarna på brickan som egna föremål (3D: ta, bär, kasta): var de står och hur stora de är (enheter)
+export const TRAY_PARTS = { tray: { at: [(K.tray[0] + K.tray[1]) / 2, (K.tray[2] + K.tray[3]) / 2, TRAY_Z - 0.35], half: [(K.tray[1] - K.tray[0]) / 2, (K.tray[3] - K.tray[2]) / 2] }, burger: { at: [K.plate[0], K.plate[1], TRAY_Z], r: K.plate[2] }, pommes: { at: [K.basket[0], K.basket[1], TRAY_Z], r: 2.6 }, dryck: { at: [K.cup[0], K.cup[1], TRAY_Z], r: 1.8 }, dessert: { at: [K.dessert[0], K.dessert[1], TRAY_Z], r: 2.2 } };
 // tillbehör som friteras och drycker som tappas upp ur maskinen (flaskor och burkar tas ur kylen under)
 export const isFried = (p) => ['fries', 'nuggets', 'ringbasket'].includes(p?.look?.shape);
 export const isPoured = (p) => p?.look?.shape === 'cup' && !p.look.bottle && !p.look.can && !p.look.box;
@@ -51,9 +57,9 @@ function makeRig(order) {
   const sideItem = items.find((it) => it.cat === 'tillbehor'), sidePart = sideItem?.part ? DB.part[sideItem.part] : null;
   const drinkItem = items.find((it) => it.cat === 'dryck'), drinkPart = drinkItem?.part ? DB.part[drinkItem.part] : null;
   const fried = !!sidePart && isFried(sidePart), poured = !!drinkPart && isPoured(drinkPart);
-  if (sideItem) S.push({ id: 'pommes', cat: 'tillbehor', name: 'Tillbehörsfickan', requires: fried ? ['act:fritera'] : [], anchor: [K.basket[0], K.basket[1], 3.2], hl: [K.basket[0] - 2.6, K.basket[0] + 2.6, K.basket[1] - 1.8, K.basket[1] + 1.8, 0.02] });
-  if (drinkItem) S.push({ id: 'dryck', cat: 'dryck', name: 'Drycken', requires: poured ? ['act:tappa'] : [], anchor: [K.cup[0], K.cup[1], 4.8], hl: [K.cup[0] - 1.9, K.cup[0] + 1.9, K.cup[1] - 1.9, K.cup[1] + 1.9, 0.02] });
-  if (items.some((it) => it.cat === 'dessert')) S.push({ id: 'dessert', cat: 'dessert', name: 'Efterrätten', requires: [], anchor: [K.dessert[0], K.dessert[1], 3.0], hl: [K.dessert[0] - 2.2, K.dessert[0] + 2.2, K.dessert[1] - 2.0, K.dessert[1] + 2.0, 0.02] });
+  if (sideItem) S.push({ id: 'pommes', cat: 'tillbehor', name: 'Tillbehörsfickan', requires: fried ? ['act:fritera'] : [], anchor: [K.basket[0], K.basket[1], 3.2], hl: [K.basket[0] - 2.6, K.basket[0] + 2.6, K.basket[1] - 1.8, K.basket[1] + 1.8, TRAY_Z + 0.02] });
+  if (drinkItem) S.push({ id: 'dryck', cat: 'dryck', name: 'Drycken', requires: poured ? ['act:tappa'] : [], anchor: [K.cup[0], K.cup[1], 4.8], hl: [K.cup[0] - 1.9, K.cup[0] + 1.9, K.cup[1] - 1.9, K.cup[1] + 1.9, TRAY_Z + 0.02] });
+  if (items.some((it) => it.cat === 'dessert')) S.push({ id: 'dessert', cat: 'dessert', name: 'Efterrätten', requires: [], anchor: [K.dessert[0], K.dessert[1], 3.0], hl: [K.dessert[0] - 2.2, K.dessert[0] + 2.2, K.dessert[1] - 2.0, K.dessert[1] + 2.0, TRAY_Z + 0.02] });
   S.forEach((s, i) => (s.n = i + 1));
   const SLOT = Object.fromEntries(S.map((s) => [s.id, s]));
   // höjden där lager k börjar: summan av lagren under (det som ligger där, annars det beställda)
@@ -155,40 +161,56 @@ function makeRig(order) {
   function fact(key, part) { const f = FACTS[key]; return typeof f === 'function' ? f(part || {}) : f || ''; }
 
   // ---------- Rita ----------
-  function drawScene(R, b, anim = {}) {
+  // Brickan med allt som står på den: brickan, tallriken med burgaren, tillbehöret, drycken och efterrätten.
+  // `only` ritar en enda del (3D: varje del är ett eget föremål man kan ta, bära och kasta), `dz` lyfter
+  // allt (2D-serveringen: brickan bärs ut ur bild), `marks` ritar konturerna för det som ännu saknas.
+  function drawTrayScene(R, b, { only = null, dz = 0, marks = false } = {}) {
     rig.lastB = b;
     const ids = Object.fromEntries(S.map((s) => [s.id, s.n]));
-    const era = eraLook(order.year || 1990), dv = (anim.plateT || 0) * SLIDE_DV;
-    drawPass(R, K.pass[0], K.pass[2], K.pass[1], K.pass[3], era, 0);
-    drawPlate(R, K.plate[0], K.plate[1] + dv, K.plate[2], K.plate[3], era, 0);
+    const era = eraLook(order.year || 1990), want = (k) => !only || only === k;
+    if (want('tray')) drawTray(R, K.tray[0], K.tray[1], K.tray[2], K.tray[3], era, TRAY_Z + dz, TRAY_ID);
+    if (want('burger')) {
+      drawPlate(R, K.plate[0], K.plate[1], K.plate[2], K.plate[3], era, 0, dz);
+      let z = dz;
+      for (const s of S) {
+        if (s.k === undefined) continue;
+        const p = b.placed[s.id];
+        if (!p) break;
+        drawLayer(R, p, { id: ids[s.id], at: [cu, cv, z], r, top: s.top, bottom: s.k === 0 });
+        z += s.top ? bunTopHeight(p) : layerHeight(p);
+      }
+    }
+    const zs = TRAY_Z + dz;
+    const side = (key, Kp, mark) => {
+      if (!SLOT[key]) return;
+      const p = b.placed[key];
+      if (p) { if (want(key)) drawSide(R, p, { id: ids[key], at: [Kp[0], Kp[1], zs] }); }
+      else if (marks && !only) mark();
+    };
+    side('pommes', K.basket, () => R.box(K.basket[0] - 2.3, K.basket[0] + 2.3, K.basket[1] - 1.5, K.basket[1] + 1.5, zs, zs + 0.02, (f, x, y, W, H) => (Math.min(x, W - x, y, H - y) < 0.15 ? 0xd0c4b0 : -1), ids.pommes, { noEdges: true }));
+    side('dryck', K.cup, () => R.box(K.cup[0] - 1.6, K.cup[0] + 1.6, K.cup[1] - 1.6, K.cup[1] + 1.6, zs, zs + 0.02, (f, x, y, W, H) => { const d = Math.hypot(x - W / 2, y - H / 2) / (W / 2); return d < 1 && d > 0.85 ? 0xd0c4b0 : -1; }, ids.dryck, { noEdges: true }));
+    side('dessert', K.dessert, () => R.box(K.dessert[0] - 2.0, K.dessert[0] + 2.0, K.dessert[1] - 1.8, K.dessert[1] + 1.8, zs, zs + 0.02, (f, x, y, W, H) => (Math.min(x, W - x, y, H - y) < 0.15 ? 0xd0c4b0 : -1), ids.dessert, { noEdges: true }));
+  }
+  function drawScene(R, b, anim = {}) {
+    rig.lastB = b;
+    const era = eraLook(order.year || 1990), t = anim.plateT || 0;
     drawToaster(R, K.toaster[0], K.toaster[1], 0, actDone(b, 'rosta') && !b.placed.l0);
     const fb = firstBiff ? S.find((s) => s.cat === 'biff') : null;
     const pattyPart = fb ? (b.placed[fb.id] || DB.part[b.station?.grill] || fb.part || DB.parts.find((p) => p.cat === 'biff')) : null;
     drawGrill(R, K.grill[0], K.grill[1], 0, pattyPart, fb && !b.placed[fb.id] ? actCount(b, 'grill') : 0);
     drawFryer(R, K.fryer[0], K.fryer[1], 0, era, b.placed.pommes ? 0 : actCount(b, 'fritera'), fried);
     drawDrinkTower(R, K.tower[0], K.tower[1], 0, era, poured && actDone(b, 'tappa') && !b.placed.dryck, drinkPart);
-    // burgaren
-    let z = 0;
-    for (const s of S) {
-      if (s.k === undefined) continue;
-      const p = b.placed[s.id];
-      if (!p) break;
-      drawLayer(R, p, { id: ids[s.id], at: [cu, cv + dv, z], r, top: s.top, bottom: s.k === 0 });
-      z += s.top ? bunTopHeight(p) : layerHeight(p);
-    }
-    // tillbehör och dryck
-    if (SLOT.pommes) { const p = b.placed.pommes; if (p) drawSide(R, p, { id: ids.pommes, at: [K.basket[0], K.basket[1] + dv, 0] }); else R.box(K.basket[0] - 2.3, K.basket[0] + 2.3, K.basket[1] - 1.5, K.basket[1] + 1.5, 0, 0.02, (f, x, y, W, H) => (Math.min(x, W - x, y, H - y) < 0.15 ? 0xd0c4b0 : -1), ids.pommes, { noEdges: true }); }
-    if (SLOT.dryck) { const p = b.placed.dryck; if (p) drawSide(R, p, { id: ids.dryck, at: [K.cup[0], K.cup[1] + dv, 0] }); else R.box(K.cup[0] - 1.6, K.cup[0] + 1.6, K.cup[1] - 1.6, K.cup[1] + 1.6, 0, 0.02, (f, x, y, W, H) => { const d = Math.hypot(x - W / 2, y - H / 2) / (W / 2); return d < 1 && d > 0.85 ? 0xd0c4b0 : -1; }, ids.dryck, { noEdges: true }); }
-    if (SLOT.dessert) { const p = b.placed.dessert; if (p) drawSide(R, p, { id: ids.dessert, at: [K.dessert[0], K.dessert[1] + dv, 0] }); else R.box(K.dessert[0] - 2.0, K.dessert[0] + 2.0, K.dessert[1] - 1.8, K.dessert[1] + 1.8, 0, 0.02, (f, x, y, W, H) => (Math.min(x, W - x, y, H - y) < 0.15 ? 0xd0c4b0 : -1), ids.dessert, { noEdges: true }); }
+    // brickan lyfts mjukt (ease in) när den bärs ut
+    drawTrayScene(R, b, { dz: t * t * LIFT_DZ, marks: true });
   }
   const drawCables = (ctx) => ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
   Object.assign(rig, {
-    VIEW, MAX_K, CONN, connectorIcon, order, year: order.year, layers, r, cu, cv,
+    VIEW, MAX_K, CONN, connectorIcon, order, year: order.year, layers, r, cu, cv, TRAY_ID,
     SLOTS: S, SLOT, ACTIONS: A, ACTION, CABLES, CABLE, STEPS, PORTS,
     actSet, actCount, actDone, missingReq, slotsFor, dropAction, pickups, canPlace, canRemove, onRemove, wattNeed, actionReady,
     portPos, portType, availablePorts, portLabel, portBusy, cableConn, cableNeeded, cableReady, cableOk, cableFrom, canConnect,
-    SCREW_OF, screwStatus, standCheck, fact, drawScene, drawCables,
+    SCREW_OF, screwStatus, standCheck, fact, drawScene, drawTrayScene, drawCables,
   });
   return rig;
 }

@@ -228,7 +228,7 @@ export class Floor {
     LY.SPOTS.forEach((s, i) => {
       if (used.has(i) || i === c._spot) return;
       if (s.kind === 'case' && !this.units?.[s.slot]?.frame) return;
-      const w = s.kind === 'seat' ? (kid ? 0.6 : 1.2) : s.kind === 'hero' ? (kid ? 3 : 1.2) : 1;
+      const w = s.kind === 'seat' ? (g.shop.dineIn && s.table !== undefined ? 8 : kid ? 0.6 : 1.2) : s.kind === 'hero' ? (kid ? 3 : 1.2) : 1;
       cand.push([i, w]);
     });
     if (!cand.length) return used.has(c._spot) || c._spot === undefined ? -1 : c._spot;
@@ -244,6 +244,21 @@ export class Floor {
     const cand = [];
     LY.SPOTS.forEach((s, i) => { if (s.kind === 'seat' && s.table !== undefined && !used.has(i)) cand.push(i); });
     return cand.length ? cand[Math.floor(Math.random() * cand.length)] : -1;
+  }
+  // Maten bars ut till kunden (3D): ingen tur till luckan – betala på plats och ät där man sitter,
+  // eller gå och sätt sig med brickan om man stod upp.
+  serveDirect(c) {
+    const g = this.game;
+    c._direct = false;
+    if (c.payout) { const p = c.payout; c.payout = null; this.coins(c.x, c.y - 42, Math.min(18, 5 + Math.floor(p.total / 1500))); g.pay(p, c); }
+    if (c.sayPickup) { c.say = c.sayPickup; c.sayPickup = null; c.bubbleT = 3.5; }
+    c.mood = c.mood === 'angry' ? c.mood : 'happy';
+    const seated = c._sit && c._spot >= 0 && LY.SPOTS[c._spot]?.table !== undefined;
+    if (!seated) c._spot = g.shop.dineIn ? this.pickSeat(c) : -1;
+    if (c._spot >= 0) {
+      c._eatMax = c._eatT = 14 + Math.random() * 10; c.phase = 'eating'; c._carry = !seated;
+      if (seated) { c._tkey = 'e' + c._spot; c._path = []; }   // sitter redan på sin plats – res dig inte
+    } else { c.phase = 'leaving'; c._spot = null; c.bubbleT = 3; }
   }
   targetFor(c) {
     const g = this.game;
@@ -296,11 +311,12 @@ export class Floor {
     if (c.bubbleT > 0) c.bubbleT -= dt;
     if (c.phase === 'waiting' && !c.moving && c._spot >= 0) {
       c._stay = (c._stay ?? 15) - dt;
-      if (c._stay <= 0) {
+      if (c._stay <= 0 && !(g.shop.dineIn && LY.SPOTS[c._spot]?.table !== undefined)) {   // vid matbordet sitter man kvar tills maten kommer
         c._stay = 12 + Math.random() * 16;
         if (Math.random() < 0.55) { const n = this.pickSpot(c); if (n >= 0) c._spot = n; }
       }
     }
+    if (c.phase === 'ready' && c._direct) this.serveDirect(c);
     const T = this.targetFor(c);
     if (c._tkey !== T.key || !c._path) { c._path = this.plan(c, T); c._tkey = T.key; }
     const path = c._path;

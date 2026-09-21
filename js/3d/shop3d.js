@@ -8,6 +8,7 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { Carry } from './carry.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import * as A from './assets.js';
 import * as C from './coords.js';
@@ -81,6 +82,7 @@ export class Shop3D {
     this.bench = new Bench3D(this);
     this.bench.place(this.room.bench);
     this.setQuality(this.quality);
+    this.carry = new Carry(this);   // föremål man tar, bär, ställer ner och kastar
     this.bindInput();
     this.ready = true;
     onProgress(1);
@@ -304,8 +306,12 @@ export class Shop3D {
       if (!this.active || this.mode !== 'walk' || this.hooks.modalOpen()) return;
       if (this.lastDrag > 4) { this.lastDrag = 0; return; }   // man drog för att titta – inget klick
       if (!this.locked) { c.requestPointerLock?.(); return; }
+      if (this.carryClick) { this.carryClick = false; return; }   // musknappen tog/släppte ett föremål
       this.interact();
     });
+    // föremål (js/3d/carry.js): musknappen ner tar, upp släpper – håll in, sväng med musen och släpp = kast
+    document.addEventListener('mousedown', (e) => { if (e.button !== 0 || !this.locked || !this.active || this.mode !== 'walk' || this.kitchen || this.hooks.modalOpen()) return; if (this.carry.down()) this.carryClick = true; });
+    document.addEventListener('mouseup', (e) => { if (e.button !== 0 || !this.carryClick || !this.locked) return; this.carry.up(); });
     // högerklick i bilden ska inte öppna webbläsarens meny
     document.addEventListener('contextmenu', (e) => { if (this.active && this.mode === 'walk' && !this.hooks.modalOpen() && !e.target.closest?.('#hud, #orders, #modal, #chatbar, input, textarea')) e.preventDefault(); });
     // dra med musen för att titta – fungerar även när muslåset inte går att få
@@ -436,7 +442,7 @@ export class Shop3D {
   }
   peopleList() {
     const g = this.game, fl = this.floor, out = [], seen = new Set();
-    const say = (c) => (typeof c.say === 'string' ? c.say : c.say?.text && (!c.say.until || performance.now() < c.say.until) ? c.say.text : '');
+    const say = (c) => (c._yell && performance.now() < c._yell.until ? c._yell.text : typeof c.say === 'string' ? c.say : c.say?.text && (!c.say.until || performance.now() < c.say.until) ? c.say.text : '');
     for (const c of g.customers) {
       if (c.x === undefined) continue;
       const seat = c._sit && c._spot >= 0 ? LY.SPOTS[c._spot] : null;
@@ -484,8 +490,9 @@ export class Shop3D {
       if (!pick) break;   // vägg/golv/möbel först i strålen
     }
     this.hover = found;
-    this.canvas.style.cursor = found ? 'pointer' : 'default';
-    this.hint(this.locked || this.touch ? this.hoverText(found) : null);
+    const ct = this.kitchen ? '' : this.carry.hoverText();
+    this.canvas.style.cursor = found || ct ? 'pointer' : 'default';
+    this.hint(ct ? ct : this.locked || this.touch ? this.hoverText(found) : null);
   }
   pickPerson(key) {
     if (key[0] === 'c') { const c = this.game.customers.find((x) => 'c' + x.id === key); return c ? { type: 'customer', c } : null; }
@@ -516,6 +523,7 @@ export class Shop3D {
   interact() {
     if (!this.active || this.mode !== 'walk' || this.hooks.modalOpen()) return;
     this.updateHover();
+    if (!this.kitchen && this.carry.use()) return;   // ta det man siktar på, eller ställ ner / ge bort det man bär
     const h = this.hover;
     if (!h) return;
     if (h.dist > REACH) { this.hooks.toast('Gå lite närmare.'); return; }
@@ -540,6 +548,7 @@ export class Shop3D {
     this.room.update(dt, fl);
     this.units.update(dt);
     this.people.sync(this.peopleList(), dt);
+    this.carry.update(dt);
     if (this.game.shop.mealOf) this.units.plates?.(this.plateList());   // tallrikarna i lokalen: vid luckan, i händerna och på borden
     this.hoverT -= dt;
     if (this.hoverT <= 0) { this.hoverT = 0.08; this.updateHover(); }

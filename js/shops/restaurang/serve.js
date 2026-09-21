@@ -1,5 +1,6 @@
-// Serveringen i hamburgerbaren: tallriken ställs på disken (luckan) – den glider dit i bilden –
-// och kunden hämtar den där, betalar och sätter sig och äter. Samma gränssnitt som datorbutikens
+// Serveringen i hamburgerbaren. I 2D bärs brickan ut ur bild och ställs på disken (luckan), kunden
+// hämtar den där, betalar och sätter sig och äter. I 3D finns ingen sådan slutbild: brickan blir ett
+// riktigt föremål som man tar med händerna och bär ut till kunden (js/3d/carry.js) – se enter(). Samma gränssnitt som datorbutikens
 // skrivbordsfinal (core/build.js pratar med enter/resize/frame/draw/onPointerDown/onDrop/
 // trayEntries/steps/nextStep/hintText/emptyText/guideAction/pressPower).
 import { Raster } from '../../core/raster.js';
@@ -8,6 +9,18 @@ import { portrait, SHOPKEEPER } from '../../core/people.js';
 const DV = { w: 872, h: 504, k: 16, hz: 13, ox: 400, oy: 80 };
 const SLIDE = 0.9;     // sekunder för tallriken att glida till luckan
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+// Kundens omdöme om en färdig bricka: tid, kladd och – när den burits ut för hand – om maten legat på golvet
+// eller kastats. Fristående, eftersom byggvyn är stängd när brickan lämnas vid bordet.
+export function judge(order, extra = []) {
+  const b = order.build || { time: 0, errors: 0 };
+  const target = 40 + 12 * order.items.length;
+  const warnings = [...extra];
+  if (b.time > target * 1.6) warnings.push('Det tog sin tid – pommesen hann bli ljumma.');
+  if (b.errors >= 4) warnings.push('Lite kladdigt på tallriken.');
+  const verdict = warnings.length ? (extra.length ? extra[0] : 'Gott! Men nästa gång lite snabbare.') : ['Mums! Precis som jag ville ha den!', 'Perfekt burgare. Den kommer jag tillbaka för!', 'Wow – kolla vilken burgare!', 'Exakt så här ska den smaka.'][order.id % 4];
+  return { kind: 'ok', warnings, verdict };
+}
 
 export class Serving {
   static DV = DV;
@@ -21,12 +34,14 @@ export class Serving {
   get d() { return (this.b.desk ||= { plugs: {}, psuOn: false, attempts: {}, success: false }); }
   get customer() { const o = this.view.order, g = this.view.game; return g?.customers?.find((c) => c.id === o?.customerId) || null; }
 
-  enter() {
+  enter(remote = false) {
     this.run = null; this.t = 0; this.dirty = true; this.plateT = 0; this.finished = false;   // samma final-instans används för nästa beställning
     this.d.success = false;
     const v = this.view;
+    // 3D-köket: ingen slutbild – brickan hamnar i händerna och bärs ut till kunden
+    if (v.gl && v.hooks.carryOut && v.hooks.carryOut(v.order, remote)) return;
     this.face = portrait(this.customer?.look || SHOPKEEPER, '#f4f1ea');
-    v.say(v.help ? 'Tallriken är klar! Tryck på <b>🍽️ Ställ på disken</b> – kunden hämtar den vid luckan och betalar.' : 'Ställ tallriken på disken!', 'info');
+    v.say(v.help ? 'Brickan är klar! Tryck på <b>🍽️ Ställ på disken</b> – kunden hämtar den vid luckan och betalar.' : 'Bär ut brickan och ställ den på disken!', 'info');
     this.resize(v.cw, v.ch, window.innerWidth <= 760);
   }
   resize(cw, ch, narrow) {
@@ -65,15 +80,7 @@ export class Serving {
     this.run = { t: 0, local: !remote, step: -1, ...this.evaluate() };
     this.view.msg = null; this.view.guideKey = null;
   }
-  evaluate() {
-    const v = this.view, b = this.b, order = v.order;
-    const target = 40 + 12 * order.items.length;
-    const warnings = [];
-    if (b.time > target * 1.6) warnings.push('Det tog sin tid – pommesen hann bli ljumma.');
-    if (b.errors >= 4) warnings.push('Lite kladdigt på tallriken.');
-    const verdict = warnings.length ? 'Gott! Men nästa gång lite snabbare.' : ['Mums! Precis som jag ville ha den!', 'Perfekt burgare. Den kommer jag tillbaka för!', 'Wow – kolla vilken burgare!', 'Exakt så här ska det smaka.'][Math.floor(Math.random() * 4)];
-    return { kind: 'ok', warnings, verdict };
-  }
+  evaluate() { return judge(this.view.order); }
   frame(dt) {
     this.t += dt;
     const run = this.run;

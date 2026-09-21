@@ -274,6 +274,19 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   (4096² skuggkarta på hög grafik) och blanka smala metallkanter är mattare. `tools/flimmer.mjs`
   mäter det: andelen av bilden som ändras mellan två bildrutor, stillastående och vid en halv
   millimeters kamerarörelse.
+- **Bär ut maten själv (3D)**: allt byggs på en **bricka** (burgaren på sin tallrik, pommesen, muggen med
+  sugrör, efterrätten). När den är klar finns ingen slutbild: brickan hamnar i händerna som ett riktigt
+  föremål (`js/3d/carry.js`). Klicka för att ta och ställa ner – på bänken, disken, ett bord eller golvet
+  – och gå ut i lokalen med W A S D. Kunden väntar vid ett bord: klicka på kunden, ställ brickan på
+  kundens bord, eller ställ den på disken (kyldiskens lock) så hämtar kunden den själv som förr. Varje del
+  går att lyfta av brickan och ställa tillbaka. **Håll in musknappen, sväng med musen och släpp** så kastas
+  föremålet med handens fart: det faller, studsar mot väggar, disk och bänkar och landar på närmaste yta.
+  En bricka som landar hårt tappar allt som står på den, mat som legat på golvet ger en anmärkning (−1
+  stjärna), en ofullständig bricka tas inte emot ("Var är burgaren?"), och en bricka som kastas rakt på
+  rätt kund fångas ("Snyggt kast!"). Fysiken är egen och enkel (punkt med radie, tyngdkraft, plana ytor,
+  block) – ingen fysikmotor. Föremålen ritas av riggen med samma voxlar som på bänken
+  (`shop.carryKit(order)` → `rig.drawTrayScene(R, b, { only })`, bänkens rastercache återanvänds).
+  I 2D är flödet som förr: 🍽️ Ställ på disken, brickan lyfts ur bild och kunden hämtar vid luckan.
 - **Köket öppnas utan frysning**: första gången bänken ritades i 3D kompilerade webbläsaren om
   shaders i flera sekunder. Tre orsaker, alla åtgärdade: bänkens byggljus kom och gick med bänken,
   och antalet ljus ingår i shadernas nyckel, så *alla* material i butiken byggdes om (ljuset ligger
@@ -438,7 +451,7 @@ node tools/3d.mjs [--snabb]              # 3D-läget: laddar, bygger Källarhål
 node tools/bygg3d.mjs                    # byggläget i 3D: bänken, kameran matchar 2D-projektionen, delar i, klicktest, zoom, ut igen
 node tools/restaurang-rig.mjs            # Node: hamburgerbarens katalog, alla 155 menyer görbara varje år, köksreglerna steg för steg, alla former ritar
 node tools/restaurang.mjs                # hamburgerbaren i webbläsaren: meny → grossist → guidad kund → kök → servera → betalt
-node tools/restaurang3d.mjs              # hamburgerbaren i 3D: stor burgare i 2D-köket, köket på bänken, servering i 3D
+node tools/restaurang3d.mjs              # hamburgerbaren i 3D: stor burgare i 2D-köket, köket på bänken, brickan i händerna, ställ ner, kasta, spill, servera vid bordet, fånga ett kast
 node tools/restaurang-ikoner.mjs         # ritar alla ingrediensers ikoner i ark per kategori (rest-ikoner-*.png)
 node tools/restaurang-golv.mjs           # restaurangens golv genom epokerna med fyllda montrar, automater och gäster som äter (rest-golv-<år>.png)
 node tools/kok-laddtid.mjs               # hur fort köket öppnas i 2D och 3D: tid till första bild, låst sida, nya shaderprogram
