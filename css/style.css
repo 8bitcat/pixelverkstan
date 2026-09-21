@@ -562,3 +562,14 @@ body.bench3d #build, body.bench3d #build-stage { background: transparent; }
 @media (pointer: coarse) { #pad3d { display: block; } }
 body.view3d #orders { background: rgba(241,235,224,.9); }
 body.view3d #hud .btn, body.view3d #hud .chip { opacity: .95; }
+
+/* tangentbrickor på knappar som har en genväg */
+kbd {
+  display: inline-block; min-width: 1.15em; padding: 0 4px; margin-left: 3px; font: 14px var(--font, monospace); line-height: 1.3; text-align: center;
+  color: var(--ink); background: #fff; border: 2px solid var(--ink); border-bottom-width: 3px; border-radius: 4px; vertical-align: 2px; text-shadow: none; opacity: .9;
+}
+@media (hover: none) { kbd, .hud-quick { display: none; } }
+.quickmenu { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.quickmenu .btn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; white-space: normal; text-align: left; font-size: 22px; padding: 10px 12px; }
+.quickmenu .btn small { font: 16px var(--font, monospace); opacity: .75; }
+.quickmenu h3 { grid-column: 1 / -1; margin: 6px 0 0; font: 20px var(--head); }

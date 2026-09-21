@@ -14,12 +14,12 @@ export function chooseMode(view, onPick) {
   const T = view.T;
   const body = `<p style="font-size:21px;margin-top:0">Hur vill du ${esc(T.modeVerb || 'bygga')} <b>${esc(view.order.title.toLowerCase())}</b> åt ${esc(view.order.name)}?</p>
     <div class="plist">
-      <div class="prow" style="grid-template-columns:44px 1fr"><span style="font-size:32px">🧑‍🔧</span><div><div class="nm">Med hjälp</div><div class="sp">${esc(T.modeHelp || 'Gula markeringar visar var allt ska sitta, checklista steg för steg och förklaringar när något blir fel.')}</div></div></div>
+      <div class="prow" style="grid-template-columns:44px 1fr"><span style="font-size:32px">${T.guideFace || '🧑‍🔧'}</span><div><div class="nm">Med hjälp</div><div class="sp">${esc(T.modeHelp || 'Gula markeringar visar var allt ska sitta, checklista steg för steg och förklaringar när något blir fel.')}</div></div></div>
       <div class="prow" style="grid-template-columns:44px 1fr"><span style="font-size:32px">😎</span><div><div class="nm">Utan hjälp – proffsläge</div><div class="sp">${esc(T.modePro || 'Inga markeringar eller tips. Glömmer du en kabel märks det först när du startar datorn.')} <b>+15 % betalt.</b></div></div></div>
     </div>`;
   const pick = (m) => { try { localStorage.setItem(PREF, m); } catch {} closeModal(); onPick(m === 'help'); };
   openModal(T.modeTitle || 'Välj byggläge', body, [
-    { label: '🧑‍🔧 Med hjälp', cls: pref === 'help' ? 'btn-go' : '', onClick: () => pick('help') },
+    { label: `${T.guideFace || '🧑‍🔧'} Med hjälp`, cls: pref === 'help' ? 'btn-go' : '', onClick: () => pick('help') },
     { label: '😎 Utan hjälp', cls: pref === 'pro' ? 'btn-go' : 'btn-gold', onClick: () => pick('pro') },
   ], { closable: false });
 }

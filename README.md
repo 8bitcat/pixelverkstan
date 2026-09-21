@@ -197,9 +197,21 @@ valet sparas (`pixelverkstan_3d`). 2D-läget finns kvar orört.
   disk/kassa/skåp/ljus/gata i `room.js`. Produkter är tryckta kartonger (`textures.js`:
   canvas-tryck med märke, namn, pixelikon, streckkod; spel/konsoler får sina pixelomslag).
 - **Styrning:** klicka i bilden → muslås; W A S D går, musen tittar, klick/E använder det i
-  siktet (kund, monter, låda, stjärnobjekt), Esc släpper musen, Q byter grafikkvalitet
+  siktet (kund, monter, låda, stjärnobjekt), Q byter grafikkvalitet
   (hög/medel/låg; sänks automatiskt om bilden hackar). Pekskärm: dra för att titta, knappar
   för att gå. Kollision via 2D-gångnätet (`floor-walk.walkable`).
+- **Tangenter i stället för Esc:** varje HUD-knapp har en bokstav som står på knappen –
+  **G** grossist, **L** lager, **B** butiken, **P** personal, **O** modeller, **K** arkad, **N** händelser,
+  **R** rummet, **V** 2D/3D – och **M** öppnar snabbmenyn med allt samlat (plus beställningarna 1–9 och
+  huvudmenyn på H). Siffrorna **1–9** öppnar beställningskorten direkt. I en öppen ruta har fotens knappar
+  var sin bokstav ur sin egen text (den gröna knappen väljer först: "Ta emot" = T, "Tacka nej" = N),
+  flikarna har siffror, Enter trycker på den gröna knappen om den är ensam, Esc stänger, och samma bokstav
+  som öppnade rutan stänger den igen. Gäller 2D och 3D (`HOT` i `main.js`, `assignKeys` i `ui.js`); i
+  köket och byggvyn är bokstäverna avstängda. **I 3D släpps musen av sig själv när en ruta öppnas och låses
+  igen när den stängs** (`relock` i `shop3d.js` – webbläsaren kräver inget klick eftersom det var sidan själv
+  som släppte låset), likadant när man lämnar köket. **Telefonen på disken** (personalsidan, `room.js`) öppnar
+  samma meny om man går dit och klickar: bordstelefon med lur före 1996, trådlös i laddare till 2008, sedan
+  en platta på stativ. `tools/genvagar.mjs` trycker sig igenom allt.
 - **Människor:** `people.js` – tio riktiga **Mixamo-figurer** (`assets/3d/chars/*.glb`, 1,7–6 MB,
   laddas vid behov och byts in mot Xbot-platshållaren när de är klara; samma kund får alltid
   samma figur) med gå/stå/spring-animation från three.js-mannekängen Xbot, som läggs på
@@ -493,6 +505,7 @@ node tools/restaurang-ikoner.mjs         # ritar alla ingrediensers ikoner i ark
 node tools/restaurang-golv.mjs           # restaurangens golv genom epokerna med fyllda montrar, automater och gäster som äter (rest-golv-<år>.png)
 node tools/kok-farger.mjs                # 3D-köket ser rätt ut: grafikkortets felmeddelanden fångas och bilden jämförs med en nybyggd textur (atlasen växer när lager läggs på)
 node tools/kok-laddtid.mjs               # hur fort köket öppnas i 2D och 3D: tid till första bild, låst sida, nya shaderprogram
+node tools/genvagar.mjs                  # tangentgenvägar: HUD-bokstäver, snabbmenyn M, dialogknappar och flikar, siffror till beställningar, muslåset tillbaka av sig självt i 3D, telefonen på disken
 node tools/restaurang-stationer.mjs      # stekbord och fritös med riktiga klick i proffsläget: vänta på färgen, vänd, salta på karet, potatis ur backen till korgen, bränd biff ger anmärkning
 node tools/restaurang-texter.mjs         # inga datorord i det hamburgerbarens spelare ser (dialoger, flikar, kök), avataren går till kassan, maten ritas på bordet i 2D
 node tools/restaurang-platser.mjs        # sittplatserna som kapacitet: fulla bord → nekad beställning → kö → inga nya kunder; stolen hålls under hämtning; alla stolar nåbara i alla lokaler

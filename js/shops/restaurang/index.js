@@ -102,7 +102,7 @@ export default {
   text: {
     signSale: 'MENY', signTag: 'ALLTID NYGRILLAT', benchSign: 'KÖKSBÄNK',
     kitDesc: 'råvaror till dina första gästers burgare, pommes och läsk – allt i en låda.', searchHint: 'Sök ingrediens, kött, sås …', resultParts: 'Mat + tillagning', resultTime: 'Tillagning', emptyUnit: 'TOMT',
-    thing: 'burgare', things: 'burgare', place: 'köket', thisThing: 'den här burgaren', guideFace: '🧑‍🍳',
+    thing: 'burgare', things: 'burgare', place: 'köket', thisThing: 'den här burgaren', guideFace: '🧑‍🍳', buildIcon: '🍳', buildingVerb: 'lagar', joinBtn: 'Laga med',
     hint3d: 'laga maten vid köksbänken bakom disken · ta brickan och bär ut den', benchName: 'Köksbänken', benchVerb: 'laga',
     workshopHover: 'Köket – maten lagas vid köksbänken bakom disken', workshopToast: 'Maten lagas vid köksbänken bakom disken – gå dit och klicka.',
     swapBtn: '📦 Byt råvara ur lagret', swapNote: 'Gästen betalar för det som ligger på burgaren – finare råvaror ger mer betalt.',

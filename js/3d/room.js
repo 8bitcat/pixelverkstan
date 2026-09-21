@@ -193,6 +193,35 @@ export function buildRoom(scene, ctx) {
   if (reg) { reg.position.set(qx + 0.02, 1.04, (cz0 + cz1) / 2); reg.rotation.y = Math.PI; g.add(reg); }
   slab(g, px - 0.06, px + 0.06, 1.04, 1.07, (cz0 + cz1) / 2 - 0.09, (cz0 + cz1) / 2 + 0.09, paintMat(0x202226, 0.4));
   slab(g, px - 0.05, px + 0.05, 1.07, 1.075, (cz0 + cz1) / 2 - 0.06, (cz0 + cz1) / 2 + 0.02, new THREE.MeshBasicMaterial({ color: 0x6fe3ff }));
+  // telefonen på disken (personalsidan): gå dit och klicka – grossist, lager, butiken och resten av menyerna.
+  // Bordstelefon med lur före 1996, trådlös i laddare till 2008, sedan en platta på stativ.
+  {
+    const ph = new THREE.Group(); ph.name = 'phone'; ph.userData.pick = { type: 'phone' };
+    const phx = rest ? Math.min(cx1 - 0.3, qx + 0.62) : (qx + px) / 2, phz = cz0 + 0.16;
+    // (framsidan är −z = mot personalen bakom disken; lutande delar ligger i en egen grupp så att skärmen följer med)
+    const box = (w, h, d, mat, x, y, z, rx = 0, to = ph) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.rotation.x = rx; m.castShadow = true; to.add(m); return m; };
+    const lean = (x, y, z, rx) => { const t = new THREE.Group(); t.position.set(x, y, z); t.rotation.x = rx; ph.add(t); return t; };
+    if (year < 1996) {
+      const body = paintMat(year < 1990 ? 0xb8402e : 0xd8cfb8, 0.45), dark = paintMat(0x2a2b2e, 0.5);
+      box(0.2, 0.05, 0.19, body, 0, 0.025, 0); box(0.2, 0.035, 0.1, body, 0, 0.06, 0.04, -0.35);
+      box(0.22, 0.035, 0.05, body, 0, 0.1, 0.075); box(0.05, 0.03, 0.06, body, -0.085, 0.085, 0.075); box(0.05, 0.03, 0.06, body, 0.085, 0.085, 0.075);   // luren på klykan
+      const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.012, 20), year < 1990 ? paintMat(0xf0ece0, 0.4) : dark); dial.position.set(0, 0.056, -0.035); dial.rotation.x = -0.12; ph.add(dial);
+    } else if (year < 2009) {
+      const body = paintMat(0x2f3238, 0.45);
+      box(0.11, 0.035, 0.12, body, 0, 0.0175, 0);
+      const t = lean(0, 0.035, 0.015, 0.2);   // luren står lutad bakåt i laddaren
+      box(0.055, 0.17, 0.03, body, 0, 0.085, 0, 0, t); box(0.04, 0.03, 0.004, new THREE.MeshBasicMaterial({ color: 0x9be86a }), 0, 0.125, -0.0165, 0, t);
+      const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.07, 6), body); ant.position.set(0.018, 0.2, 0.005); t.add(ant);
+    } else {
+      const body = paintMat(0x17181b, 0.35), steel = metalMat(0xb8bec8, 0.35);
+      box(0.12, 0.012, 0.1, steel, 0, 0.006, 0.03); box(0.014, 0.13, 0.014, steel, 0, 0.065, 0.06);
+      const t = lean(0, 0.15, 0.03, 0.32);   // plattan lutar bakåt så att skärmen syns uppifrån
+      box(0.26, 0.18, 0.012, body, 0, 0, 0, 0, t); box(0.24, 0.16, 0.002, new THREE.MeshBasicMaterial({ color: 0x6fd0ff }), 0, 0, -0.0071, 0, t);
+    }
+    ph.position.set(phx, 1.04, phz);
+    g.add(ph);
+    out.phone = { x: phx, z: phz };
+  }
   chainSign(g, 'BESTÄLL', qx, 2.25, cz1 + 0.15, 1.1, 0.3, '#2f8f46');
   chainSign(g, 'UTLÄMNING', C.toX(LY.PICKUP[0][0]), 2.25, cz1 + 0.15, 1.3, 0.3, '#2c6fb7');
   // skåpen längs väggen bakom disken (lådhurtsar) + hylla ovanpå

@@ -65,8 +65,8 @@ export function renderFriendBuilds(list, onJoin) {
     const el = document.createElement('div');
     el.className = 'friendbuild';
     el.style.setProperty('--pc', x.color || '#7ee8fa');
-    el.innerHTML = `<div><b>🔧 ${x.names.map(esc).join(' och ')} ${x.names.length > 1 ? 'bygger' : 'bygger'}</b><small>${esc(x.order.title)} åt ${esc(x.order.name)}</small></div>
-      ${x.mine ? '<span class="fb-here">Du är med</span>' : '<button class="btn btn-go btn-small">Bygg med</button>'}`;
+    el.innerHTML = `<div><b>${x.text?.buildIcon || '🔧'} ${x.names.map(esc).join(' och ')} ${x.text?.buildingVerb || 'bygger'}</b><small>${esc(x.order.title)} åt ${esc(x.order.name)}</small></div>
+      ${x.mine ? '<span class="fb-here">Du är med</span>' : `<button class="btn btn-go btn-small">${esc(x.text?.joinBtn || 'Bygg med')}</button>`}`;
     el.querySelector('button')?.addEventListener('click', () => onJoin(x.order));
     box.append(el);
   }
@@ -94,14 +94,50 @@ export function openModal(title, bodyHtml, buttons = [], { closable = true } = {
   const dlg = m.querySelector('.dlg');
   dlg.dataset.title = title;
   if (keepScroll) dlg.scrollTop = keepScroll;
+  assignKeys(dlg);
   return dlg;
 }
-export function closeModal() { liveRefresh = null; $('#modal').classList.add('hidden'); $('#modal').innerHTML = ''; }
+export function closeModal() { liveRefresh = null; $('#modal').classList.add('hidden'); $('#modal').innerHTML = ''; delete $('#modal').dataset.hotkey; }
+// Bokstavsgenvägar: varje knapp i dialogens fot får en bokstav ur sin egen text (visas som en liten tangent),
+// flikarna får siffror. Knappar som redan har data-key (snabbmenyn) behåller sin.
+function assignKeys(dlg) {
+  const used = new Set([...dlg.querySelectorAll('[data-key]')].map((b) => b.dataset.key));
+  // den gröna huvudknappen väljer först, och ordens första bokstäver går före bokstäver mitt i ord
+  const foot = [...dlg.querySelectorAll('.dlg-foot .btn')].sort((a, b) => b.classList.contains('btn-go') - a.classList.contains('btn-go'));
+  for (const el of foot) {
+    if (el.dataset.key) continue;
+    const txt = el.textContent.toUpperCase(), ok = (c) => /[A-ZÅÄÖ]/.test(c) && !used.has(c);
+    const ch = txt.split(/[^A-ZÅÄÖ]+/).map((w) => w[0]).find((c) => c && ok(c)) || [...txt].find(ok);
+    if (!ch) continue;
+    used.add(ch); el.dataset.key = ch; el.insertAdjacentHTML('beforeend', ` <kbd>${ch}</kbd>`);
+  }
+  [...dlg.querySelectorAll('[data-tab]')].slice(0, 9).forEach((t, i) => { if (t.dataset.key) return; t.dataset.key = String(i + 1); t.insertAdjacentHTML('beforeend', ` <kbd>${i + 1}</kbd>`); });
+}
+// Tangenter i en öppen dialog: bokstaven på knappen, siffran på fliken, Enter = den gröna knappen (om den är ensam),
+// Esc = stäng. Samma bokstav som öppnade dialogen stänger den igen (main.js sätter data-hotkey).
+const typingNow = () => /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '') || !!document.activeElement?.isContentEditable;
+window.addEventListener('keydown', (e) => {
+  if (!modalOpen() || e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
+  const m = $('#modal');
+  let el = null;
+  if (e.key === 'Escape') el = m.querySelector('[data-close]');
+  else if (typingNow()) return;
+  else if (e.key === 'Enter') { const go = [...m.querySelectorAll('.dlg-foot .btn-go:not(:disabled)')]; if (go.length === 1) el = go[0]; }
+  else if (e.key.length === 1) {
+    const k = e.key.toUpperCase();
+    el = [...m.querySelectorAll('[data-key]')].find((b) => b.dataset.key === k && !b.disabled) || null;
+    if (!el && m.dataset.hotkey === k) el = m.querySelector('[data-close]');
+  }
+  if (!el) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  el.click();
+}, true);
 export const modalOpen = () => !$('#modal').classList.contains('hidden');
 
 // ---------- HUD ----------
 export function renderHud(game, h, room = null) {
   const li = game.levelInfo();
+  const kb = (n) => (h.keys?.[n] ? ` <kbd>${h.keys[n]}</kbd>` : '');   // tangenten som öppnar samma sak (main.js)
   $('#hud').innerHTML = `
     <div class="chip money">💰 ${fmt(game.money)} kr</div>
     <div class="chip" title="${li.next ? `Nästa år: ${esc(li.next.title)}` : 'Nutid!'}">📅 ${li.year ?? li.level} <small style="font-family:var(--font);font-size:15px">${esc(li.era?.title || li.title)}</small> <span class="xpbar"><i style="width:${Math.round(li.frac * 100)}%"></i></span></div>
@@ -111,13 +147,14 @@ export function renderHud(game, h, room = null) {
     ${(game.activeEvents || []).length ? `<button class="chip news-chip" data-h="news" title="Pågående händelser">📰 ${esc(game.activeEvents[0].ev.title)}${game.activeEvents.length > 1 ? ` +${game.activeEvents.length - 1}` : ''}</button>` : ''}
     ${room ? `<button class="chip room-chip" data-h="room" title="Rummet – koden och spelarna">👥 ${esc(room.code)} · ${room.count}</button><button class="btn" data-h="chat" title="Chatta (Enter)">💬</button>` : ''}
     <div class="hud-spacer"></div>
-    ${game.shop.fit ? '<button class="btn" data-h="fit" title="Bås, hyllor, inredning och lokal">🏪 Butiken</button>' : ''}
-    ${game.hasArcadeRoom ? '<button class="btn" data-h="arcade" title="Arkadrummet – gå in och spela">🕹️ Arkad</button>' : ''}
-    ${game.shop.models ? '<button class="btn" data-h="models" title="Egna datormodeller – lansera, recenseras, sälj">🧩 Modeller</button>' : ''}
-    ${game.shop.staff ? `<button class="btn" data-h="staff" title="Personal – tekniker och säljare">👥 Personal${game.staff?.length ? ` ${game.staff.length}` : ''}</button>` : ''}
-    <button class="btn" data-h="stock" title="Förråd och skyltning">📦 Lager</button>
-    <button class="btn" data-h="shop">🛒 Grossist</button>
-    ${game.shop.fit ? `<button class="btn" data-h="view3d" title="${h.is3d ? 'Tillbaka till 2D-vyn' : 'Gå in i butiken i 3D'}">${h.is3d ? '🗺️ 2D' : '🧊 3D'}</button>` : ''}
+    ${game.shop.fit ? '<button class="btn" data-h="fit" title="Bås, hyllor, inredning och lokal">🏪 Butiken' + kb('fit') + '</button>' : ''}
+    ${game.hasArcadeRoom ? '<button class="btn" data-h="arcade" title="Arkadrummet – gå in och spela">🕹️ Arkad' + kb('arcade') + '</button>' : ''}
+    ${game.shop.models ? '<button class="btn" data-h="models" title="Egna datormodeller – lansera, recenseras, sälj">🧩 Modeller' + kb('models') + '</button>' : ''}
+    ${game.shop.staff ? `<button class="btn" data-h="staff" title="Personal – tekniker och säljare">👥 Personal${game.staff?.length ? ` ${game.staff.length}` : ''}${kb('staff')}</button>` : ''}
+    <button class="btn" data-h="stock" title="Förråd och skyltning">📦 Lager${kb('stock')}</button>
+    <button class="btn" data-h="shop">🛒 Grossist${kb('shop')}</button>
+    ${game.shop.fit ? `<button class="btn" data-h="view3d" title="${h.is3d ? 'Tillbaka till 2D-vyn' : 'Gå in i butiken i 3D'}">${h.is3d ? '🗺️ 2D' : '🧊 3D'}${kb('view3d')}</button>` : ''}
+    ${h.quick ? `<button class="btn hud-quick" data-h="quick" title="Snabbmenyn – allt går att nå med tangenterna">📋 Meny${kb('quick')}</button>` : ''}
     <button class="btn" data-h="menu" title="Meny – byt startår eller butik">☰</button>`;
   $('#hud').querySelectorAll('[data-h]').forEach((b) => (b.onclick = () => h[b.dataset.h]()));
 }
@@ -131,9 +168,9 @@ export function renderOrders(game, onBuild, players = []) {
     const n = o.build ? Object.keys(o.build.placed).length : 0;
     const f = c && isFinite(c.patienceMax) ? Math.max(0, c.patience / c.patienceMax) : 1;
     const builders = players.filter((p) => p.away === 'workshop' && p.orderId === o.id);
-    const who = builders.length ? ` · 🔧 ${builders.map((p) => `<i style="color:${esc(p.color || '#555')};font-style:normal">■</i>${esc(p.name)}`).join(' ')}` : '';
+    const who = builders.length ? ` · ${game.shop.text?.buildIcon || '🔧'} ${builders.map((p) => `<i style="color:${esc(p.color || '#555')};font-style:normal">■</i>${esc(p.name)}`).join(' ')}` : '';
     const st = o.staff ? (game.staff || []).find((x) => x.id === o.staff) : null;
-    const who2 = st ? ` · ${o.repair ? '🔍' : '🔧'} ${esc(st.name.split(' ')[0])} ${Math.round((st.progress || 0) * 100)} %` : '';
+    const who2 = st ? ` · ${o.repair ? '🔍' : (game.shop.text?.buildIcon || '🔧')} ${esc(st.name.split(' ')[0])} ${Math.round((st.progress || 0) * 100)} %` : '';
     cards.push({ o, c, html: `<div><b>${esc(o.title)}</b><small>${esc(o.name)} · ${n}/${o.items.length} delar${who}${who2}</small>
       <div class="pbar ${f < 0.35 ? 'low' : ''}"><i style="width:${Math.round(f * 100)}%"></i></div></div>
       <button class="btn btn-go btn-small" ${o.service && o.serviceT != null ? 'disabled' : ''}>${o.service ? (o.serviceT != null ? `⏳ ${Math.round(o.serviceT / (game.serviceOf(o)?.time || 1) * 100)} %` : st ? '👀 Ta över' : '🛠️ Utför') : st ? '👀 Ta över' : o.repair ? (game.shop.text?.repairBtn || '🔍 Laga') : (game.shop.text?.buildBtn || '🔧 Bygg')}</button>` });
@@ -150,11 +187,12 @@ export function renderOrders(game, onBuild, players = []) {
   if (front?.phase === 'queue' && !game.orders.length) {
     box.insertAdjacentHTML('beforeend', `<div class="ocard" style="grid-template-columns:1fr"><div><b>👆 En kund väntar!</b><small>Tryck på kunden med ❗ vid disken för att ta beställningen.</small></div></div>`);
   }
-  for (const { o, c, html } of cards) {
+  for (const [ix, { o, c, html }] of cards.entries()) {
     const el = document.createElement('div'); el.className = 'ocard';
     el.append(portrait(c?.look || game.customers[0]?.look || {}));
     el.insertAdjacentHTML('beforeend', html);
-    el.querySelector('button').onclick = () => onBuild(o);
+    const bt = el.querySelector('button'); bt.onclick = () => onBuild(o);
+    if (ix < 9) bt.insertAdjacentHTML('beforeend', ` <kbd>${ix + 1}</kbd>`);   // siffran öppnar beställningen (main.js)
     box.append(el);
   }
 }

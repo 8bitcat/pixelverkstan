@@ -195,6 +195,7 @@ export class Shop3D {
     if (!this.ready || !this.bench || !this.room?.bench) return false;
     if (this.mode !== 'bench') {
       this.mode = 'bench';
+      if (this.locked || this.relock) { this.relockBench = true; this.relock = false; }
       if (this.locked) document.exitPointerLock?.();
       this.keys.clear(); this.hover = null; this.canvas.style.cursor = 'default';
       $('#hud3d')?.classList.add('hidden');
@@ -212,6 +213,7 @@ export class Shop3D {
     if (!this.ready || !this.bench || !this.room?.bench) return false;
     if (!this.kitchen) {
       this.kitchen = true;
+      if (this.locked || this.relock) { this.relockBench = true; this.relock = false; }
       if (this.locked) document.exitPointerLock?.();
       this.keys.clear(); this.hover = null; this.canvas.style.cursor = 'default';
       document.body.classList.add('bench3d', 'kitchen3d');
@@ -272,7 +274,10 @@ export class Shop3D {
     } catch (e) { console.warn('förvärmning av bänken misslyckades', e); }
     this.warmDone = true;
   }
+  // musen låses (igen) – får webbläsaren för sig att neka visas bara den vanliga "klicka i bilden"-raden
+  lock() { if (!this.active || this.locked) return; try { const p = this.canvas.requestPointerLock?.(); p?.catch?.(() => {}); } catch { /* nekad */ } }
   leaveBench() {
+    if (this.relockBench) { this.relockBench = false; this.relock = true; this.shutT = 0; }   // tillbaka i butiken: musen låses igen
     if (this.kitchen) {
       this.kitchen = false;
       this.bench.detach();
@@ -373,7 +378,7 @@ export class Shop3D {
     const el = $('#hint3d'); if (!el) return;
     if (text !== null) { el.textContent = text; el.classList.toggle('hidden', !text); return; }
     if (this.kitchen) { el.textContent = '🍔 Köket: dra i bilden för att titta · klicka på stationerna och brickan · W A S D går'; el.classList.remove('hidden'); return; }
-    el.textContent = this.locked ? '' : 'Klicka i bilden för att styra · W A S D går · musen tittar (eller dra i bilden) · piltangenter går och vänder · klicka på kunder, montrar och lådor · ' + (this.game?.shop.text?.hint3d || 'bygg vid arbetsbänken bakom disken') + ' · Esc släpper musen · Q byter grafikkvalitet';
+    el.textContent = this.locked ? '' : 'Klicka i bilden för att styra · W A S D går · musen tittar (eller dra i bilden) · piltangenter går och vänder · klicka på kunder, montrar och lådor · ' + (this.game?.shop.text?.hint3d || 'bygg vid arbetsbänken bakom disken') + ' · M öppnar menyn – alla knappar har en bokstav (G grossist, L lager, B butiken …) och telefonen på disken öppnar samma meny · Q byter grafikkvalitet';
     el.classList.toggle('hidden', this.locked);
   }
 
@@ -520,6 +525,7 @@ export class Shop3D {
     const far = h.dist > REACH ? ' (gå närmare)' : '';
     if (h.type === 'customer') return (this.floor.clickable(h.c) ? `${h.c.name} vill beställa – klicka för att ta emot` : `${h.c.name}${h.c.phase === 'waiting' ? ` väntar på sin ${this.game.shop.text?.thing || 'dator'}` : h.c.phase === 'ready' ? ` hämtar sin ${this.game.shop.text?.thing || 'dator'}` : h.c.phase === 'eating' ? ' äter' : ''}`) + far;
     if (h.type === 'box') return 'Leverans från grossisten – klicka för att packa upp' + far;
+    if (h.type === 'phone') return 'Telefonen – grossist, lager, butiken och resten av menyerna (eller tryck M)' + far;
     if (h.type === 'workshop') return this.game.shop.text?.workshopHover || 'Verkstaden – datorerna byggs på arbetsbänken bakom disken';
     if (h.type === 'bench') { const n = (this.game.orders || []).filter((o) => !o.service).length; const T = this.game.shop.text || {}; return (n ? `${T.benchName || 'Arbetsbänken'} – klicka för att ${T.benchVerb || 'bygga'} (${n} ${n === 1 ? 'beställning' : 'beställningar'} väntar)` : `${T.benchName || 'Arbetsbänken'} – ta emot en beställning vid disken först`) + far; }
     if (h.type === 'player') return h.p.name;
@@ -544,6 +550,7 @@ export class Shop3D {
     if (h.dist > REACH) { this.hooks.toast('Gå lite närmare.'); return; }
     if (h.type === 'customer') return this.hooks.onCustomerClick(h.c);
     if (h.type === 'box') return this.hooks.onBoxClick(h.d);
+    if (h.type === 'phone') return this.hooks.onMenu?.();
     if (h.type === 'unit') return this.hooks.onShowcaseClick(h.what);
     if (h.type === 'workshop') return this.hooks.toast(this.game.shop.text?.workshopToast || 'Datorerna byggs på arbetsbänken bakom disken – gå dit och klicka.');
     if (h.type === 'bench') return this.hooks.onBench?.();
@@ -557,7 +564,11 @@ export class Shop3D {
     fl.refreshStock();
     if (fl.lokal !== this.lokal || fl.fitSig !== this.fitSig || this.game.year !== this.year) this.rebuildAll();
     else if (fl.sig !== this.sig) { this.sig = fl.sig; this.units.rebuild(); this.envDirty = true; this.envT = 0; }
-    if (this.hooks.modalOpen() && this.locked) document.exitPointerLock?.();
+    // en dialog släpper musen – och när den stängs låses musen igen av sig själv (ingen Esc, inget extra klick)
+    const mo = this.hooks.modalOpen();
+    if (mo && this.locked) { this.relock = true; document.exitPointerLock?.(); }
+    if (mo) this.shutT = 0;
+    else if (this.relock && !this.kitchen) { this.shutT = (this.shutT || 0) + dt; if (this.shutT > 0.12) { this.relock = false; this.lock(); } }
     this.move(dt);
     this.syncLocal();
     this.room.update(dt, fl);

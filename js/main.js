@@ -27,6 +27,7 @@ const hooks3d = {
   onBoxClick: (d) => floor?.onBoxClick?.(d),
   onStaff: () => UI.openStaff(game),
   onBench: () => benchMenu(),
+  onMenu: () => openQuickMenu('phone'),   // telefonen på disken
   onServe: (order, info) => serveOrder(order, info),   // brickan lämnades till kunden, på bordet eller på disken (js/3d/carry.js)
   openOrderId: () => build?.order?.id ?? null,
   modalOpen: () => UI.modalOpen(),
@@ -393,11 +394,58 @@ function benchMenu() {
   if (!list.length) return UI.toast(game.shop.text?.noBuilds || 'Inga datorer att bygga just nu – ta emot en kund vid disken först.', '');
   if (list.length === 1) return openBuild(list[0]);
   const body = `<p style="font-size:19px;margin-top:0">${esc(game.shop.text?.whichBuild || 'Vilken dator vill du bygga?')}</p><div class="plist">${list.map((o) => `<button class="shop-opt" data-order="${o.id}"><b>${o.repair ? '🔧 ' : ''}${esc(o.title)}</b><small>åt ${esc(o.name)}${o.repair ? ' · reparation' : ''}</small></button>`).join('')}</div>`;
-  const dlg = UI.openModal('🔧 Arbetsbänken', body, [{ label: 'Stäng', onClick: UI.closeModal }]);
+  const dlg = UI.openModal(`${game.shop.text?.buildIcon || '🔧'} ${game.shop.text?.benchName || 'Arbetsbänken'}`, body, [{ label: 'Stäng', onClick: UI.closeModal }]);
   dlg.querySelectorAll('[data-order]').forEach((b) => (b.onclick = () => { UI.closeModal(); const o = game.orders.find((x) => String(x.id) === b.dataset.order); if (o) openBuild(o); }));
 }
 
+// ---------- Genvägar ----------
+// Varje HUD-knapp har en bokstav, M öppnar snabbmenyn med allt samlat och siffrorna öppnar beställningarna.
+// I 3D-läget släpps musen av sig själv när en dialog öppnas och låses igen när den stängs (js/3d/shop3d.js) –
+// man behöver aldrig trycka Esc för att komma åt knapparna.
+const HOT = [
+  { code: 'KeyG', k: 'G', h: 'shop' }, { code: 'KeyL', k: 'L', h: 'stock' }, { code: 'KeyB', k: 'B', h: 'fit' },
+  { code: 'KeyP', k: 'P', h: 'staff' }, { code: 'KeyO', k: 'O', h: 'models' }, { code: 'KeyK', k: 'K', h: 'arcade' },
+  { code: 'KeyN', k: 'N', h: 'news' }, { code: 'KeyR', k: 'R', h: 'room' }, { code: 'KeyV', k: 'V', h: 'view3d' },
+  { code: 'KeyM', k: 'M', h: 'quick' },
+];
+const hotAvailable = (h) => !!game && !!({ shop: true, stock: true, quick: true, fit: game.shop.fit, staff: game.shop.staff, models: game.shop.models, arcade: game.hasArcadeRoom, news: (game.activeEvents || []).length, room: coop, view3d: game.shop.fit }[h]);
+function openQuickMenu(from = 'key') {
+  const T = game.shop.text || {};
+  const rows = [
+    ['shop', '🛒 Grossist', 'Beställ hem varor'], ['stock', '📦 Lager', 'Förråd och skyltning'], ['fit', '🏪 Butiken', 'Inredning, utrustning och lokal'],
+    ['staff', '👥 Personal', 'Anställ, kurser och löner'], ['models', '🧩 Modeller', 'Egna modeller'], ['arcade', '🕹️ Arkad', 'Gå in och spela'],
+    ['news', '📰 Händelser', 'Det som pågår just nu'], ['room', '👥 Rummet', 'Koden och spelarna'], ['view3d', is3d() ? '🗺️ 2D-vyn' : '🧊 3D-vyn', is3d() ? 'Tillbaka till kartan' : 'Gå in i butiken'],
+  ].filter(([h]) => hotAvailable(h));
+  const key = (h) => HOT.find((x) => x.h === h).k;
+  const orders = game.orders.filter((o) => !(o.service && o.serviceT != null)).slice(0, 9);
+  const body = `<div class="quickmenu">
+    ${rows.map(([h, label, sub]) => `<button class="btn" data-key="${key(h)}" data-q="${h}"><span>${label} <kbd>${key(h)}</kbd></span><small>${esc(sub)}</small></button>`).join('')}
+    ${orders.length ? `<h3>${esc(T.ordersTitle || 'Beställningar')}</h3>` + orders.map((o, i) => `<button class="btn btn-go" data-key="${i + 1}" data-order="${o.id}"><span>${esc(o.title)} <kbd>${i + 1}</kbd></span><small>åt ${esc(o.name)}</small></button>`).join('') : ''}
+    <h3>Övrigt</h3>
+    <button class="btn" data-key="H" data-q="menu"><span>☰ Huvudmenyn <kbd>H</kbd></span><small>Byt startår eller verksamhet (spelet sparas)</small></button>
+  </div>
+  <p style="margin:12px 0 0;font-size:16px;opacity:.8">Bokstäverna fungerar direkt i butiken också – menyn behöver inte vara öppen. ${is3d() ? 'Musen släpps när en ruta öppnas och låses igen när den stängs.' : ''}</p>`;
+  const dlg = UI.openModal(from === 'phone' ? '📞 Telefonen' : '📋 Meny', body, [{ label: 'Stäng', onClick: UI.closeModal }]);
+  $('#modal').dataset.hotkey = 'M';
+  dlg.querySelectorAll('[data-q]').forEach((b) => (b.onclick = () => { UI.closeModal(); const h = b.dataset.q; hudHandlers[h](); if (UI.modalOpen() && h !== 'menu') $('#modal').dataset.hotkey = key(h); }));
+  dlg.querySelectorAll('[data-order]').forEach((b) => (b.onclick = () => { UI.closeModal(); const o = game.orders.find((x) => String(x.id) === b.dataset.order); if (o) openBuild(o); }));
+}
+document.addEventListener('keydown', (e) => {
+  if (!game || screen !== 'shop' || UI.modalOpen() || UI.chatBarOpen() || e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
+  if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return;
+  if (view3d?.active && (view3d.kitchen || view3d.mode === 'bench')) return;
+  const d = /^Digit([1-9])$/.exec(e.code);
+  if (d) { const b = document.querySelectorAll('#orders .ocard button')[+d[1] - 1]; if (b && !b.disabled) { e.preventDefault(); b.click(); } return; }
+  const hot = HOT.find((x) => x.code === e.code);
+  if (!hot || !hotAvailable(hot.h)) return;
+  e.preventDefault();
+  hudHandlers[hot.h]();
+  if (UI.modalOpen()) $('#modal').dataset.hotkey = hot.k;
+});
+
 const hudHandlers = {
+  keys: Object.fromEntries(HOT.map((x) => [x.h, x.k])),
+  quick: () => openQuickMenu(),
   view3d: () => (is3d() ? disable3D() : enable3D()),
   get is3d() { return is3d(); },
   shop: () => UI.openShop(game),
@@ -471,9 +519,9 @@ function updateFriendBuilds() {
     if (!order) continue;
     if (friendAt.get(p.id) !== order.id) {
       friendAt.set(p.id, order.id);
-      if (!(screen === 'build' && build.order === order)) UI.toast(`🔧 ${p.name} började bygga ${order.title.toLowerCase()} – tryck på Bygg med för att hjälpa till!`, 'good');
+      if (!(screen === 'build' && build.order === order)) UI.toast(`${game.shop.text?.buildIcon || '🔧'} ${p.name} började ${game.shop.text?.benchVerb || 'bygga'} ${order.title.toLowerCase()} – tryck på ${game.shop.text?.joinBtn || 'Bygg med'} för att hjälpa till!`, 'good');
     }
-    const g = groups.get(order.id) || { order, names: [], color: p.color, mine: screen === 'build' && build.order === order };
+    const g = groups.get(order.id) || { order, names: [], color: p.color, text: game.shop.text, mine: screen === 'build' && build.order === order };
     g.names.push(p.name);
     groups.set(order.id, g);
   }
