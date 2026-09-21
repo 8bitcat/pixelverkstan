@@ -262,6 +262,7 @@ function setupGame(shopModule, opts) {
   });
   game.on((type, data) => {
     if (type === 'change' || type === 'fit') { hudDirty = true; queueRefresh(); }
+    if (type === 'seats') { hudDirty = true; queueRefresh(); }   // någon satte sig eller gick: platsräknaren och en öppen beställningsdialog
     if (coop instanceof CoopHost && coop.onGameEvent(type, data) === false) return;
     if (type === 'toast') UI.toast(data.text, data.kind);
     if (type === 'levelup') setTimeout(() => UI.showLevelUp(game, data), 900);

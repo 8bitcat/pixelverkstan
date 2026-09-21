@@ -70,6 +70,8 @@ export class Floor {
     const lokal = F ? F.lokalOf(fit) : 3;
     // lokalens planlösning: platser, möbler, hinder och gångnät
     LY.setPlan(lokal, shop.floorPlans || null); WK.rebuild();
+    for (const c of this.game.customers) { c._res = undefined; }   // ny planlösning: stolarna delas ut på nytt
+    this.game.seatInfo = shop.dineIn ? () => this.seatInfo() : null;   // spelet frågar golvet om det finns en ledig stol
     const open = LY.SLOTS.length;
     this.lokal = lokal; this.openSlots = open;
     this.fitSig = JSON.stringify(fit);
@@ -159,6 +161,7 @@ export class Floor {
     if (!this.mirror) for (const c of [...g.customers]) this.moveCustomer(c, dt);
     else this.followCustomers(dt);
     for (const pl of this.players) this.movePlayer(pl, dt);
+    this.watchSeats(dt);
     for (const v of this.vans) { v.t += dt; if (v.stop > 0 && Math.abs(v.x - LY.DOOR.cx + 15) < 3) { v.stop -= dt; } else v.x += v.v * dt; }
     this.vans = this.vans.filter((v) => v.x < SC.STREET_W + 40);
     this.updateStreet(dt);
@@ -237,10 +240,26 @@ export class Floor {
     return cand[cand.length - 1][0];
   }
 
-  // ledig stol vid ett matbord (restaurangen)
+  // ---------- Sittplatser (restaurangen): borden begränsar hur många gäster man kan ha ----------
+  // En gäst får sin stol när beställningen tas emot och behåller den tills hen ätit klart – även medan
+  // hen hämtar maten vid luckan. Är alla stolar upptagna kan ingen ny beställning tas emot: kön växer,
+  // de som väntar tröttnar, och blir kön full kommer inga nya kunder. Fler bord = större lokal.
+  seatSpots() { const out = []; LY.SPOTS.forEach((s, i) => { if (s.kind === 'seat' && s.table !== undefined) out.push(i); }); return out; }
+  seatsTaken(except = null) {
+    const out = new Set();
+    for (const x of this.game.customers) {
+      if (x === except || !['waiting', 'ready', 'eating'].includes(x.phase)) continue;
+      const i = x._res >= 0 ? x._res : x._spot;
+      if (i >= 0 && LY.SPOTS[i]?.table !== undefined) out.add(i);
+    }
+    return out;
+  }
+  seatInfo() { const total = this.seatSpots().length, used = Math.min(total, this.seatsTaken().size); return { total, used, free: total - used }; }
+  // ledig stol vid ett matbord – den egna reserverade stolen i första hand
   pickSeat(c) {
     const g = this.game;
-    const used = new Set(g.customers.filter((x) => x !== c && (x.phase === 'waiting' || x.phase === 'eating') && x._spot >= 0).map((x) => x._spot));
+    if (c._res >= 0 && LY.SPOTS[c._res]?.table !== undefined) return c._res;
+    const used = this.seatsTaken(c);
     const cand = [];
     LY.SPOTS.forEach((s, i) => { if (s.kind === 'seat' && s.table !== undefined && !used.has(i)) cand.push(i); });
     return cand.length ? cand[Math.floor(Math.random() * cand.length)] : -1;
@@ -267,6 +286,8 @@ export class Floor {
       return { x: LY.QUEUE[i][0], y: LY.QUEUE[i][1], dir: 'up', key: 'q' + i };
     }
     if (c.phase === 'waiting') {
+      // restaurangen: gästen sätter sig på sin reserverade stol och väntar på maten där
+      if (g.shop.dineIn && !(c._res >= 0)) { const s = this.pickSeat(c); if (s >= 0) { c._res = s; c._spot = s; } }
       if (c._spot === undefined || c._spot === null) { c._spot = this.pickSpot(c); c._stay = 12 + Math.random() * 14; }
       if (c._spot < 0) { const o = OVERFLOW[c.id % OVERFLOW.length]; return { x: o[0], y: o[1], dir: 'down', key: 'o' + c.id }; }
       const s = LY.SPOTS[c._spot];
@@ -352,6 +373,16 @@ export class Floor {
       const i = g.customers.indexOf(c);
       if (i >= 0) g.customers.splice(i, 1);
     }
+  }
+
+  // säg till när antalet upptagna stolar ändras (HUD:ens platsräknare)
+  watchSeats(dt) {
+    if (!this.game.shop.dineIn) return;
+    this.seatT = (this.seatT || 0) - dt;
+    if (this.seatT > 0) return;
+    this.seatT = 0.5;
+    const i = this.seatInfo(), sig = i.used + '/' + i.total;
+    if (sig !== this.seatSig) { this.seatSig = sig; this.game.emit('seats', i); }
   }
 
   updateKeeper(dt) {

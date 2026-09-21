@@ -22,9 +22,9 @@ export const PLANS = {
   // Hörnrestaurangen: sittbås längs högerväggen
   4: { name: 'Hörnrestaurangen', style: 'glass', slots: [...LEFT, ...BOTTOM, S(7, 466, 506, 254), S(8, 356, 396, 254)], tables: [T(176, 262), T(176, 340), T(240, 262), T(240, 340), T(360, 320, true), T(360, 400, true), T(424, 320, true), T(424, 400, true)], plants: PLANTS, extraPlants: EXTRA },
   // Burgarpalatset
-  5: { name: 'Burgarpalatset', style: 'led', slots: [...LEFT, ...BOTTOM, S(7, 466, 506, 254), S(8, 356, 396, 254), S(9, 466, 506, 380)], tables: [T(176, 262), T(176, 340), T(240, 262), T(240, 340), T(176, 418), T(240, 418), T(360, 320, true), T(360, 400, true)], plants: PLANTS, extraPlants: EXTRA },
+  5: { name: 'Burgarpalatset', style: 'led', slots: [...LEFT, ...BOTTOM, S(7, 466, 506, 254), S(8, 356, 396, 254), S(9, 466, 506, 380)], tables: [T(176, 262), T(176, 340), T(240, 262), T(240, 340), T(176, 418), T(240, 418), T(304, 340), T(360, 320, true), T(360, 400, true)], plants: PLANTS, extraPlants: EXTRA },
   // Megaburger: ö-monter mitt i rummet och bord runt om
-  6: { name: 'Megaburger', style: 'led', slots: [...LEFT, ...BOTTOM, S(7, 466, 506, 254), S(8, 356, 396, 254), S(9, 466, 506, 380), S(10, 148, 280, 236)], tables: [T(176, 300), T(240, 300), T(176, 378), T(240, 378), T(360, 320, true), T(360, 400, true), T(424, 320, true)], plants: PLANTS, extraPlants: EXTRA },
+  6: { name: 'Megaburger', style: 'led', slots: [...LEFT, ...BOTTOM, S(7, 466, 506, 254), S(8, 356, 396, 254), S(9, 466, 506, 380), S(10, 148, 280, 236)], tables: [T(176, 300), T(240, 300), T(176, 378), T(240, 378), T(304, 300), T(304, 378), T(360, 320, true), T(360, 400, true), T(424, 320, true), T(420, 400, true)], plants: PLANTS, extraPlants: EXTRA },
 };
 // luckan (utlämning) ovanpå kyldisken till vänster, kassan till höger – i alla lokaler
 for (const p of Object.values(PLANS)) p.pickupLeft = true;

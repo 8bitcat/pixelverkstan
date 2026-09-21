@@ -141,6 +141,7 @@ function tickSaljare(game, s, dt) {
     return true;
   }
   if (game.missingFor(o).length || game.missingChoices(o).length) return false;   // spelaren får köpa in
+  if (!o.product && game.seatsFull) return false;   // restaurangen: inget ledigt bord
   // merförsäljning: ett grafikkort ur lagret om beställningen saknar ett
   if (!o.product && !o.repair && !o.items.some((it) => it.cat === 'gpu') && Math.random() < 0.12 * s.stats.salj) {
     const others = o.items.filter((it) => it.part).map((it) => game.shop.part[it.part]).filter(Boolean);

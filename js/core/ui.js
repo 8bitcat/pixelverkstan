@@ -106,6 +106,7 @@ export function renderHud(game, h, room = null) {
     <div class="chip money">💰 ${fmt(game.money)} kr</div>
     <div class="chip" title="${li.next ? `Nästa år: ${esc(li.next.title)}` : 'Nutid!'}">📅 ${li.year ?? li.level} <small style="font-family:var(--font);font-size:15px">${esc(li.era?.title || li.title)}</small> <span class="xpbar"><i style="width:${Math.round(li.frac * 100)}%"></i></span></div>
     <div class="chip">😊 ${game.stats.served}</div>
+    ${game.shop.dineIn && game.seatInfo ? (() => { const s = game.seatInfo(); return `<button class="chip fit-chip" data-h="fit" style="${s.free <= 0 ? 'background:#e23b5a;color:#fff' : ''}" title="Sittplatser: ${s.used} av ${s.total} upptagna. Fulla bord ger kö – bygg ut under Butiken, Lokal.">🪑 ${s.used}/${s.total}</button>`; })() : ''}
     ${game.shop.fit ? `<button class="chip fit-chip" data-h="fit" title="Butiken: dragningskraft, trivsel och rykte">🪧${game.fitStats.drag} 😊${game.fitStats.trivsel} ⭐${game.rykte}</button>` : ''}
     ${(game.activeEvents || []).length ? `<button class="chip news-chip" data-h="news" title="Pågående händelser">📰 ${esc(game.activeEvents[0].ev.title)}${game.activeEvents.length > 1 ? ` +${game.activeEvents.length - 1}` : ''}</button>` : ''}
     ${room ? `<button class="chip room-chip" data-h="room" title="Rummet – koden och spelarna">👥 ${esc(room.code)} · ${room.count}</button><button class="btn" data-h="chat" title="Chatta (Enter)">💬</button>` : ''}
@@ -195,8 +196,10 @@ export function openOrderDialog(game, c, h) {
     if (repair) rows = o.items.map((it) => { const p = shop.part[it.part]; return p ? `<div class="prow"><span data-icon="${p.id}"></span><div><div class="nm">${esc(p.name)}</div><div class="sp">${esc(shop.cats[p.cat].name)} · ${esc(shop.specLine(p))}</div></div><div class="st">kundens</div></div>` : ''; }).join('');
     const gone = game.hasGone(o) || miss.some((m) => !game.onSale(shop.part[m.id]));
     const waiting = miss.length && !toBuy.length && !gone && !locked.length;
+    const full = !o.product && game.seatsFull, seats = full ? game.seatInfo() : null;
     let tip = '';
-    if (o.tutorial === 0) tip = '💡 Allt kunden vill ha finns i lagret (✓). Tryck på <b>Ta emot beställningen</b>.';
+    if (full) tip = `🪑 Alla ${seats.total} platser är upptagna. ${esc(c.name)} väntar i kön tills någon ätit klart. Blir kön full kommer inga nya kunder – bygg ut med fler bord under 🏪 Butiken → Lokal.`;
+    else if (o.tutorial === 0) tip = '💡 Allt kunden vill ha finns i lagret (✓). Tryck på <b>Ta emot beställningen</b>.';
     else if (o.tutorial !== undefined && toBuy.length) tip = '💡 Grafikkortet finns inte i lagret! Köp in det från grossisten – det kommer i en låda som du packar upp.';
     else if (gone) tip = '🛑 En del i beställningen säljs inte längre och går inte att köpa in. Tacka nej till kunden – nya kunder kommer snart.';
     else if (locked.length) tip = `🔒 Kunden vill ha något finare än butiken får sälja (${esc([...new Set(locked)].join(', '))}). Tacka nej – önskemålet hamnar på efterfrågantavlan i 🏪 Butiken.`;
@@ -224,7 +227,7 @@ export function openOrderDialog(game, c, h) {
       { label: `🛒 Köp in det som saknas (${fmt(buyCost)} kr)`, cls: 'btn-gold', hidden: !toBuy.length, disabled: buyCost > game.money,
         onClick: () => { act('buyMissing', { customerId: c.id }); render(); } },
       { label: '🛒 Till grossisten', hidden: !missChoice.length, onClick: () => h.onShop(missChoice[0], () => openOrderDialog(game, c, h)) },
-      { label: gone ? '🛑 Går inte att bygga' : locked.length ? '🔒 Får inte säljas' : waiting ? '🚚 Väntar på lådan …' : prod ? `💰 Sälj för ${fmt(price)} kr` : svc ? (canSvc ? '🛠️ Ta emot jobbet' : '🔒 Saknar utrustning') : repair ? '🔧 Ta emot jobbet' : '✓ Ta emot beställningen', cls: 'btn-go', disabled: miss.length || missChoice.length || (svc && !canSvc), onClick: () => { closeModal(); h.onAccept(c); } },
+      { label: gone ? '🛑 Går inte att bygga' : locked.length ? '🔒 Får inte säljas' : waiting ? '🚚 Väntar på lådan …' : prod ? `💰 Sälj för ${fmt(price)} kr` : svc ? (canSvc ? '🛠️ Ta emot jobbet' : '🔒 Saknar utrustning') : repair ? '🔧 Ta emot jobbet' : full ? '🪑 Inget ledigt bord' : '✓ Ta emot beställningen', cls: 'btn-go', disabled: miss.length || missChoice.length || (svc && !canSvc) || full, onClick: () => { closeModal(); h.onAccept(c); } },
     ];
     const dlg = openModal(`Ny kund: ${esc(c.name)}`, body, buttons);
     dlg.querySelector('[data-face]').replaceWith(portrait(c.look));

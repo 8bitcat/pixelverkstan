@@ -53,11 +53,11 @@ export const ITEMS = [
   { id: 'ac', name: 'Luftkonditionering', icon: '❄️', group: 'trivsel', year: 1990, cost: 1500, trivsel: 2, desc: 'Svalt även när grillen går för fullt.' },
   { id: 'kassa2', name: 'Extra kassa', icon: '🧾', group: 'trivsel', year: 1965, cost: 1200, queue: 1, desc: 'Plats för en kund till i kön.' },
   // lokalen: alla börjar i Korvkiosken och jobbar sig upp genom sex lokaler
-  { id: 'lokal2', name: 'Gatuköket', icon: '🧹', group: 'lokal', year: 1955, cost: 2000, lokal: 2, desc: 'Ta bort bräderna, skura grillen, måla. Enkelt – men en plats till.' },
-  { id: 'lokal3', name: 'Kvartersbaren', icon: '🏗️', group: 'lokal', year: 1955, cost: 5000, lokal: 3, needs: 'lokal2', desc: 'Nytt golv, bås och ordentlig belysning.' },
-  { id: 'lokal4', name: 'Hörnrestaurangen', icon: '🏪', group: 'lokal', year: 1955, cost: 10000, lokal: 4, needs: 'lokal3', desc: 'Fönster åt två håll, fler bås, fler spotlights.' },
-  { id: 'lokal5', name: 'Burgarpalatset', icon: '🏢', group: 'lokal', year: 1955, cost: 20000, lokal: 5, needs: 'lokal4', desc: 'Hela huset: tio platser och stengolv.' },
-  { id: 'lokal6', name: 'Megaburger', icon: '🏬', group: 'lokal', year: 1970, cost: 45000, lokal: 6, needs: 'lokal5', drag: 4, rykte: 2, desc: 'Drive-in, neon och ljus överallt. Kunderna kommer från hela stan.' },
+  { id: 'lokal2', name: 'Gatuköket', icon: '🧹', group: 'lokal', year: 1955, cost: 2000, lokal: 2, desc: 'Ta bort bräderna, skura grillen, måla. Fyra bord i stället för två: 8 sittplatser.' },
+  { id: 'lokal3', name: 'Kvartersbaren', icon: '🏗️', group: 'lokal', year: 1955, cost: 5000, lokal: 3, needs: 'lokal2', desc: 'Nytt golv, bås och ordentlig belysning. Sex bord: 12 sittplatser.' },
+  { id: 'lokal4', name: 'Hörnrestaurangen', icon: '🏪', group: 'lokal', year: 1955, cost: 10000, lokal: 4, needs: 'lokal3', desc: 'Fönster åt två håll, fler bås, fler spotlights. Åtta bord: 16 sittplatser.' },
+  { id: 'lokal5', name: 'Burgarpalatset', icon: '🏢', group: 'lokal', year: 1955, cost: 20000, lokal: 5, needs: 'lokal4', desc: 'Hela huset: tio platser för inredning, stengolv och nio bord – 18 sittplatser.' },
+  { id: 'lokal6', name: 'Megaburger', icon: '🏬', group: 'lokal', year: 1970, cost: 45000, lokal: 6, needs: 'lokal5', drag: 4, rykte: 2, desc: 'Drive-in, neon och ljus överallt. Kunderna kommer från hela stan. Tio bord: 20 sittplatser.' },
   // köket
   { id: 'dubbelgrill', name: 'Dubbelgrill', icon: '🔥', group: 'verkstad', year: 1975, cost: 1500, desc: 'Steker två biffar samtidigt – bygget går fortare.' },
   { id: 'fritos', name: 'Ny fritös', icon: '🍟', group: 'verkstad', year: 1955, cost: 900, desc: 'Större korgar, jämnare värme – knaprigare pommes.' },

@@ -769,7 +769,9 @@ export class Game {
       } else {
         // kunder kommer även när butiken är tom (de beställer det man får köpa in), men mer sällan
         const empty = !this.hasShown();
-        if (this.queue().length < this.maxQueue && this.orders.length < MAX_ORDERS && this.customers.length < 7 && (!empty || this.queue().length === 0)) {
+        // en större restaurang rymmer fler gäster på en gång (de som äter tar ingen plats i kön)
+        const room = this.shop.dineIn && this.seatInfo ? Math.max(7, 3 + this.seatInfo().total) : 7;
+        if (this.queue().length < this.maxQueue && this.orders.length < MAX_ORDERS && this.customers.length < room && (!empty || this.queue().length === 0)) {
           this.spawn(this.shop.generateOrder(this, FIRST_NAMES));
         }
         this.spawnTimer = (Math.max(14, 40 - this.level * 5) + Math.random() * 12) * (empty ? 1.6 : 1) * this.spawnMul;
@@ -864,9 +866,12 @@ export class Game {
   }
 
   // ---------- Beställningar ----------
+  // restaurangen: finns det en ledig stol? (golvet svarar – utan golv finns ingen gräns)
+  get seatsFull() { return !!(this.shop.dineIn && this.seatInfo && this.seatInfo().free <= 0); }
   accept(c) {
     const order = c.order;
     if (this.missingFor(order).length || this.missingChoices(order).length) return false;
+    if (!order.product && this.seatsFull) return false;   // alla bord upptagna: gästen får vänta i kön
     if (order.service && !this.canDoService(order)) return false;
     // färdiga produkter säljs direkt över disk: kunden går till utlämningen och betalar
     if (order.product) {

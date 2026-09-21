@@ -287,6 +287,13 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   block) – ingen fysikmotor. Föremålen ritas av riggen med samma voxlar som på bänken
   (`shop.carryKit(order)` → `rig.drawTrayScene(R, b, { only })`, bänkens rastercache återanvänds).
   I 2D är flödet som förr: 🍽️ Ställ på disken, brickan lyfts ur bild och kunden hämtar vid luckan.
+- **Sittplatserna är kapaciteten**: en gäst får sin stol när beställningen tas emot och behåller den tills
+  hen ätit klart – även medan hen hämtar maten vid luckan (`floor.seatInfo/seatsTaken/pickSeat`, `c._res`).
+  Är alla stolar upptagna kan ingen ny beställning tas emot (`game.seatsFull`, även för personalen): dialogen
+  säger "🪑 Inget ledigt bord", gästen står kvar i kön och tappar tålamod, och när kön är full kommer inga
+  nya kunder. HUD:en visar `🪑 upptagna/platser` (röd när det är fullt; klick öppnar Butiken). Det som
+  löser det är en större lokal: 4 → 8 → 12 → 16 → 18 → 20 platser (`floor-plans.js`), och kundtaket växer
+  med lokalen (3 + platser). `tools/restaurang-platser.mjs` testar kedjan och att varje stol går att nå.
 - **Kunden tar tuggor (3D)**: måltiden på luckan, i kundens händer och på bordet är samma voxlar som i
   köket (`rig.drawMeal(R, meal, { eaten })`, ritad ur `c.meal`), inte en förenklad tallrik. Medan gästen
   äter skärs runda tuggor ur burgaren från gästens sida – genom alla lager, så att snittytan visar bröd,
@@ -461,6 +468,7 @@ node tools/restaurang3d.mjs              # hamburgerbaren i 3D: stor burgare i 2
 node tools/restaurang-ikoner.mjs         # ritar alla ingrediensers ikoner i ark per kategori (rest-ikoner-*.png)
 node tools/restaurang-golv.mjs           # restaurangens golv genom epokerna med fyllda montrar, automater och gäster som äter (rest-golv-<år>.png)
 node tools/kok-laddtid.mjs               # hur fort köket öppnas i 2D och 3D: tid till första bild, låst sida, nya shaderprogram
+node tools/restaurang-platser.mjs        # sittplatserna som kapacitet: fulla bord → nekad beställning → kö → inga nya kunder; stolen hålls under hämtning; alla stolar nåbara i alla lokaler
 node tools/flimmer.mjs                   # 3D-bilden ska stå stilla: mäter hur mycket som ändras mellan två bildrutor och vid en halv mm kamerarörelse
 node tools/restaurang-anim.mjs           # 3D: Mixamo-klippen laddas, gäster som sitter spelar sitt-/ätklipp, den som bär spelar bärklippet (rest-anim-*.png)
 node tools/mixamo-anim.mjs [filter]      # konverterar Mixamo-animationer (Without Skin) i assets/3d/mixamo/anim/ till assets/3d/anim/*.glb + manifest
