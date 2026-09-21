@@ -338,11 +338,13 @@ export class Carry {
   // ett kastat föremål träffar en kund: rätt bricka fångas, allt annat studsar av
   hitCustomer(p) {
     if (p.vel.length() < 1.2 || p.pos.y < 0.25 || p.pos.y > 1.85) return false;
-    for (const c of this.game.customers) {
+    const o = this.game.orders.find((x) => x.id === p.orderId);
+    // den som väntar på just den här brickan prövas först (står två nära varandra ska rätt kund fånga den)
+    const list = [...this.game.customers].sort((a, b) => (b.id === o?.customerId) - (a.id === o?.customerId));
+    for (const c of list) {
       if (c.x === undefined || c.y < LY.WALL_Y) continue;
       const dx = p.pos.x - C.toX(c.x), dz = p.pos.z - C.toZ(c.y);
       if (Math.hypot(dx, dz) > 0.4) continue;
-      const o = this.game.orders.find((x) => x.id === p.orderId);
       if (p.kind === 'tray' && o?.customerId === c.id && !this.complete(p).length) { this.deliver(p, c, { direct: true, thrown: true }); return true; }
       p.vel.x *= -0.35; p.vel.z *= -0.35; p.vel.y = Math.max(p.vel.y, 0.6);
       p.pos.x = C.toX(c.x) + dx / (Math.hypot(dx, dz) || 1) * 0.42; p.pos.z = C.toZ(c.y) + dz / (Math.hypot(dx, dz) || 1) * 0.42;
