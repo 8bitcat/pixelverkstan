@@ -85,7 +85,7 @@ export class Shop3D {
     this.ready = true;
     onProgress(1);
   }
-  ctx() { const g = this.game; return { game: g, floor: this.floor, plan: LY.PLAN, lokal: this.floor.lokal, year: g.year, shop: g.shop, theme: g.shop.theme || {}, shadowMap: this.quality === 'hög' ? 4096 : 2048 }; }
+  ctx() { const g = this.game; return { game: g, floor: this.floor, plan: LY.PLAN, lokal: this.floor.lokal, year: g.year, shop: g.shop, theme: g.shop.theme || {}, shadowMap: 2048 }; }
   rebuildAll() {
     this.room?.dispose(); this.units?.dispose();
     const ctx = this.ctx();
@@ -216,6 +216,44 @@ export class Shop3D {
     }
     this.bench.attach(view, { free: true });
     return true;
+  }
+  // Förvärmer byggläget: första gången bänkens lådor ritas måste webbläsaren kompilera deras shaders,
+  // vilket fryser bilden i ett par sekunder just när man ska börja laga maten. Här byggs en liten
+  // provscen med samma material medan spelaren går runt i butiken, och kompileringen görs i bakgrunden.
+  async warmBench() {
+    if (this.warmed || !this.ready || !this.bench || !this.room?.bench) return;
+    this.warmed = true;
+    const b = this.bench;
+    try {
+      b.place(this.room.bench);
+      const vis = b.group.visible;
+      b.group.visible = true;
+      b.renderWith((R) => {
+        R.box(0, 6, 0, 6, 0, 0.5, () => 0xc8a060, 1);                        // ogenomskinligt
+        R.box(1, 5, 1, 5, 0.5, 2, () => 0xe4eef2, 2, { alpha: 0.5 });        // glas
+      });
+      if (this.renderer.compileAsync) await this.renderer.compileAsync(this.scene, this.camera);
+      else this.renderer.compile(this.scene, this.camera);
+      // en bildruta till en liten buffert (syns inte): då kompileras även skuggkartans och djuppassets
+      // program för bänkens material – de står annars för större delen av frysningen
+      const rt = new THREE.WebGLRenderTarget(8, 8), prev = this.renderer.getRenderTarget();
+      this.renderer.setRenderTarget(rt);
+      this.renderer.render(this.scene, this.camera);
+      this.renderer.setRenderTarget(prev);
+      rt.dispose();
+      // och en bildruta genom hela renderkedjan (kontaktskuggor, bloom, kantutjämning) – till en buffert,
+      // så att provlådorna aldrig syns. Djuppassens program kompileras bara den vägen.
+      const last = this.composer?.passes?.at(-1);
+      if (last) {
+        const was = last.renderToScreen;
+        last.renderToScreen = false;
+        try { this.composer.render(); } finally { last.renderToScreen = was; }
+      }
+      b.clearMeshes();
+      b.group.visible = vis;
+      b.cache = new Map();
+    } catch (e) { console.warn('förvärmning av bänken misslyckades', e); }
+    this.warmDone = true;
   }
   leaveBench() {
     if (this.kitchen) {
@@ -506,6 +544,7 @@ export class Shop3D {
     this.hoverT -= dt;
     if (this.hoverT <= 0) { this.hoverT = 0.08; this.updateHover(); }
     if (this.envDirty) { this.envT += dt; if (this.envT > 0.6) { this.bakeEnv(); this.envDirty = false; } }
+    if (!this.warmed && this.frames > 4 && !this.envDirty) this.warmBench();   // bänkens shaders i bakgrunden
     // frivilligt: sänk kvaliteten om bilden hackar
     const p = this.perf, now = performance.now();
     if (p.last) { const ft = (now - p.last) / 1000; p.warm += ft; if (p.warm > 3 && ft < 0.5) { p.t += ft; p.n++; } }

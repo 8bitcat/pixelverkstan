@@ -107,11 +107,14 @@ export class Bench3D {
     this.view = null; this.desk = null; this.origProj = null; this.center = new THREE.Vector3();
     this.U = U; this.off = new THREE.Vector3(13, 0, 12); this.pSrc = null; this.filter = null; this.ppu = PPU;
     this.stats = { boxes: 0, faces: 0, atlas: [0, 0], ms: 0, cached: 0 };
-    // byggljus: en mjuk "lampa" snett uppifrån vänster (som 2D-skuggningen antyder) – rummets
-    // lampor och bänklampan ger resten
-    const key = new THREE.DirectionalLight(0xfff6ea, 0.35);
-    key.position.set(-6, 14, 9); key.target.position.set(13, 0, 12);
-    this.group.add(key, key.target);
+    // Byggljus: en mjuk "lampa" snett uppifrån vänster (som 2D-skuggningen antyder) – rummets
+    // lampor och bänklampan ger resten. Ljuset ligger i scenen, inte i bänkgruppen, och släcks i
+    // stället för att döljas: antalet ljus ingår i shadernas nyckel, så om det kom och gick måste
+    // webbläsaren kompilera om alla material i hela butiken just när man ska börja laga maten.
+    this.key = new THREE.DirectionalLight(0xfff6ea, 0);
+    this.keyTarget = new THREE.Object3D();
+    view3d.scene.add(this.key, this.keyTarget);
+    this.key.target = this.keyTarget;
     this.mats = {
       opaque: new THREE.MeshStandardMaterial({ roughness: 0.78, metalness: 0.02, alphaTest: 0.5, side: THREE.FrontSide }),
       glass: new THREE.MeshStandardMaterial({ roughness: 0.15, metalness: 0.1, transparent: true, depthWrite: false, side: THREE.FrontSide }),
@@ -134,6 +137,11 @@ export class Bench3D {
     this.group.position.copy(this.center).sub(off);
     this.group.visible = true;
     this.camSig = '';
+    // byggljuset följer bänken (det ligger i scenen, se konstruktorn)
+    this.group.updateMatrixWorld(true);
+    this.key.position.copy(this.group.localToWorld(new THREE.Vector3(-6, 14, 9)));
+    this.keyTarget.position.copy(this.group.localToWorld(new THREE.Vector3(13, 0, 12)));
+    this.key.intensity = this.view || this.desk ? 0.35 : 0;   // lyser bara när man bygger – inte i butiken
   }
   // ---------- Byggläget (chassit på bänken) ----------
   attach(view, opts = {}) {
@@ -142,6 +150,7 @@ export class Bench3D {
     view.gl = this;
     this.free = !!opts.free;   // köket: ingen låst kamera – spelarens egen kamera används
     view.dirty = true;
+    this.key.intensity = 0.35;
     this.U = U; this.off.set(13, 0, 12); this.filter = null; this.ppu = PPU; this.rotY = -Math.PI / 4;
     this.pSrc = () => view.P;
     // byggvyns projektion går genom 3D-kameran (markeringar, uttag, kablar, pekare hamnar rätt)
@@ -180,6 +189,7 @@ export class Bench3D {
     if (this.view) { this.view.gl = null; this.view.dirty = true; if (this.origProj) this.view.P.proj = this.origProj; }
     this.view = null; this.pSrc = null;
     this.group.visible = false;
+    this.key.intensity = 0;   // släck, men låt ljuset vara kvar i scenen (shadernas nyckel)
     this.clearMeshes();
     if (this.bench?.lamp) this.bench.lamp.shadow.needsUpdate = true;
   }
@@ -321,16 +331,19 @@ export class Bench3D {
     const c = this.atlasCanvas;
     if (c.width !== AW || c.height !== AH) { c.width = AW; c.height = AH; }
     c.getContext('2d').putImageData(new ImageData(data, AW, AH), 0, 0);
-    if (!this.atlas || this.atlas.image !== c || this.atlasSize?.[0] !== AW || this.atlasSize?.[1] !== AH) {
-      this.atlas?.dispose();
+    // Texturen skapas en gång och återanvänds även när atlasen byter storlek (canvasen är densamma).
+    // Att byta textur och sätta material.needsUpdate kastar bort materialets kompilerade shader, och
+    // den måste då byggas om – det var det som fick bilden att frysa när köket öppnades.
+    if (!this.atlas) {
       this.atlas = new THREE.CanvasTexture(c);
       this.atlas.colorSpace = THREE.SRGBColorSpace; this.atlas.flipY = false;
       this.atlas.magFilter = THREE.NearestFilter; this.atlas.minFilter = THREE.LinearMipmapLinearFilter;
       this.atlas.anisotropy = 4; this.atlas.generateMipmaps = true;
       this.mats.opaque.map = this.atlas; this.mats.glass.map = this.atlas;
       this.mats.opaque.needsUpdate = true; this.mats.glass.needsUpdate = true;
-      this.atlasSize = [AW, AH];
-    } else this.atlas.needsUpdate = true;
+    }
+    this.atlas.needsUpdate = true;
+    this.atlasSize = [AW, AH];
     this.atlasData = data; this.atlasW = AW; this.atlasH = AH;
     // geometri: en mesh för ogenomskinligt, en för glas
     const build = (list, glass) => {
@@ -464,5 +477,5 @@ export class Bench3D {
   // 2D-formelns punkt (så som rastern hade lagt den) – för tester: hur mycket perspektivet avviker
   isoOf(u, v, z = 0) { const P = this.pSrc(); return [P.ox + (u - v) * P.k, P.oy + (u + v) * P.k / 2 - z * P.hz]; }
   info() { return { ...this.stats, active: this.active, desk: !!this.desk, quads: this.quads.size, cables: this.cableGroup.children.length, cache: this.cache.size }; }
-  dispose() { this.detach(); this.atlas?.dispose(); this.v.scene.remove(this.group); }
+  dispose() { this.detach(); this.atlas?.dispose(); this.v.scene.remove(this.group); this.v.scene.remove(this.key, this.keyTarget); }
 }

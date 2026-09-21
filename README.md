@@ -274,6 +274,13 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   (4096² skuggkarta på hög grafik) och blanka smala metallkanter är mattare. `tools/flimmer.mjs`
   mäter det: andelen av bilden som ändras mellan två bildrutor, stillastående och vid en halv
   millimeters kamerarörelse.
+- **Köket öppnas utan frysning**: första gången bänken ritades i 3D kompilerade webbläsaren om
+  shaders i flera sekunder. Tre orsaker, alla åtgärdade: bänkens byggljus kom och gick med bänken,
+  och antalet ljus ingår i shadernas nyckel, så *alla* material i butiken byggdes om (ljuset ligger
+  nu alltid i scenen och släcks i stället); texturatlasen byttes ut vid varje bygge, vilket kastade
+  materialets shader (texturen återanvänds nu); och bänkens material var okända tills köket
+  öppnades (`view3d.warmBench()` kompilerar dem i bakgrunden medan man går runt i butiken).
+  `tools/kok-laddtid.mjs` mäter tid, låst sida och antal nya shaderprogram vid öppning (10 → 1).
 - **Köket i 3D**: ingen låst byggbild som i datorbutiken. Du står vid disken, vänder dig om
   (dra i bilden) och jobbar vid köksbänken bakom dig med din egen kamera: klicka på brödrosten,
   grillen, fritösen, dryckesmaskinen och brickan, gå runt med W A S D. Lådan med råvaror och
@@ -434,6 +441,7 @@ node tools/restaurang.mjs                # hamburgerbaren i webbläsaren: meny �
 node tools/restaurang3d.mjs              # hamburgerbaren i 3D: stor burgare i 2D-köket, köket på bänken, servering i 3D
 node tools/restaurang-ikoner.mjs         # ritar alla ingrediensers ikoner i ark per kategori (rest-ikoner-*.png)
 node tools/restaurang-golv.mjs           # restaurangens golv genom epokerna med fyllda montrar, automater och gäster som äter (rest-golv-<år>.png)
+node tools/kok-laddtid.mjs               # hur fort köket öppnas i 2D och 3D: tid till första bild, låst sida, nya shaderprogram
 node tools/flimmer.mjs                   # 3D-bilden ska stå stilla: mäter hur mycket som ändras mellan två bildrutor och vid en halv mm kamerarörelse
 node tools/restaurang-anim.mjs           # 3D: Mixamo-klippen laddas, gäster som sitter spelar sitt-/ätklipp, den som bär spelar bärklippet (rest-anim-*.png)
 node tools/mixamo-anim.mjs [filter]      # konverterar Mixamo-animationer (Without Skin) i assets/3d/mixamo/anim/ till assets/3d/anim/*.glb + manifest
