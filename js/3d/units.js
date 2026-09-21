@@ -469,43 +469,57 @@ export class Units {
     }
   }
   // tallrikar med burgare: vid luckan (kunder som hämtar) och på borden (kunder som äter)
+  // tallrikar med mat: vid luckan (kunder som hämtar), i händerna på den som bär ut den och på borden
+  // (kunden äter från den). Formen byggs om bara när måltiden eller hur mycket som ätits ändras –
+  // platsen sätts varje bildruta, så tallriken i händerna följer med figuren.
   plates(list) {
-    const sig = list.map((p) => p.key + ':' + p.stage + ':' + (p.meal ? p.meal.layers.join(',') + p.meal.pommes + p.meal.dryck : '')).join('|');
-    if (sig === this.plateSig) return;
-    this.plateSig = sig;
-    if (!this.plateGroup) { this.plateGroup = new THREE.Group(); this.scene.add(this.plateGroup); }
-    for (const m of [...this.plateGroup.children]) { this.plateGroup.remove(m); m.traverse((o) => o.geometry?.dispose()); }
-    const white = paintMat(0xf6f3ec, 0.4), bun = paintMat(0xd9a55d, 0.7), patty = paintMat(0x6e3a26, 0.8), cup = paintMat(0xf4f1ea, 0.5);
+    if (!this.plateGroup) { this.plateGroup = new THREE.Group(); this.scene.add(this.plateGroup); this.plateMap = new Map(); }
+    const seen = new Set();
     for (const p of list) {
-      const g = new THREE.Group(); g.position.set(p.x, p.y, p.z);
-      const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.012, 20), white); plate.position.y = 0.006; plate.castShadow = true; g.add(plate);
-      const part = (id) => this.shop.part?.[id];
-      const meal = p.meal;
-      if (p.stage < 0.9) {
-        const s = p.stage < 0.3 ? 1 : p.stage < 0.6 ? 0.7 : 0.45;
-        const layers = meal ? meal.layers.map(part).filter(Boolean) : [];
-        if (layers.length) {
-          let y = 0.012;
-          layers.forEach((q, i) => {
-            const L = q.look || {}, top = i === layers.length - 1 && L.shape === 'bun';
-            const h = L.shape === 'bun' ? 0.016 : L.shape === 'patty' ? 0.014 : L.shape === 'cheese' || L.shape === 'sauce' || L.shape === 'drizzle' ? 0.004 : 0.007;
-            const r = (L.shape === 'leaf' ? 0.064 : L.shape === 'cheese' && !L.round ? 0.06 : 0.055) * s;
-            const m = paintMat(hexOf(L.color, 0xc8a060), 0.7);
-            const mesh = top ? new THREE.Mesh(new THREE.SphereGeometry(r, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), m) : new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 14), m);
-            if (top) { mesh.scale.y = 0.55; mesh.position.set(-0.03, y, 0); } else mesh.position.set(-0.03, y + h / 2, 0);
-            g.add(mesh); y += top ? 0 : h;
-          });
-        } else {
-          const b1 = new THREE.Mesh(new THREE.CylinderGeometry(0.055 * s, 0.055 * s, 0.014, 14), bun); b1.position.set(-0.03, 0.02, 0); g.add(b1);
-          const pt = new THREE.Mesh(new THREE.CylinderGeometry(0.058 * s, 0.058 * s, 0.014, 14), patty); pt.position.set(-0.03, 0.034, 0); g.add(pt);
-          const b2 = new THREE.Mesh(new THREE.SphereGeometry(0.058 * s, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), bun); b2.scale.y = 0.6; b2.position.set(-0.03, 0.041, 0); g.add(b2);
-        }
-        // pommes: små gula stavar, färre ju mer som ätits
-        if (meal?.pommes) { const n = Math.round(6 * (1 - p.stage)); for (let i = 0; i < n; i++) { const f = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.05, 0.008), paintMat(0xf0c050, 0.6)); f.position.set(0.06 + (i % 3) * 0.012, 0.035, -0.04 + Math.floor(i / 3) * 0.014); f.rotation.z = (i % 2 ? 0.2 : -0.15); g.add(f); } }
+      seen.add(p.key);
+      const sig = p.stage + ':' + (p.meal ? p.meal.layers.join(',') + p.meal.pommes + p.meal.dryck + p.meal.dessert : '');
+      let e = this.plateMap.get(p.key);
+      if (!e || e.sig !== sig) {
+        if (e) { this.plateGroup.remove(e.g); e.g.traverse((o) => o.geometry?.dispose()); }
+        e = { g: this.makePlate(p), sig };
+        this.plateMap.set(p.key, e); this.plateGroup.add(e.g);
       }
-      if (!meal || meal.dryck) { const d = meal?.dryck ? part(meal.dryck) : null, L = d?.look || {}, cm = d ? paintMat(hexOf(L.cup || L.color, 0xf4f1ea), 0.5) : cup; const c = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.025, 0.09, 12), cm); c.position.set(0.11, 0.045, 0.06); g.add(c); }
-      this.plateGroup.add(g);
+      e.g.position.set(p.x, p.y, p.z);
+      e.g.rotation.y = p.yaw || 0;
     }
+    for (const [k, e] of this.plateMap) if (!seen.has(k)) { this.plateGroup.remove(e.g); e.g.traverse((o) => o.geometry?.dispose()); this.plateMap.delete(k); }
+  }
+  // en tallrik: lagren i måltidens ordning och färger, pommes och mugg (mindre ju mer som ätits)
+  makePlate(p) {
+    const white = paintMat(0xf6f3ec, 0.4), bun = paintMat(0xd9a55d, 0.7), patty = paintMat(0x6e3a26, 0.8), cup = paintMat(0xf4f1ea, 0.5);
+    const g = new THREE.Group();
+    const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.012, 20), white); plate.position.y = 0.006; plate.castShadow = true; g.add(plate);
+    const part = (id) => this.shop.part?.[id];
+    const meal = p.meal;
+    if (p.stage < 0.9) {
+      const s = p.stage < 0.3 ? 1 : p.stage < 0.6 ? 0.7 : 0.45;
+      const layers = meal ? meal.layers.map(part).filter(Boolean) : [];
+      if (layers.length) {
+        let y = 0.012;
+        layers.forEach((q, i) => {
+          const L = q.look || {}, top = i === layers.length - 1 && L.shape === 'bun';
+          const h = L.shape === 'bun' ? 0.016 : L.shape === 'patty' ? 0.014 : L.shape === 'cheese' || L.shape === 'sauce' || L.shape === 'drizzle' ? 0.004 : 0.007;
+          const r = (L.shape === 'leaf' ? 0.064 : L.shape === 'cheese' && !L.round ? 0.06 : 0.055) * s;
+          const m = paintMat(hexOf(L.color, 0xc8a060), 0.7);
+          const mesh = top ? new THREE.Mesh(new THREE.SphereGeometry(r, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), m) : new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 14), m);
+          if (top) { mesh.scale.y = 0.55; mesh.position.set(-0.03, y, 0); } else mesh.position.set(-0.03, y + h / 2, 0);
+          g.add(mesh); y += top ? 0 : h;
+        });
+      } else {
+        const b1 = new THREE.Mesh(new THREE.CylinderGeometry(0.055 * s, 0.055 * s, 0.014, 14), bun); b1.position.set(-0.03, 0.02, 0); g.add(b1);
+        const pt = new THREE.Mesh(new THREE.CylinderGeometry(0.058 * s, 0.058 * s, 0.014, 14), patty); pt.position.set(-0.03, 0.034, 0); g.add(pt);
+        const b2 = new THREE.Mesh(new THREE.SphereGeometry(0.058 * s, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), bun); b2.scale.y = 0.6; b2.position.set(-0.03, 0.041, 0); g.add(b2);
+      }
+      // pommes: små gula stavar, färre ju mer som ätits
+      if (meal?.pommes) { const n = Math.round(6 * (1 - p.stage)); for (let i = 0; i < n; i++) { const f = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.05, 0.008), paintMat(0xf0c050, 0.6)); f.position.set(0.06 + (i % 3) * 0.012, 0.035, -0.04 + Math.floor(i / 3) * 0.014); f.rotation.z = (i % 2 ? 0.2 : -0.15); g.add(f); } }
+    }
+    if (!meal || meal.dryck) { const d = meal?.dryck ? part(meal.dryck) : null, L = d?.look || {}, cm = d ? paintMat(hexOf(L.cup || L.color, 0xf4f1ea), 0.5) : cup; const c = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.025, 0.09, 12), cm); c.position.set(0.11, 0.045, 0.06); g.add(c); }
+    return g;
   }
   rebuild() {
     this.clear();
@@ -554,7 +568,7 @@ export class Units {
     this.syncBoxes(dt);
   }
   pickTargets() { return [...this.pickables, ...[...this.boxes.values()].map((b) => b.m)]; }
-  dispose() { this.clear(); this.scene.remove(this.group); this.scene.remove(this.boxGroup); }
+  dispose() { this.clear(); this.scene.remove(this.group); this.scene.remove(this.boxGroup); if (this.plateGroup) { this.scene.remove(this.plateGroup); this.plateGroup = null; this.plateMap = null; } this.displayVox?.dispose(); this.displayVox = null; }
 }
 
 export const MODELS_UNITS = ['sofa_02', 'modern_arm_chair_01', 'coffee_table_round_01', 'potted_plant_02', 'cardboard_box_01', 'plastic_crate_02', 'standing_chalkboard_01', 'gamepad', 'gaming_console', 'steel_frame_shelves_01', 'wooden_display_shelves_01', 'WetFloorSign_01'];

@@ -90,6 +90,11 @@ const pick = await page.evaluate(() => {
 ok(pick.held && pick.l0 && pick.station?.rosta === pick.l0, `brödet togs från brödrosten med handen och lades på tallriken: ${JSON.stringify(pick)}`);
 // bygg via byggvyns egna funktioner i hjälpens ordning
 const midShot = page.waitForFunction(() => window.__midShot, null, { timeout: 20000 }).then(() => page.screenshot({ path: OUT + 'rest-4b-markering.png' })).catch(() => {});
+const nogul = await page.evaluate(() => {
+  const v = PV.build, s = v.L.SLOT.l1;
+  return { ring: !!s?.ring, slots: v.L.SLOTS.filter((x) => x.k !== undefined).every((x) => x.ring) };
+});
+ok(nogul.ring && nogul.slots, 'burgarens lager markeras med pil (ring), inte en gul ruta över maten');
 const built = await page.evaluate(async () => {
   const v = PV.build, L = v.L, log = [];
   for (let guard = 0; guard < 40; guard++) {

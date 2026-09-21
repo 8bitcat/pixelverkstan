@@ -35,6 +35,18 @@ export function drawHighlight(ctx, view, slot, t, color = '#f5c542') {
   ctx.restore();
 }
 
+// Liten pil som guppar ovanför nästa plats i stapeln. Lagren ligger ovanpå varandra, så en ruta
+// (eller ens en streckad kant) skulle täcka burgaren – pilen står bredvid och pekar ner.
+export function drawDropArrow(ctx, x, y, t, color = '#f5c542') {
+  const dy = Math.sin(t * 5) * 3;
+  ctx.save();
+  ctx.translate(x, y - 30 + dy);
+  ctx.beginPath(); ctx.moveTo(0, 12); ctx.lineTo(-9, -5); ctx.lineTo(9, -5); ctx.closePath();
+  ctx.fillStyle = color; ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
 export function drawHotspot(ctx, x, y, t, icon, label, small = false) {
   const r = small ? 9 : 15;
   ctx.save();

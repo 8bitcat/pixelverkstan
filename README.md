@@ -257,8 +257,8 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   **dryckesmaskinen** (tappa upp) innan muggen ställs på brickan (flaskor och burkar tas ur
   kylen under) → efterrätten sist. Råvaran kan **släppas direkt på stationen** (brödet på
   brödrosten, biffen på grillen, pommesen i fritösen, muggen vid maskinen) – det utför
-  handgreppet, i hjälpläget likaväl som i proffsläget. Bara nästa lager i stapeln markeras, med
-  en ring i stället för en fylld ruta så att burgaren syns. **Det som ligger färdigt på en station
+  handgreppet, i hjälpläget likaväl som i proffsläget. Bara nästa lager i stapeln markeras, och
+  markeringen är en liten pil ovanför stapeln – ingen ruta över maten, så burgaren syns hela tiden. **Det som ligger färdigt på en station
   tas med handen**: tryck på eller dra från det rostade brödet på brödrosten, biffen på grillen,
   pommesen i korgen och muggen vid maskinen – inte via lådan. En hand guppar över det som går att
   ta, och stationen minns vilken råvara som lades på (`b.station`, följer med i co-op). Biffen går
@@ -275,13 +275,14 @@ inredning, co-op) men med ett kök i stället för en verkstad:
 - **Servering** (`serve.js`): burgaren byggs på en tallrik; med 🍽️ Ställ på disken glider
   tallriken (med pommes, dryck och efterrätt) bort till luckan med värmelamporna. Kunden
   hämtar den där, säger sitt omdöme (beror på tid och kladd) och betalar, bär tallriken till
-  ett bord, sätter sig och äter: burgaren lyfts mot munnen vid varje tugga, käkarna går, och
+  ett bord (i 3D ligger den i händerna och följer armarna medan hon går, annars framför bröstet),
+  sätter sig och äter från tallriken som står på bordet framför henne: burgaren lyfts mot munnen vid varje tugga, käkarna går, och
   burgaren blir mindre tills bara smulor och servetten är kvar. **Måltiden du byggde följer
   med fysiskt** (`shop.mealOf`): samma lager i samma ordning, pommes, mugg i dryckens färg och
   efterrätt ritas på tallriken vid luckan, i händerna på vägen till bordet och på bordet, och
   äts upp bit för bit. Pixelfigurerna har egna poser för att bära tallriken (armarna fram) och
-  äta (händerna vid munnen). I 3D sjunker gästen ner på stolen och tuggar, tallrikarna byggs av
-  samma lager, och gästerna spelar riktiga Mixamo-klipp: Stand To Sit, Sitting Idle, Sitting
+  äta (händerna vid munnen). I 3D syns tallrikarna överallt i lokalen – vid luckan, i händerna och
+  på borden – och byggs av samma lager, och gästerna spelar riktiga Mixamo-klipp: Stand To Sit, Sitting Idle, Sitting
   Talking (tuggorna), Sitting Drinking, Sit To Stand och Carrying (tallriken). På stolarna lyfts
   figuren så att stussen vilar på sitsen (höftbenet mäts i sittposen) – barn och mindre figurer
   sitter annars genom stolen. Klippen exporteras

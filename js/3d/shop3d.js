@@ -374,10 +374,23 @@ export class Shop3D {
     let i = 0;
     for (const c of g.customers) {
       if (c.phase === 'ready' && c.payout) { const dc = this.room?.displayCase; out.push({ key: 'r' + c.id, x: C.toX(LY.PICKUP[0][0] - 16 + Math.min(2, i++) * 22), y: dc ? dc.top : 1.04, z: dc ? (dc.z0 + dc.z1) / 2 : C.toZ(LY.COUNTER.top + 6), stage: 0, meal: c.meal || null }); continue; }
+      // bär tallriken till bordet: den ligger i händerna (handens plats i figuren)
+      if (c.phase === 'eating' && c._carry && !c._sit) {
+        // händerna när bärklippet spelas, annars framför bröstet (t.ex. medan figuren fortfarande laddas)
+        const hp = this.people?.handPos('c' + c.id), yaw = hp ? hp.yaw : C.yawOf(c.dir);
+        const hands = hp && hp.cur === 'carry' && hp.y > 0.7;
+        const ch = (hp?.h || (c.look?.kid ? 1.25 : 1.76)) * 0.58;
+        const x = hands ? hp.x : (hp ? hp.x : C.toX(c.x)) + Math.sin(yaw) * 0.26;
+        const z = hands ? hp.z : (hp ? hp.z : C.toZ(c.y)) + Math.cos(yaw) * 0.26;
+        const y = hands ? hp.y + 0.03 : ch;
+        out.push({ key: 'h' + c.id, x, y, z, yaw, stage: 0, meal: c.meal || null });
+        continue;
+      }
       if (c.phase === 'eating' && c._sit && c._spot >= 0) {
         const sp = LY.SPOTS[c._spot]; if (!sp?.plate) continue;
         const stage = c._eatMax ? Math.max(0, Math.min(1, 1 - c._eatT / c._eatMax)) : (c._eat || 0) / 100;
-        out.push({ key: 'e' + c.id, x: C.toX(sp.plate[0]), y: 0.76, z: C.toZ(sp.plate[1]), stage: Math.round(stage * 10) / 10, meal: c.meal || null });
+        // tallriken står närmare gästen än i 2D (gästen sitter bak på stolen) så att hon äter från den
+        out.push({ key: 'e' + c.id, x: C.toX(sp.plate[0]), y: 0.76, z: C.toZ(sp.plate[1]) - 0.2, stage: Math.round(stage * 10) / 10, meal: c.meal || null, yaw: Math.PI });
       }
     }
     return out;
@@ -488,6 +501,7 @@ export class Shop3D {
     this.room.update(dt, fl);
     this.units.update(dt);
     this.people.sync(this.peopleList(), dt);
+    if (this.game.shop.mealOf) this.units.plates?.(this.plateList());   // tallrikarna i lokalen: vid luckan, i händerna och på borden
     this.hoverT -= dt;
     if (this.hoverT <= 0) { this.hoverT = 0.08; this.updateHover(); }
     if (this.envDirty) { this.envT += dt; if (this.envT > 0.6) { this.bakeEnv(); this.envDirty = false; } }

@@ -740,10 +740,12 @@ export class BuildView {
 
     const entry = this.selected && this.trayEntries().find((x) => x.key === this.selected);
     const next = this.help ? this.nextStep() : null;
+    // platser i en stapel (burgarens lager) markeras med en pil ovanför – ingen gul ruta över maten
+    const mark = (s, col) => { if (!s) return; if (s.ring) { const [mx, my] = D.proj(this, ...s.anchor); D.drawDropArrow(ctx, mx, my, this.t, col); } else D.drawHighlight(ctx, this, s, this.t, col); };
     // markeringar (bara med hjälp)
     if (this.help) {
-      if (entry?.kind === 'part') for (const s of this.L.slotsFor(entry.part)) D.drawHighlight(ctx, this, s, this.t);
-      else if (!entry && next?.kind === 'slot') D.drawHighlight(ctx, this, this.L.SLOT[next.id], this.t);
+      if (entry?.kind === 'part') for (const s of this.L.slotsFor(entry.part)) mark(s);
+      else if (!entry && next?.kind === 'slot') mark(this.L.SLOT[next.id]);
       for (const a of this.L.ACTIONS) {
         if (!this.L.actionReady(a, this.b)) continue;
         const done = this.L.actSet(this.b, a.id);
@@ -765,7 +767,7 @@ export class BuildView {
         D.drawHand(ctx, x, y, this.t, this.help ? `Ta ${pu.name}` : '');
       }
     }
-    if (this.flash) D.drawHighlight(ctx, this, this.flash.slot, this.t * 3, '#45b964');
+    if (this.flash) mark(this.flash.slot, '#45b964');
     // uttagsetiketter när man håller en kabel
     if (entry?.kind === 'cable') {
       const wants = entry.cable.wants;

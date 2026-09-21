@@ -359,6 +359,16 @@ export class People {
     if (ac.mark) ac.mark.material.dispose();
     this.actors.delete(k);
   }
+  // mitt mellan händerna i världen (tallriken som bärs) – null om figuren inte är laddad än
+  handPos(key) {
+    const ac = this.actors.get(key);
+    if (!ac?.root) return null;
+    if (ac.hands === undefined) { const l = findBone(ac.g, /LeftHand$/), r = findBone(ac.g, /RightHand$/); ac.hands = l && r ? [l, r] : null; }
+    if (!ac.hands) return null;
+    ac.g.updateMatrixWorld(true);
+    const a = ac.hands[0].getWorldPosition(new THREE.Vector3()), b = ac.hands[1].getWorldPosition(new THREE.Vector3());
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2, yaw: ac.yaw, cur: ac.cur, h: ac.h || 1.76 };
+  }
   // objektet (för raycast) → nyckel
   keyOf(obj) {
     for (const [k, ac] of this.actors) { let o = obj; while (o) { if (o === ac.g) return k; o = o.parent; } }

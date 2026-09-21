@@ -53,6 +53,29 @@ const act = await page.evaluate(() => {
 console.log('3D', JSON.stringify(act));
 ok(act.filter((a) => a.sit).every((a) => ['sitIdle', 'eat', 'drink'].includes(a.cur)), 'de som sitter spelar sitt-/ätklipp');
 ok(act.filter((a) => a.sit).every((a) => a.y >= 0 && a.y < 0.3 && a.hips >= 0.5), 'stussen vilar på sitsen: höften ≥ 0,5 m, figuren lyfts vid behov (inte nedsänkt genom stolen)');
+const plates = await page.evaluate(() => {
+  const u = PV.view3d.units, out = [];
+  for (const [k, e] of u.plateMap || []) out.push({ k, y: +e.g.position.y.toFixed(2), kids: e.g.children.length });
+  return { list: out, walk: PV.view3d.mode };
+});
+console.log('tallrikar', JSON.stringify(plates));
+ok(plates.list.some((p) => p.k.startsWith('e')) , 'tallrik på bordet hos den som äter (i lokalen, inte bara i köket)');
+// tallriken i händerna: tvinga en gäst i bärläge (annars hinner hon sätta sig) och bygg om tallrikarna
+const carried = await page.evaluate(() => {
+  const v = PV.view3d, c = PV.game.customers[0];
+  const was = { sit: c._sit, carry: c._carry };
+  c._sit = false; c._carry = true; c.phase = 'eating';
+  const hp = v.people.handPos('c' + c.id);
+  v.people.sync(v.peopleList(), 0.016);
+  v.units.plates(v.plateList());
+  const e = v.units.plateMap.get('h' + c.id);
+  const out = { hand: hp ? { x: +hp.x.toFixed(2), y: +hp.y.toFixed(2), z: +hp.z.toFixed(2) } : null, plate: e ? { y: +e.g.position.y.toFixed(2), kids: e.g.children.length } : null };
+  c._sit = was.sit; c._carry = was.carry;
+  return out;
+});
+console.log('bärande', JSON.stringify(carried));
+ok(carried.plate && carried.plate.y > 0.7 && carried.plate.kids > 1, `tallriken ligger i händerna på den som bär ut den: ${JSON.stringify(carried)}`);
+ok(!!carried.hand, 'handens plats hittas i figuren (tallriken följer armarna)');
 const carrier = act.find((a) => a.carry && a.moving);
 ok(!carrier || carrier.cur === 'carry', `den som bär tallriken spelar bärklippet (${carrier ? carrier.cur : 'står stilla'})`);
 await page.screenshot({ path: OUT + 'rest-anim-1.png', timeout: 180000 });
