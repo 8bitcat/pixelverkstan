@@ -207,7 +207,7 @@ export function openOrderDialog(game, c, h) {
     else if (prod && !miss.length) tip = '💰 Färdig vara – sälj direkt över disk, kunden hämtar vid utlämningen.';
     else if (svc) tip = canSvc ? `🛠️ Ta emot jobbet – utför det från beställningskortet (eller låt en tekniker göra det). Fast pris.` : `🔒 Butiken saknar utrustningen. Köp den under 🏪 Butiken → Verkstad, eller tacka nej – önskemålet hamnar på efterfrågantavlan.`;
     else if (repair) tip = `🔧 Kunden lämnar in datorn. Diagnosavgiften (${fmt(shop.diagnosisFee || 150)} kr) får du direkt, resten när den fungerar. Ställ den på bänken, koppla in och starta – symptomet visar var felet sitter. Svårighet: ${'★'.repeat(o.repair.stars || 1)}`;
-    else if (toBuy.length && buyCost > game.money) tip = `😬 Du har inte råd att köpa in det som saknas (${fmt(buyCost)} kr). Tacka nej, eller sälj fler datorer först.`;
+    else if (toBuy.length && buyCost > game.money) tip = `😬 Du har inte råd att köpa in det som saknas (${fmt(buyCost)} kr). Tacka nej, eller sälj fler ${game.shop.text?.things || 'datorer'} först.`;
     const price = shop.priceFor(o, {});
     const canEdit = !prod && !repair && !svc && o.tutorial !== 0;
     // tillval på bygget: överklocka, burn-in, garanti
@@ -218,7 +218,7 @@ export function openOrderDialog(game, c, h) {
       <h3 style="margin:4px 0 8px">${prod ? 'Vill köpa' : repair ? 'Lämnar in' : svc ? 'Vill ha hjälp' : 'Beställning'}: ${esc(o.title)}</h3>
       <div class="plist">${rows}</div>
       ${optBar}
-      ${canEdit ? `<div class="swapbar"><button class="btn btn-small" data-stockpick>📦 Byt del ur lagret</button>${!hasGpu ? '<button class="btn btn-small btn-gold" data-addgpu>➕ Lägg till grafikkort</button>' : ''}<small>Kunden betalar delarnas pris – ett bättre kort ger mer betalt.</small></div>` : ''}
+      ${canEdit ? `<div class="swapbar"><button class="btn btn-small" data-stockpick>${esc(shop.text?.swapBtn || '📦 Byt del ur lagret')}</button>${!hasGpu && shop.cats.gpu ? '<button class="btn btn-small btn-gold" data-addgpu>➕ Lägg till grafikkort</button>' : ''}<small>${esc(shop.text?.swapNote || 'Kunden betalar delarnas pris – ett bättre kort ger mer betalt.')}</small></div>` : ''}
       <div class="sum"><span>Kunden betalar${o.items.some((i) => i.choice) ? ' ca' : ''}${repair ? ' när den är lagad' : ''}</span><b>${fmt(price)} kr</b></div>
       <div class="sp" style="color:var(--muted)">${svc ? 'Fast pris för tjänsten.' : prod ? `${esc(shop.specLine(prod))}${shop.products && shop.products.valueAt(prod, game.year) < 1 ? ' · <b>värdet har sjunkit</b> – gammalt lager' : ''}` : repair ? 'Arbetskostnad efter svårighet – delarna är kundens egna.' : o.model ? '🧩 Din egen modell – fast pris, som i Datormagazin.' : `Delarnas pris + ${fmt(shop.feeFor(o))} kr i montering.`}</div>
       ${tip ? `<div class="speech" style="margin:10px 0 0;background:#fff4c7">${tip}</div>` : ''}`;
@@ -259,7 +259,7 @@ export function openPartPicker(game, opts) {
     let st, btn;
     if (same) { st = '<span class="ok">✓ i beställningen</span>'; btn = ''; }
     else if (!it && !canAdd) { st = '<span style="color:var(--muted)">inte i beställningen</span>'; btn = ''; }
-    else if (placed) { st = '<span style="color:var(--muted)">sitter redan i datorn</span>'; btn = ''; }
+    else if (placed) { st = `<span style="color:var(--muted)">${esc(game.shop.text?.alreadyIn || 'sitter redan i datorn')}</span>`; btn = ''; }
     else if (!fits) { st = '<span class="bad">✗ passar inte ihop</span>'; btn = ''; }
     else btn = `<button class="btn btn-small btn-go" data-pick="${p.id}" data-idx="${idx}">${it ? 'Byt in' : '➕ Lägg till'}</button>`;
     return `<div class="prow gamerow"><span data-icon="${p.id}"></span><div><div class="nm">${esc(p.name)}</div><div class="sp">${esc(shop.specLine(p))} · i lager ${game.stockFree(p.id)} · kund betalar ${fmt(shop.retail(p))} kr</div>${st ? `<div class="sp">${st}</div>` : ''}</div>${btn}</div>`;
@@ -440,7 +440,7 @@ export function showLevelUp(game, info) {
   const gone = shop.parts.filter((p) => p.until === y - 1).length;
   // tidningsnotiser: konsoler och arkadmaskiner som lanseras i år
   const launches = shop.parts.filter((p) => (p.cat === 'konsol' || p.cat === 'arkad') && p.year === y);
-  const news = launches.length ? `<div class="news"><b>📰 Datortidningen:</b> ${launches.map((p) => p.cat === 'arkad' ? `<i>${esc(p.brand || 'Spelhallen')} ställer ut ${esc(p.name)} – köerna ringlar långa.</i>` : `<i>${esc(p.brand ? p.brand[0].toUpperCase() + p.brand.slice(1) : '')} lanserar ${esc(p.name)}${p.cost ? ` för ${fmt(Math.round(p.cost * 1.3 / 10) * 10)} kr` : ''}.</i>`).join(' ')} ${launches.some((p) => p.cat === 'konsol') ? 'Kunderna kommer att fråga efter den – ha en TV-hörna och köp in.' : ''}</div>` : '';
+  const news = launches.length ? `<div class="news"><b>${esc(game.shop.text?.newsTitle || '📰 Datortidningen:')}</b> ${launches.map((p) => p.cat === 'arkad' ? `<i>${esc(p.brand || 'Spelhallen')} ställer ut ${esc(p.name)} – köerna ringlar långa.</i>` : `<i>${esc(p.brand ? p.brand[0].toUpperCase() + p.brand.slice(1) : '')} lanserar ${esc(p.name)}${p.cost ? ` för ${fmt(Math.round(p.cost * 1.3 / 10) * 10)} kr` : ''}.</i>`).join(' ')} ${launches.some((p) => p.cat === 'konsol') ? 'Kunderna kommer att fråga efter den – ha en TV-hörna och köp in.' : ''}</div>` : '';
   // bokslut för året som gick, och gala vid decennieskifte
   const bk = (game.years || []).find((e) => e.year === info.from) || (game.years || []).at(-1);
   const bokslut = bk ? `<div class="bokslut"><b>📒 Bokslut ${bk.year}</b><div class="bgrid"><span>Intäkter</span><b>${fmt(bk.revenue)} kr</b><span>Utgifter</span><b>${fmt(bk.expenses)} kr</b><span>Resultat</span><b class="${bk.profit >= 0 ? 'ok' : 'bad'}">${bk.profit >= 0 ? '+' : ''}${fmt(bk.profit)} kr</b><span>Kunder</span><b>${bk.served} betjänade${bk.lost ? ` · ${bk.lost} tröttnade` : ''}</b>${bk.sold ? `<span>Modeller</span><b>${bk.sold} sålda</b>` : ''}${bk.wages ? `<span>Löner</span><b>${fmt(bk.wages)} kr</b>` : ''}<span>Rykte</span><b>⭐ ${bk.rykte}</b>${bk.rival ? `<span>Konkurrent</span><b>${esc(bk.rival.name)} ${'▮'.repeat(Math.round(bk.rival.strength * 5))}${'▯'.repeat(5 - Math.round(bk.rival.strength * 5))}</b>` : ''}</div></div>` : '';
@@ -530,7 +530,7 @@ export function openFittings(game, tab = null, slot = null) {
       <div class="fit-stats"><span title="Dragningskraft: fler kunder">🪧 ${S.drag}</span><span title="Trivsel: kunderna väntar längre">😊 ${S.trivsel}</span><span title="Rykte: stjärnor från nöjda kunder">⭐ ${game.rykte}</span></div></div>`;
     const dem = Object.entries(game.demand || {}).sort((a, b) => b[1] - a[1]).slice(0, 5);
     const demand = dem.length ? `<div class="demand"><b>📋 Kunder har frågat efter:</b> ${dem.map(([t, n]) => `<span>${esc(t)} <i>×${n}</i></span>`).join(' ')}</div>` : '';
-    const tabs = [['platser', '🏬 Platser'], ['skylt', '🪧 Skyltning'], ['trivsel', '😊 Trivsel'], ['verkstad', '🔧 Verkstad'], ['lager', '🗄️ Lager & lokal'], ...(game.hasArcadeRoom ? [['arkad', '🕹️ Arkadrummet']] : [])]
+    const tabs = [['platser', '🏬 Platser'], ['skylt', '🪧 Skyltning'], ['trivsel', '😊 Trivsel'], ['verkstad', game.shop.text?.workshopTab || '🔧 Verkstad'], ['lager', '🗄️ Lager & lokal'], ...(game.hasArcadeRoom ? [['arkad', '🕹️ Arkadrummet']] : [])]
       .map(([id, label]) => `<button class="tab ${st.tab === id ? 'on' : ''}" data-tab="${id}">${label}</button>`).join('');
     let body = '';
     if (st.tab === 'platser' && st.pick !== null) {

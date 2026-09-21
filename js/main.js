@@ -154,7 +154,7 @@ async function renderMenu() {
   const av = myAvatar();
   $('#menu').innerHTML = `<div class="menu-card">
     <h1>Pixel<span class="r">verkstan</span></h1>
-    <p class="sub">Ta emot beställningar, bygg ihop dem i verkstaden och lär dig hur saker fungerar på riktigt.</p>
+    <p class="sub">Ta emot beställningar, bygg och laga dem själv och lär dig hur saker fungerar på riktigt.</p>
     <div class="shop-pick">${SHOPS.map((s) => `<button class="shop-opt ${s.module ? '' : 'locked'}" data-shop="${s.id}">
       <div class="ic">${s.icon}</div><b>${s.name}</b><small>${s.desc}</small></button>`).join('')}</div>
     <div class="menu-row">
@@ -188,16 +188,17 @@ async function renderMenu() {
 
 function chooseStartYear(mod, onPick, title = '📅 Välj startår') {
   migrateSaves();
+  const shopT = mod.text || {};   // verksamhetens egna ord (dator / burgare)
   const last = +store.get('pixelverkstan_last_' + mod.id);
   const rows = mod.startYears.map((y) => {
     const sv = readSave(mod.id, y.year, mod.lastYear);
     const info = sv
-      ? `<span class="slot-save">▶ Fortsätt · nu år <span class="slot-year">${sv.year}</span> · ${fmt(sv.money)} kr · ${sv.served} ${sv.served === 1 ? 'dator' : 'datorer'}${last === y.year ? ' · ⭐ senast' : ''}</span>`
+      ? `<span class="slot-save">▶ Fortsätt · nu år <span class="slot-year">${sv.year}</span> · ${fmt(sv.money)} kr · ${sv.served} ${sv.served === 1 ? (shopT.thing || 'dator') : (shopT.things || 'datorer')}${last === y.year ? ' · ⭐ senast' : ''}</span>`
       : '<span class="slot-new">✚ Nytt spel</span>';
     return `<div class="year-row"><button class="shop-opt ${sv ? 'has-save' : ''}" data-year="${y.year}"><b>${y.year} – ${y.title}</b><small>${y.desc}</small>${info}</button>
       ${sv ? `<button class="btn btn-small" data-reset="${y.year}" title="Börja om från ${y.year}">↺ Börja om</button>` : ''}</div>`;
   }).join('');
-  const body = `<p style="font-size:20px;margin-top:0">Vilket år öppnar du butiken? Åren går framåt när du bygger datorer – och grossisten säljer bara delar som fanns just då. Varje startår har en egen sparning.</p>
+  const body = `<p style="font-size:20px;margin-top:0">${esc(shopT.yearQ || 'Vilket år öppnar du butiken? Åren går framåt när du bygger datorer – och grossisten säljer bara delar som fanns just då.')} Varje startår har en egen sparning.</p>
     <div class="plist">${rows}</div>`;
   const dlg = UI.openModal(title, body, [{ label: '← Till menyn', onClick: UI.closeModal }]);
   dlg.classList.add('dlg-wide');
@@ -484,7 +485,7 @@ function updateFriendBuilds() {
 
 // ---------- Co-op: lobby ----------
 function openCoopMenu() {
-  const body = `<p style="font-size:19px;margin-top:0">Driv butiken ihop med kompisar: ta emot kunder, packa upp lådor och bygg datorer tillsammans – ni ser varandras muspekare i verkstaden.</p>
+  const body = `<p style="font-size:19px;margin-top:0">Driv butiken ihop med kompisar: ta emot kunder, packa upp lådor och ${esc(game?.shop.text?.coopDo || 'bygg datorer tillsammans – ni ser varandras muspekare i verkstaden')}.</p>
     <div class="coop-pick">
       <div class="coop-card"><b>🏠 Starta ett rum</b><small>Du blir värd. Butiken och sparningen är din – kompisarna går med med en kod.</small><button class="btn btn-go" id="c-host">Starta rum</button></div>
       <div class="coop-card"><b>🚪 Gå med</b><small>Skriv in koden din kompis fick.</small><input id="c-code" maxlength="4" placeholder="ABCD" autocomplete="off" autocapitalize="characters"><button class="btn btn-gold" id="c-join">Gå med</button></div>

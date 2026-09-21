@@ -598,7 +598,9 @@ export class Floor {
       const chew = eating ? this.art?.eatPhase?.(t, c.id) : null;   // { bite, munch } – tuggor och käkrörelser
       if (eating && this.art?.eatSprite) {
         const [px, py] = LY.SPOTS[c._spot].plate, stage = c._eatMax ? Math.max(0, Math.min(1, 1 - c._eatT / c._eatMax)) : (c._eat || 0) / 100;
-        S.push([c.y + 3, () => this.art.eatSprite(ctx, px, py, stage, c.id, t, chew, c.meal || null)]);
+        // maten står PÅ bordet: den ritas efter bordsskivan (gästen sitter bakom bordet och ritas före)
+        const tb = LY.TABLES[LY.SPOTS[c._spot].table];
+        S.push([(tb ? tb.base : c.y + 2) + 0.5, () => this.art.eatSprite(ctx, px, py, stage, c.id, t, chew, c.meal || null)]);
       }
       // bär tallriken från luckan till bordet
       if (c._carry && !c._sit && this.art?.carrySprite) S.push([c.y + 1, () => this.art.carrySprite(ctx, c.x, c.y, c.dir, c.id, c.meal || null)]);

@@ -7,6 +7,12 @@ const GW = Math.ceil(LY.FW / CELL), GH = Math.ceil(LY.FH / CELL);
 const C = LY.COUNTER;
 const PAD = 3;
 const free = new Uint8Array(GW * GH);
+// Var avataren ställer sig för olika saker (counter och home följer kassan – se rebuild)
+export const SPOTS = {
+  counter: [322, 129],                    // bakom disken, mittemot kön
+  workshop: [478, 128],                   // dörren till verkstaden / köket
+  home: [352, 129],
+};
 // hinder vid fötterna [x0, y0, x1, y1] – räknas om när lokalen byts (floor.build → rebuild)
 export function rebuild() {
   const BLOCKS = [
@@ -20,6 +26,9 @@ export function rebuild() {
     if (ok) for (const [x0, y0, x1, y1] of BLOCKS) if (x > x0 - PAD && x < x1 + PAD && y > y0 - PAD && y < y1 + PAD) { ok = false; break; }
     free[gy * GW + gx] = ok ? 1 : 0;
   }
+  // avatarens platser följer kassan: hamburgerbaren har kön till höger (LY.QUEUE/KEEPER_HOME byts med planen)
+  SPOTS.counter = [LY.QUEUE[0][0] + 4, 129];
+  SPOTS.home = [LY.KEEPER_HOME[0] + 14, 129];
   // dörröppningen upp mot trottoaren
   for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
     const x = gx * CELL + CELL / 2, y = gy * CELL + CELL / 2;
@@ -100,10 +109,4 @@ export function findPath(sx, sy, tx, ty) {
   return out;
 }
 
-// Var avataren ställer sig för olika saker
-export const SPOTS = {
-  counter: [322, 129],                    // bakom disken, mittemot kön
-  workshop: [478, 128],                   // dörren till verkstaden
-  home: [352, 129],
-};
 export const DELIVERY = [[248, 124], [270, 140], [244, 150], [266, 162], [250, 112]];

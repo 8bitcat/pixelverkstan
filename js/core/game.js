@@ -378,7 +378,7 @@ export class Game {
       { name: 'Butiken', icon: '🏬', medal: medal(lokal, 5, 3, 1), text: this.shop.fit?.LOKAL_NAME?.[lokal] || `lokal ${lokal}` },
     ];
     const gold = m.filter((x) => x.medal === '🥇').length;
-    const title = gold >= 4 ? 'Decenniets datorbutik' : gold >= 2 ? 'Kvarterets stolthet' : m.some((x) => x.medal === '🥇' || x.medal === '🥈') ? 'En butik att räkna med' : 'Överlevaren';
+    const title = gold >= 4 ? (this.shop.text?.decadeTitle || 'Decenniets datorbutik') : gold >= 2 ? 'Kvarterets stolthet' : m.some((x) => x.medal === '🥇' || x.medal === '🥈') ? 'En butik att räkna med' : 'Överlevaren';
     const a = { year, title, medals: m, gold };
     (this.awards ||= []).push(a);
     this.stats.stars = (this.stats.stars || 0) + gold * 3;
@@ -685,7 +685,7 @@ export class Game {
     if (!o || !p || o.repair || o.product) return false;
     const it = o.items[index];
     if (!it || it.cat !== p.cat || it.part === partId) return false;
-    if (it.part && this.isPlaced(o, it.part)) { this.emit('toast', { text: 'Den delen sitter redan i datorn – ta ur den först.', kind: 'bad' }); return false; }
+    if (it.part && this.isPlaced(o, it.part)) { this.emit('toast', { text: this.shop.text?.alreadyInToast || 'Den delen sitter redan i datorn – ta ur den först.', kind: 'bad' }); return false; }
     const others = o.items.filter((x, i) => i !== index && x.part).map((x) => this.shop.part[x.part]).filter(Boolean);
     if (this.shop.fitsWith && !this.shop.fitsWith(p, others, this.year)) { this.emit('toast', { text: `${p.name} passar inte ihop med de andra delarna.`, kind: 'bad' }); return false; }
     if (target.orderId != null) {
@@ -706,7 +706,7 @@ export class Game {
     if (!o || !p || o.repair || o.product) return false;
     if (!['gpu', 'sound'].includes(p.cat) || o.items.some((x) => x.cat === p.cat)) return false;
     const others = o.items.filter((x) => x.part).map((x) => this.shop.part[x.part]).filter(Boolean);
-    if (this.shop.fitsWith && !this.shop.fitsWith(p, others, this.year)) { this.emit('toast', { text: `${p.name} passar inte i den här datorn.`, kind: 'bad' }); return false; }
+    if (this.shop.fitsWith && !this.shop.fitsWith(p, others, this.year)) { this.emit('toast', { text: `${p.name} passar inte i ${this.shop.text?.thisThing || 'den här datorn'}.`, kind: 'bad' }); return false; }
     if (target.orderId != null) {
       if (this.stockFree(partId) < 1) { this.emit('toast', { text: `${p.name} finns inte i lagret.`, kind: 'bad' }); return false; }
       this.takeStock(partId); o.reserved.push(partId);

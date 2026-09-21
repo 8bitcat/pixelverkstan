@@ -477,6 +477,7 @@ node tools/restaurang-ikoner.mjs         # ritar alla ingrediensers ikoner i ark
 node tools/restaurang-golv.mjs           # restaurangens golv genom epokerna med fyllda montrar, automater och gäster som äter (rest-golv-<år>.png)
 node tools/kok-farger.mjs                # 3D-köket ser rätt ut: grafikkortets felmeddelanden fångas och bilden jämförs med en nybyggd textur (atlasen växer när lager läggs på)
 node tools/kok-laddtid.mjs               # hur fort köket öppnas i 2D och 3D: tid till första bild, låst sida, nya shaderprogram
+node tools/restaurang-texter.mjs         # inga datorord i det hamburgerbarens spelare ser (dialoger, flikar, kök), avataren går till kassan, maten ritas på bordet i 2D
 node tools/restaurang-platser.mjs        # sittplatserna som kapacitet: fulla bord → nekad beställning → kö → inga nya kunder; stolen hålls under hämtning; alla stolar nåbara i alla lokaler
 node tools/flimmer.mjs                   # 3D-bilden ska stå stilla: mäter hur mycket som ändras mellan två bildrutor och vid en halv mm kamerarörelse
 node tools/restaurang-anim.mjs           # 3D: Mixamo-klippen laddas, gäster som sitter spelar sitt-/ätklipp, den som bär spelar bärklippet (rest-anim-*.png)

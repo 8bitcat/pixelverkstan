@@ -362,7 +362,7 @@ export class Shop3D {
     const el = $('#hint3d'); if (!el) return;
     if (text !== null) { el.textContent = text; el.classList.toggle('hidden', !text); return; }
     if (this.kitchen) { el.textContent = '🍔 Köket: dra i bilden för att titta · klicka på stationerna och brickan · W A S D går'; el.classList.remove('hidden'); return; }
-    el.textContent = this.locked ? '' : 'Klicka i bilden för att styra · W A S D går · musen tittar (eller dra i bilden) · piltangenter går och vänder · klicka på kunder, montrar och lådor · bygg vid arbetsbänken bakom disken · Esc släpper musen · Q byter grafikkvalitet';
+    el.textContent = this.locked ? '' : 'Klicka i bilden för att styra · W A S D går · musen tittar (eller dra i bilden) · piltangenter går och vänder · klicka på kunder, montrar och lådor · ' + (this.game?.shop.text?.hint3d || 'bygg vid arbetsbänken bakom disken') + ' · Esc släpper musen · Q byter grafikkvalitet';
     el.classList.toggle('hidden', this.locked);
   }
 
@@ -507,10 +507,10 @@ export class Shop3D {
   hoverText(h) {
     if (!h) return '';
     const far = h.dist > REACH ? ' (gå närmare)' : '';
-    if (h.type === 'customer') return (this.floor.clickable(h.c) ? `${h.c.name} vill beställa – klicka för att ta emot` : `${h.c.name}${h.c.phase === 'waiting' ? ' väntar på sin dator' : h.c.phase === 'ready' ? ' hämtar sin dator' : ''}`) + far;
+    if (h.type === 'customer') return (this.floor.clickable(h.c) ? `${h.c.name} vill beställa – klicka för att ta emot` : `${h.c.name}${h.c.phase === 'waiting' ? ` väntar på sin ${this.game.shop.text?.thing || 'dator'}` : h.c.phase === 'ready' ? ` hämtar sin ${this.game.shop.text?.thing || 'dator'}` : h.c.phase === 'eating' ? ' äter' : ''}`) + far;
     if (h.type === 'box') return 'Leverans från grossisten – klicka för att packa upp' + far;
-    if (h.type === 'workshop') return 'Verkstaden – datorerna byggs på arbetsbänken bakom disken';
-    if (h.type === 'bench') { const n = (this.game.orders || []).filter((o) => !o.service).length; return (n ? `Arbetsbänken – klicka för att bygga (${n} ${n === 1 ? 'beställning' : 'beställningar'} väntar)` : 'Arbetsbänken – ta emot en beställning vid disken först') + far; }
+    if (h.type === 'workshop') return this.game.shop.text?.workshopHover || 'Verkstaden – datorerna byggs på arbetsbänken bakom disken';
+    if (h.type === 'bench') { const n = (this.game.orders || []).filter((o) => !o.service).length; const T = this.game.shop.text || {}; return (n ? `${T.benchName || 'Arbetsbänken'} – klicka för att ${T.benchVerb || 'bygga'} (${n} ${n === 1 ? 'beställning' : 'beställningar'} väntar)` : `${T.benchName || 'Arbetsbänken'} – ta emot en beställning vid disken först`) + far; }
     if (h.type === 'player') return h.p.name;
     if (h.type === 'staff') return `${h.s.name} (${h.s.role})`;
     if (h.type === 'unit') {
@@ -534,7 +534,7 @@ export class Shop3D {
     if (h.type === 'customer') return this.hooks.onCustomerClick(h.c);
     if (h.type === 'box') return this.hooks.onBoxClick(h.d);
     if (h.type === 'unit') return this.hooks.onShowcaseClick(h.what);
-    if (h.type === 'workshop') return this.hooks.toast('Datorerna byggs på arbetsbänken bakom disken – gå dit och klicka.');
+    if (h.type === 'workshop') return this.hooks.toast(this.game.shop.text?.workshopToast || 'Datorerna byggs på arbetsbänken bakom disken – gå dit och klicka.');
     if (h.type === 'bench') return this.hooks.onBench?.();
     if (h.type === 'staff') return this.hooks.onStaff?.();
   }
