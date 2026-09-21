@@ -99,12 +99,14 @@ if (!locked) {
 await press('g', 300); await frames(2);
 const s1 = await page.evaluate(() => ({ locked: PV.view3d.locked, modal: !document.querySelector('#modal').classList.contains('hidden') }));
 ok(s1.modal && !s1.locked, 'G i 3D öppnar grossisten och släpper musen av sig själv');
-await press('g', 300); await frames(3); await page.waitForTimeout(400);
+await press('g', 300); await page.waitForFunction(() => PV.view3d.locked, null, { timeout: 20000 }).catch(() => {});
 const s2 = await page.evaluate(() => ({ locked: PV.view3d.locked, modal: !document.querySelector('#modal').classList.contains('hidden') }));
 ok(!s2.modal && s2.locked, 'när rutan stängs låses musen igen – ingen Esc och inget extra klick');
-await press('m', 300); await frames(2); await press('Escape', 300); await frames(3); await page.waitForTimeout(400);
+await page.evaluate(() => { const c = PV.view3d.canvas, orig = c.requestPointerLock.bind(c); window.__lockTries = 0; window.__lockErr = null; c.requestPointerLock = (...a) => { window.__lockTries++; const p = orig(...a); p?.catch?.((e) => { window.__lockErr = e.message; }); return p; }; });
+await press('m', 300); await frames(2); await press('Escape', 300); await page.waitForFunction(() => PV.view3d.locked, null, { timeout: 20000 }).catch(() => {});
 const s3 = await page.evaluate(() => ({ locked: PV.view3d.locked, modal: !document.querySelector('#modal').classList.contains('hidden') }));
 ok(!s3.modal && s3.locked, 'även när rutan stängs med Esc');
+if (!s3.locked) console.log('     muslåset efter Esc: ' + JSON.stringify(await page.evaluate(() => ({ tries: window.__lockTries, err: window.__lockErr, relock: PV.view3d.relock, shutAt: PV.view3d.shutAt, locked: PV.view3d.locked, el: document.pointerLockElement?.tagName || null }))));
 const hint = await page.evaluate(() => { const v = PV.view3d; const was = v.locked; v.locked = false; v.hint(); const tx = document.querySelector('#hint3d').textContent; v.locked = was; v.hint(); return tx; });
 ok(/M öppnar menyn/.test(hint) && !/Esc släpper/.test(hint), 'hjälpraden i 3D berättar om M i stället för Esc');
 console.log(errors.length ? 'FEL:\n' + errors.join('\n') : 'Inga fel.');

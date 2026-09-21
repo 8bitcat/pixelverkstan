@@ -277,7 +277,7 @@ export class Shop3D {
   // musen låses (igen) – får webbläsaren för sig att neka visas bara den vanliga "klicka i bilden"-raden
   lock() { if (!this.active || this.locked) return; try { const p = this.canvas.requestPointerLock?.(); p?.catch?.(() => {}); } catch { /* nekad */ } }
   leaveBench() {
-    if (this.relockBench) { this.relockBench = false; this.relock = true; this.shutT = 0; }   // tillbaka i butiken: musen låses igen
+    if (this.relockBench) { this.relockBench = false; this.relock = true; this.shutAt = 0; }   // tillbaka i butiken: musen låses igen
     if (this.kitchen) {
       this.kitchen = false;
       this.bench.detach();
@@ -567,8 +567,9 @@ export class Shop3D {
     // en dialog släpper musen – och när den stängs låses musen igen av sig själv (ingen Esc, inget extra klick)
     const mo = this.hooks.modalOpen();
     if (mo && this.locked) { this.relock = true; document.exitPointerLock?.(); }
-    if (mo) this.shutT = 0;
-    else if (this.relock && !this.kitchen) { this.shutT = (this.shutT || 0) + dt; if (this.shutT > 0.12) { this.relock = false; this.lock(); } }
+    // (väggklockan, inte spelets dt: långsamma bildrutor kapas och skulle annars skjuta upp låset i det oändliga)
+    if (mo) this.shutAt = 0;
+    else if (this.relock && !this.kitchen) { this.shutAt ||= performance.now(); if (performance.now() - this.shutAt > 120) { this.relock = false; this.lock(); } }
     this.move(dt);
     this.syncLocal();
     this.room.update(dt, fl);
