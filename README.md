@@ -267,6 +267,13 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   i restaurangen: allt görs i köket. Köksutrustningen följer epoken (krom på femtiotalet,
   rostfritt i kedjan, svart stål 2016). Fakta om Maillard, kärntemperaturer, dubbelfritering
   m.m. i guiden.
+- **Stillastående bild**: 3D-vyn får inte flimra. Skyltfönstren och kyldisken gjorde det: glas med
+  `transmission` ritar om allt bakom rutan varje bildruta, och kontaktskuggorna (GTAO) "kokade" vid
+  kanter. Montrarnas glas använder därför `paneMat` (genomskinligt utan transmission), AO har kortare
+  radie och kraftigare brusdämpning, solens skuggkamera täcker rummet i stället för en stor marginal
+  (4096² skuggkarta på hög grafik) och blanka smala metallkanter är mattare. `tools/flimmer.mjs`
+  mäter det: andelen av bilden som ändras mellan två bildrutor, stillastående och vid en halv
+  millimeters kamerarörelse.
 - **Köket i 3D**: ingen låst byggbild som i datorbutiken. Du står vid disken, vänder dig om
   (dra i bilden) och jobbar vid köksbänken bakom dig med din egen kamera: klicka på brödrosten,
   grillen, fritösen, dryckesmaskinen och brickan, gå runt med W A S D. Lådan med råvaror och
@@ -427,6 +434,7 @@ node tools/restaurang.mjs                # hamburgerbaren i webbläsaren: meny �
 node tools/restaurang3d.mjs              # hamburgerbaren i 3D: stor burgare i 2D-köket, köket på bänken, servering i 3D
 node tools/restaurang-ikoner.mjs         # ritar alla ingrediensers ikoner i ark per kategori (rest-ikoner-*.png)
 node tools/restaurang-golv.mjs           # restaurangens golv genom epokerna med fyllda montrar, automater och gäster som äter (rest-golv-<år>.png)
+node tools/flimmer.mjs                   # 3D-bilden ska stå stilla: mäter hur mycket som ändras mellan två bildrutor och vid en halv mm kamerarörelse
 node tools/restaurang-anim.mjs           # 3D: Mixamo-klippen laddas, gäster som sitter spelar sitt-/ätklipp, den som bär spelar bärklippet (rest-anim-*.png)
 node tools/mixamo-anim.mjs [filter]      # konverterar Mixamo-animationer (Without Skin) i assets/3d/mixamo/anim/ till assets/3d/anim/*.glb + manifest
 tools/art-styles.html, tools/art-icons.html  # alla delars stilar och ikoner

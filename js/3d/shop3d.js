@@ -85,7 +85,7 @@ export class Shop3D {
     this.ready = true;
     onProgress(1);
   }
-  ctx() { const g = this.game; return { game: g, floor: this.floor, plan: LY.PLAN, lokal: this.floor.lokal, year: g.year, shop: g.shop, theme: g.shop.theme || {} }; }
+  ctx() { const g = this.game; return { game: g, floor: this.floor, plan: LY.PLAN, lokal: this.floor.lokal, year: g.year, shop: g.shop, theme: g.shop.theme || {}, shadowMap: this.quality === 'hög' ? 4096 : 2048 }; }
   rebuildAll() {
     this.room?.dispose(); this.units?.dispose();
     const ctx = this.ctx();
@@ -141,12 +141,13 @@ export class Shop3D {
     if (this.quality === 'hög') {
       const gtao = new GTAOPass(this.scene, cam, w, h);
       gtao.output = GTAOPass.OUTPUT.Default;
-      gtao.updateGtaoMaterial({ radius: cam.isOrthographicCamera ? 0.12 : 0.3, distanceExponent: 1, thickness: 1, scale: 1.1, samples: 12, distanceFallOff: 1, screenSpaceRadius: false });
-      gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 4, radiusExponent: 1, rings: 2, samples: 16 });
-      gtao.blendIntensity = 0.85;
-      comp.addPass(gtao);
+      // kortare radie, fler prov och kraftigare brusdämpning: AO-mönstret "kokade" vid kanter när kameran rörde sig
+      gtao.updateGtaoMaterial({ radius: cam.isOrthographicCamera ? 0.1 : 0.22, distanceExponent: 1, thickness: 1, scale: 1.1, samples: 16, distanceFallOff: 1, screenSpaceRadius: false });
+      gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 8, radiusExponent: 1, rings: 3, samples: 16 });
+      gtao.blendIntensity = 0.65;
+      comp.addPass(gtao); comp.gtao = gtao; this.gtao = gtao;   // sparad för finjustering och flimmertestet
     }
-    comp.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.32, 0.55, 0.92));
+    comp.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.28, 0.55, 0.96));   // högre tröskel: solkanter blinkade i bloomen
     comp.addPass(new OutputPass());
     comp.addPass(new SMAAPass(w * dpr, h * dpr));
     return comp;

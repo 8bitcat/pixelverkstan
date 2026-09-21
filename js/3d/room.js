@@ -20,6 +20,9 @@ const STYLE = {
 const FLOORS = { 1: ['concrete_floor_worn_001', 0.9], 2: ['laminate_floor_02', 1], 3: ['floor_tiles_06', 1], 4: ['terrazzo_tiles', 1], 5: ['terrazzo_tiles', 0.75], 6: ['floor_tiles_06', 0.8] };
 
 export const glassMat = (tint = 0xe6f0f4, transmission = 0.92) => new THREE.MeshPhysicalMaterial({ color: tint, transmission, roughness: 0.04, metalness: 0, ior: 1.5, thickness: 0.02, envMapIntensity: 1.2, side: THREE.DoubleSide, depthWrite: false });
+// Enkelt glas utan transmission: transmission renderar om allt bakom rutan varje bildruta, vilket
+// flimrar när många glasytor ligger nära varandra (kyldisken). Det här är stabilt och nästan lika fint.
+export const paneMat = (tint = 0xe4eef2, opacity = 0.17) => new THREE.MeshPhysicalMaterial({ color: tint, transparent: true, opacity, roughness: 0.06, metalness: 0, ior: 1.45, specularIntensity: 1, envMapIntensity: 1, side: THREE.DoubleSide, depthWrite: false });
 export const metalMat = (color = 0x1b1d22, rough = 0.32) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0.85 });
 export const paintMat = (color, rough = 0.55) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0.05 });
 
@@ -131,18 +134,18 @@ export function buildRoom(scene, ctx) {
   const road = new THREE.Mesh(new THREE.PlaneGeometry(R.W + 8, 9), A.pbr('asphalt_floor', { repeat: [(R.W + 8) / 3, 3], color: 0x9a9a98 }));
   road.rotation.x = -Math.PI / 2; road.position.set(0, -0.16, -T - 4.3 - 4.5); road.receiveShadow = true; g.add(road);
   // fönster: glas, karm, spröjs
-  const frame = metalMat(st.frame, 0.4);
+  const frame = metalMat(st.frame, 0.52);   // matt karm: blanka smala kanter glittrar när kameran rör sig
   for (const w of [winL, winR]) {
     if (w.x1 - w.x0 < 0.5) continue;
     const pane = new THREE.Mesh(new THREE.PlaneGeometry(w.x1 - w.x0, w.y1 - w.y0), glassMat());
     pane.position.set((w.x0 + w.x1) / 2, (w.y0 + w.y1) / 2, -T / 2); g.add(pane);
     const fw = 0.06;
     slab(g, w.x0 - fw, w.x1 + fw, w.y0 - fw, w.y0, -T + 0.04, -0.04, frame); slab(g, w.x0 - fw, w.x1 + fw, w.y1, w.y1 + fw, -T + 0.04, -0.04, frame);
-    slab(g, w.x0 - fw, w.x0, w.y0, w.y1, -T + 0.04, -0.04, frame); slab(g, w.x1, w.x1 + fw, w.y0, w.y1, -T + 0.04, -0.04, frame);
+    slab(g, w.x0 - fw, w.x0, w.y0 + 0.002, w.y1 - 0.002, -T + 0.04, -0.04, frame); slab(g, w.x1, w.x1 + fw, w.y0 + 0.002, w.y1 - 0.002, -T + 0.04, -0.04, frame);
     const n = Math.max(1, Math.round((w.x1 - w.x0) / 1.3));
-    for (let i = 1; i < n; i++) { const x = w.x0 + (w.x1 - w.x0) * i / n; slab(g, x - 0.02, x + 0.02, w.y0, w.y1, -T / 2 - 0.02, -T / 2 + 0.02, frame); }
-    // fönsterbräda
-    slab(g, w.x0 - 0.08, w.x1 + 0.08, w.y0 - 0.04, w.y0, -T, 0.06, paintMat(0xf4f1ea, 0.5));
+    for (let i = 1; i < n; i++) { const x = w.x0 + (w.x1 - w.x0) * i / n; slab(g, x - 0.02, x + 0.02, w.y0 + 0.002, w.y1 - 0.002, -T / 2 + 0.004, -T / 2 + 0.03, frame); }
+    // fönsterbräda (under karmen – låg den i karmen flimrade kanten, samma yta två gånger)
+    slab(g, w.x0 - 0.08, w.x1 + 0.08, w.y0 - fw - 0.045, w.y0 - fw - 0.002, -T, 0.06, paintMat(0xf4f1ea, 0.5));
   }
   // ÖPPET-neon i vänstra fönstret
   if (winL.x1 - winL.x0 > 0.5) { const n = neonSign('ÖPPET', '#ff4d6d', 1.05, 0.34, 2.4); n.position.set(winL.x1 - 0.7, winL.y1 - 0.35, -0.05); g.add(n); out.open = n; }
@@ -232,9 +235,11 @@ export function buildRoom(scene, ctx) {
   // ljus: sol genom fönstren, himmelsfyllnad, takarmaturer, spotar
   const sun = new THREE.DirectionalLight(0xfff1dc, 2.4);
   sun.position.set(-3.5, 7.5, -8); sun.target.position.set(0.5, 0, 3.5); g.add(sun, sun.target);
-  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
-  Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 1, far: 30 });
-  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
+  sun.castShadow = true; sun.shadow.mapSize.set(ctx.shadowMap || 2048, ctx.shadowMap || 2048);
+  // kameran täcker rummet med liten marginal (förr ±9 m): tätare texlar → skuggkanterna kryper mindre när man går
+  const sr = Math.hypot(R.W, D) / 2 + 0.6;
+  Object.assign(sun.shadow.camera, { left: -sr, right: sr, top: sr, bottom: -sr, near: 1, far: 30 });
+  sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.05;   // skuggakne flimrade längs fönsterkarmar och disk
   out.lights.sun = sun;
   const hemi = new THREE.HemisphereLight(0xdbe8ff, 0x6a6058, 0.75); g.add(hemi);
   g.add(new THREE.AmbientLight(0xfff4e6, 0.22));
