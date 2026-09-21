@@ -331,9 +331,12 @@ export class Bench3D {
     const c = this.atlasCanvas;
     if (c.width !== AW || c.height !== AH) { c.width = AW; c.height = AH; }
     c.getContext('2d').putImageData(new ImageData(data, AW, AH), 0, 0);
-    // Texturen skapas en gång och återanvänds även när atlasen byter storlek (canvasen är densamma).
-    // Att byta textur och sätta material.needsUpdate kastar bort materialets kompilerade shader, och
-    // den måste då byggas om – det var det som fick bilden att frysa när köket öppnades.
+    // Texture-objektet skapas en gång och sitter kvar på materialen: att byta objekt och sätta
+    // material.needsUpdate kastar bort materialets kompilerade shader, som då måste byggas om (det fick
+    // bilden att frysa när köket öppnades). Men grafikkortets textur kan INTE byta storlek i efterhand –
+    // växer atlasen måste den skapas om, annars hamnar nya bilder utanför och alla ytor får fel textur.
+    // dispose() släpper bara grafikkortets kopia; objektet och materialens koppling till det är kvar.
+    if (this.atlas && (this.atlasSize?.[0] !== AW || this.atlasSize?.[1] !== AH)) this.atlas.dispose();
     if (!this.atlas) {
       this.atlas = new THREE.CanvasTexture(c);
       this.atlas.colorSpace = THREE.SRGBColorSpace; this.atlas.flipY = false;

@@ -11,7 +11,7 @@ const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--ena
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(`[pageerror] ${e.message}\n${e.stack}`));
-page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+page.on("console", (m) => { if (m.type() === "error" || /GL_INVALID|WebGL: INVALID/.test(m.text())) errors.push(m.text().slice(0, 200)); });   // grafikkortets fel kommer bara som varningar
 const ok = (c, m) => { console.log((c ? 'OK   ' : 'FEL  ') + m); if (!c) errors.push(m); };
 const crash = async (e) => { const NL = String.fromCharCode(10); console.log('KRASCH ' + String(e.message).split(NL)[0]); console.log(errors.join(NL)); try { await page.screenshot({ path: OUT + '3d-bygg-krasch.png' }); } catch {} process.exit(1); };
 process.on('unhandledRejection', crash); process.on('uncaughtException', crash);
