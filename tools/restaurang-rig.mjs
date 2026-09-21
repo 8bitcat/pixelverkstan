@@ -35,14 +35,23 @@ applyBuildOp(shop, order, { t: 'place', slot: 'l0', part: order.items[0].part })
 const biffSlot = L.SLOTS.find((s) => s.cat === 'biff'), biff = P[order.items.find((i) => i.cat === 'biff').part];
 ok(!L.canPlace(biffSlot, biff, b).ok, 'biffen kräver grill: ' + L.canPlace(biffSlot, biff, b).msg);
 ok(L.actionReady(L.ACTION.grill, b) && !L.actionReady(L.ACTION.salt, b), 'grillen är redo, saltet inte än');
-applyBuildOp(shop, order, { t: 'act', id: 'grill', i: 0 });
-ok(!L.actDone(b, 'grill') && L.actCount(b, 'grill') === 1, 'första tryck: biffen ligger på (1/2)');
-applyBuildOp(shop, order, { t: 'act', id: 'grill', i: 1 });
+b.time = 100; applyBuildOp(shop, order, { t: 'act', id: 'grill', i: 0, at: b.time });
+ok(!L.actDone(b, 'grill') && L.actCount(b, 'grill') === 1, 'första tryck: biffen ligger på stekbordet (1/2)');
+ok(!L.pointReady(L.ACTION.grill, 1, b) && /bryns/.test(L.actHint(L.ACTION.grill, b)) && /färg/.test(L.whyNot(L.ACTION.grill, b) || ''), 'biffen går inte att vända direkt: ' + L.actHint(L.ACTION.grill, b).replace(/<[^>]+>/g, ''));
+b.time += 2.5; ok(L.cookInfo(b).grill.a > 0.4 && L.cookInfo(b).grill.a < 0.6 && !L.pointReady(L.ACTION.grill, 1, b), `efter 2,5 s är undersidan halvbrynt (${L.cookInfo(b).grill.a.toFixed(2)})`);
+const sigA = L.cookSig(b); b.time += 3; ok(L.pointReady(L.ACTION.grill, 1, b) && /Vänd/.test(L.actHint(L.ACTION.grill, b)) && L.cookSig(b) !== sigA, 'efter 5,5 s går den att vända, och bilden ritas om när färgen ändras');
+applyBuildOp(shop, order, { t: 'act', id: 'grill', i: 1, at: b.time });
 ok(!L.canPlace(biffSlot, biff, b).ok, 'kryddning krävs: ' + L.canPlace(biffSlot, biff, b).msg);
 ok(!L.pickups(b).some((p) => p.id === 'grill'), 'biffen går inte att ta från grillen innan den är kryddad (saltet har samma klickyta)');
-applyBuildOp(shop, order, { t: 'act', id: 'salt', i: 0 });
-ok(L.canPlace(biffSlot, biff, b).ok, 'stekt och kryddad biff får läggas');
-ok(L.pickups(b).some((p) => p.id === 'grill' && p.part?.cat === 'biff'), 'kryddad biff går att ta från grillen med handen');
+applyBuildOp(shop, order, { t: 'act', id: 'salt', i: 0, at: b.time });
+ok(L.ACTION.salt.alts?.[0]?.length === 1 && L.ACTION.salt.points[0][0] !== L.ACTION.grill.points[0][0], 'saltet sitter på salt- och pepparkaret bredvid stekbordet (och går också att klicka på biffen)');
+ok(!L.canPlace(biffSlot, biff, b).ok && /båda sidor/.test(L.canPlace(biffSlot, biff, b).msg) && !L.pickups(b).some((p) => p.id === 'grill'), 'andra sidan måste också få färg: ' + L.canPlace(biffSlot, biff, b).msg);
+b.time += 5.5;
+ok(L.canPlace(biffSlot, biff, b).ok && L.cookWarnings(b).length === 0, 'stekt på båda sidor och kryddad: biffen får läggas på burgaren');
+ok(L.pickups(b).some((p) => p.id === 'grill' && p.part?.cat === 'biff' && p.from === 'stekbordet'), 'den färdiga biffen går att ta från stekbordet med handen');
+{ // ligger den kvar för länge blir den bränd – det märker gästen
+  const t0 = b.time; b.time += 20; const w = L.cookWarnings(b); b.time = t0;
+  ok(w.length === 1 && /bränd/.test(w[0]), 'en biff som ligger kvar för länge blir bränd: ' + w.join(' ')); }
 const top = L.SLOTS.filter((s) => s.cat === 'brod').at(-1);
 ok(!L.canPlace(top, P[order.items[0].part], b).ok, 'toppbrödet kräver lagren under: ' + L.canPlace(top, P[order.items[0].part], b).msg);
 // fel sort på toppen
@@ -100,8 +109,14 @@ ok(!F.optionsFor(fit, 4, 'wide', 1996).some((o) => o.kind === 'cat') && F.option
   const b = o.build = newBuild(); b.help = true; const L2 = rigFor(o);
   ok(L2.ACTION.fritera && L2.ACTION.tappa && L2.SLOT.dessert && L2.STEPS.indexOf('act:fritera') < L2.STEPS.indexOf('slot:pommes') && L2.STEPS.indexOf('act:tappa') < L2.STEPS.indexOf('slot:dryck'), `köket har fritös, dryckesmaskin och efterrättsplats (${L2.STEPS.join(' ')})`);
   ok(!L2.canPlace(L2.SLOT.pommes, P.pommes, b).ok && !L2.canPlace(L2.SLOT.dryck, P.cola, b).ok, 'pommesen måste friteras och colan tappas upp först: ' + L2.canPlace(L2.SLOT.pommes, P.pommes, b).msg);
-  applyBuildOp(shop, o, { t: 'act', id: 'fritera', i: 0 }); ok(!L2.actDone(b, 'fritera'), 'korgen nere (1/2)');
-  applyBuildOp(shop, o, { t: 'act', id: 'fritera', i: 1 }); applyBuildOp(shop, o, { t: 'act', id: 'tappa', i: 0 });
+  ok(L2.ACTION.fritera.points.length === 3 && L2.pickups(b).some((x) => x.id === 'back' && x.name === 'potatis' && x.part.id === 'pommes'), 'fritösen har tre steg, och potatisen går att ta ur backen bredvid');
+  ok(L2.pointReady(L2.ACTION.fritera, 0, b) && !L2.pointReady(L2.ACTION.fritera, 1, b), 'korgen måste laddas innan den sänks');
+  b.time = 50; applyBuildOp(shop, o, { t: 'act', id: 'fritera', i: 0, at: b.time, part: 'pommes' });
+  ok(L2.cookInfo(b).fry.loaded && !L2.pickups(b).some((x) => x.id === 'back') && L2.pointReady(L2.ACTION.fritera, 1, b), 'potatisen ligger i korgen – nu går den att sänka');
+  applyBuildOp(shop, o, { t: 'act', id: 'fritera', i: 1, at: b.time }); ok(!L2.actDone(b, 'fritera') && L2.cookInfo(b).fry.cooking && !L2.pointReady(L2.ACTION.fritera, 2, b), 'korgen nere i oljan (2/3) – går inte att lyfta direkt');
+  b.time += 6.5; ok(L2.cookInfo(b).fry.prog >= 1 && L2.pointReady(L2.ACTION.fritera, 2, b) && /Lyft/.test(L2.actHint(L2.ACTION.fritera, b)), 'efter 6,5 s är det gyllene och korgen går att lyfta');
+  applyBuildOp(shop, o, { t: 'act', id: 'fritera', i: 2, at: b.time }); applyBuildOp(shop, o, { t: 'act', id: 'tappa', i: 0, at: b.time });
+  ok(L2.actDone(b, 'fritera') && L2.pickups(b).some((x) => x.id === 'fritera' && x.from === 'fritöskorgen') && L2.cookWarnings(b).length === 0, 'det friterade ligger i den upplyfta korgen och går att ta');
   ok(L2.canPlace(L2.SLOT.pommes, P.pommes, b).ok && L2.canPlace(L2.SLOT.dryck, P.cola, b).ok && L2.canPlace(L2.SLOT.dessert, P.applepaj, b).ok, 'friterat, upptappat och efterrätten får läggas på brickan');
   let n = 0; const R3 = { k: 16, hz: 13, ox: 0, oy: 0, defaultId: 0, box: () => n++, proj: (u, v, z) => [u - v, (u + v) / 2 - z] };
   L2.drawScene(R3, b, {}); ok(n > 30, `köksscenen med fritös och dryckesmaskin ritar ${n} lådor`);

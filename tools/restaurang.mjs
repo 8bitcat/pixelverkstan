@@ -99,7 +99,7 @@ const built = await page.evaluate(async () => {
   const v = PV.build, L = v.L, log = [];
   for (let guard = 0; guard < 40; guard++) {
     const s = v.nextStep(); if (!s || s.kind === 'stand') break;
-    if (s.kind === 'act') { const a = L.ACTION[s.id]; const done = L.actSet(v.b, a.id); const i = a.points.findIndex((p, k) => !done.has(k)); v.doAction(a, i); log.push('act:' + a.id + ':' + i); }
+    if (s.kind === 'act') { const a = L.ACTION[s.id]; const done = L.actSet(v.b, a.id); const i = a.points.findIndex((p, k) => !done.has(k)); v.doAction(a, i); v.b.time += 8; /* tillagningen tar tid */ log.push('act:' + a.id + ':' + i); }
     else if (s.kind === 'slot') { const e = v.trayEntries().find((x) => x.key === s.entryKey) || v.partEntries().find((x) => L.slotsFor(x.part).some((sl) => sl.id === s.id)); if (!e) { log.push('ingen del för ' + s.id); break; } if (s.id === 'l3') { v.selected = e.key; await new Promise((r) => setTimeout(r, 250)); window.__midShot = true; await new Promise((r) => setTimeout(r, 900)); v.selected = null; } const r = v.place(e, L.SLOT[s.id]); log.push('slot:' + s.id + ':' + (r ? 'ok' : 'nej')); }
     await new Promise((r) => setTimeout(r, 30));
   }

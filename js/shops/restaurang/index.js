@@ -102,7 +102,7 @@ export default {
   text: {
     signSale: 'MENY', signTag: 'ALLTID NYGRILLAT', benchSign: 'KÖKSBÄNK',
     kitDesc: 'råvaror till dina första gästers burgare, pommes och läsk – allt i en låda.', searchHint: 'Sök ingrediens, kött, sås …', resultParts: 'Mat + tillagning', resultTime: 'Tillagning', emptyUnit: 'TOMT',
-    thing: 'burgare', things: 'burgare', place: 'köket', thisThing: 'den här burgaren',
+    thing: 'burgare', things: 'burgare', place: 'köket', thisThing: 'den här burgaren', guideFace: '🧑‍🍳',
     hint3d: 'laga maten vid köksbänken bakom disken · ta brickan och bär ut den', benchName: 'Köksbänken', benchVerb: 'laga',
     workshopHover: 'Köket – maten lagas vid köksbänken bakom disken', workshopToast: 'Maten lagas vid köksbänken bakom disken – gå dit och klicka.',
     swapBtn: '📦 Byt råvara ur lagret', swapNote: 'Gästen betalar för det som ligger på burgaren – finare råvaror ger mer betalt.',
@@ -114,7 +114,7 @@ export default {
     titleFor: (order, gen) => `${order.title} åt ${order.name}`,
     welcome: (name) => `Välkommen till köket! Nu bygger vi ${name}s burgare lager för lager. Följ de gula markeringarna.`,
     build: (name) => `Bygg burgaren åt ${name}. Rosta brödet, stek biffen och lägg lagren i rätt ordning.`,
-    pro: 'Proffsläge! Inga markeringar. Släpp brödet på brödrosten, biffen på grillen (två gånger: lägg på och vänd), salta, pommesen i fritösen och muggen vid dryckesmaskinen – och bygg lagren på tallriken i beställningens ordning.',
+    pro: 'Proffsläge! Inga markeringar. Släpp brödet på brödrosten och biffen på stekbordet, vänd den när undersidan fått färg, krydda med salt- och pepparkaret, lägg råvaran i fritöskorgen och sänk ner den, tappa upp drycken – och bygg lagren på brickan i beställningens ordning. Lämna inget för länge: det bränns.',
     dragHint: 'Dra ingredienserna från lådan till brickan.',
     standBtn: '🍽️ Servera', openBtn: '🔙 Tillbaka till köket', standStep: '🍽️ Ställ tallriken på disken', testHead: 'Servering',
     builtHint: 'Allt står på brickan! Tryck på 🍽️ Servera.', doneHint: 'Allt är klart! Tryck på <b>🍽️ Servera</b> och ställ brickan på disken.', doneHint3d: 'Allt är klart! <b>Klicka på brickan</b> för att ta den och bär ut den till kunden.',

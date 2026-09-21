@@ -251,9 +251,10 @@ inredning, co-op) men med ett kök i stället för en verkstad:
 - **155 menyer** (`orders.js`): recept lager för lager med tillåtna ingredienser per lager,
   år, nivå, pris, kundrepliker och brödkrav. Kunden beställer det som finns i kylen (helst),
   ibland något som saknas, ibland får du välja drycken.
-- **Köket** (`rig.js`): rosta brödet i brödrosten → underbrödet → lägg biffen på grillen,
-  vänd, salta och peppra → lager i rätt ordning → toppbrödet (samma sort som under) →
-  **fritösen** (sänk ner korgen, lyft upp) innan pommes, nuggets och lökringar läggs i fickan →
+- **Köket** (`rig.js`): rosta brödet i brödrosten → underbrödet → lägg biffen på **stekbordet**,
+  vänd när undersidan fått färg, salta och peppra på salt- och pepparkaret → lager i rätt ordning →
+  toppbrödet (samma sort som under) → **fritösen** (lägg i korgen, sänk ner, lyft upp när det är
+  gyllene) innan pommes, nuggets och lökringar läggs i fickan →
   **dryckesmaskinen** (tappa upp) innan muggen ställs på brickan (flaskor och burkar tas ur
   kylen under) → efterrätten sist. Råvaran kan **släppas direkt på stationen** (brödet på
   brödrosten, biffen på grillen, pommesen i fritösen, muggen vid maskinen) – det utför
@@ -262,8 +263,23 @@ inredning, co-op) men med ett kök i stället för en verkstad:
   tas med handen**: tryck på eller dra från det rostade brödet på brödrosten, biffen på grillen,
   pommesen i korgen och muggen vid maskinen – inte via lådan. En hand guppar över det som går att
   ta, och stationen minns vilken råvara som lades på (`b.station`, följer med i co-op). Biffen går
-  att ta först när den är saltad (saltet har samma klickyta), och en handling som är redo vinner
-  alltid över plockning. Inget säljs över disk och det finns inga hyllor eller montrar
+  att ta först när den är stekt på båda sidor och kryddad, och en handling som är redo vinner
+  alltid över plockning.
+- **Stekbord och fritös med riktig tillagning** (`COOK` i `rig.js`, `drawGrill`/`drawFryer` i `art.js`):
+  stekbordet är en rostfri stekhäll med stänkskydd, två vred, lampor och fettlåda. Biffen läggs på rå och
+  rosa, undersidan bryns på fem sekunder (kanten mörknar nerifrån), sedan går den att **vända** – då
+  syns den brynta sidan upp – och andra sidan bryns lika länge. Först när båda sidor har färg går biffen
+  att ta. Ligger den kvar över 17 sekunder på en sida blir den **bränd**, det ryker och gästen ger
+  en anmärkning (en stjärna mindre). Fritösen är en dubbelfritös med två kar, bubblande olja,
+  avtappningskranar och trådkorgar med svarta handtag. Bredvid står **potatisbacken** (eller den blå
+  fryslådan för nuggets och lökringar): ta råvaran med handen och släpp den i korgen, tryck på handtaget
+  för att sänka korgen, vänta sex sekunder medan voxelpommesen går från blek till gyllene, lyft. För
+  länge i oljan (19 s) = bränt. **Salt- och pepparkaret** står bredvid stekbordet med egen klickyta
+  (det går också att trycka på biffen), så kryddningen fungerar i proffsläget utan markeringar. Ett klick
+  på en station som inte är redo ger besked ("Vänta – undersidan har inte fått färg än.") i stället för
+  tystnad. Tiderna sparas som tidsstämplar på handgreppen (`b.actAt`, `b.placedAt`), följer med i
+  sparning och co-op, och äldre byggen utan tidsstämplar räknas som färdiga. Hjälprutan visar procenten
+  medan det bryns. Samma scen ritas i 3D-köket. `tools/restaurang-stationer.mjs` klickar igenom allt. Inget säljs över disk och det finns inga hyllor eller montrar
   i restaurangen: allt görs i köket. Köksutrustningen följer epoken (krom på femtiotalet,
   rostfritt i kedjan, svart stål 2016). Fakta om Maillard, kärntemperaturer, dubbelfritering
   m.m. i guiden.
@@ -409,7 +425,7 @@ js/shops/
   restaurang/   Hamburgerbaren
     menu.js         416 ingredienser (bröd, biff, ost, extra, grönt, sås, tillbehör, dryck, efterrätt), epoker, höjder
     orders.js       155 menyer med recept per lager, generator, start, guidade kunder, priser
-    rig.js          köket: brödrost, grill (lägg på/vänd/salta), lagren på brickan, ficka och dryck
+    rig.js          köket: brödrost, stekbord (lägg på/vänta/vänd), saltkar, fritös (ladda/sänk/lyft), lagren på brickan, ficka och dryck
     art.js          isometrisk grafik för alla former + ikoner
     serve.js        finalen: servera brickan, kunden smakar och betalar
     upgrades.js     läskkyl/dessertdisk, jukebox m.m., lokaler Gatuköket → Megaburger, kylrum
@@ -477,6 +493,7 @@ node tools/restaurang-ikoner.mjs         # ritar alla ingrediensers ikoner i ark
 node tools/restaurang-golv.mjs           # restaurangens golv genom epokerna med fyllda montrar, automater och gäster som äter (rest-golv-<år>.png)
 node tools/kok-farger.mjs                # 3D-köket ser rätt ut: grafikkortets felmeddelanden fångas och bilden jämförs med en nybyggd textur (atlasen växer när lager läggs på)
 node tools/kok-laddtid.mjs               # hur fort köket öppnas i 2D och 3D: tid till första bild, låst sida, nya shaderprogram
+node tools/restaurang-stationer.mjs      # stekbord och fritös med riktiga klick i proffsläget: vänta på färgen, vänd, salta på karet, potatis ur backen till korgen, bränd biff ger anmärkning
 node tools/restaurang-texter.mjs         # inga datorord i det hamburgerbarens spelare ser (dialoger, flikar, kök), avataren går till kassan, maten ritas på bordet i 2D
 node tools/restaurang-platser.mjs        # sittplatserna som kapacitet: fulla bord → nekad beställning → kö → inga nya kunder; stolen hålls under hämtning; alla stolar nåbara i alla lokaler
 node tools/flimmer.mjs                   # 3D-bilden ska stå stilla: mäter hur mycket som ändras mellan två bildrutor och vid en halv mm kamerarörelse

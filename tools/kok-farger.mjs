@@ -63,7 +63,7 @@ for (let guard = 0; guard < 40; guard++) {
   const step = await page.evaluate(() => {
     const v = PV.build, L = v.L, s = v.nextStep();
     if (!s || s.kind === 'stand') return null;
-    if (s.kind === 'act') { const a = L.ACTION[s.id], done = L.actSet(v.b, a.id), i = a.points.findIndex((p, k) => !done.has(k)); v.doAction(a, i); return { act: s.id }; }
+    if (s.kind === 'act') { const a = L.ACTION[s.id], done = L.actSet(v.b, a.id), i = a.points.findIndex((p, k) => !done.has(k)); v.doAction(a, i); v.b.time += 8; /* tillagningen tar tid */ return { act: s.id }; }
     const e = v.trayEntries().find((x) => x.key === s.entryKey) || v.partEntries().find((x) => L.slotsFor(x.part).some((sl) => sl.id === s.id));
     if (!e) return { err: 'ingen del för ' + s.id };
     v.place(e, L.SLOT[s.id]);

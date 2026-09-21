@@ -3,7 +3,7 @@
 // läggs i fickan och drycken på brickan. Samma API som datorbutikens rigg (core/build.js
 // pratar bara med riggen), men utan kablar och uttag.
 import { DB, layerHeight, bunTopHeight, burgerRadius, BURGER_CATS, CATS } from './menu.js';
-import { drawPlate, drawTray, drawToaster, drawGrill, drawLayer, drawSide, drawFryer, drawDrinkTower } from './art.js';
+import { drawPlate, drawTray, drawToaster, drawGrill, drawShakers, drawCrate, drawLayer, drawSide, drawFryer, drawDrinkTower } from './art.js';
 import { eraLook } from './era.js';
 
 export const VIEW = { w: 872, h: 504, k: 16, hz: 13, ox: 400, oy: 80 };
@@ -13,7 +13,7 @@ export const connectorIcon = (conn, W = 40, H = 30) => { const c = document.crea
 
 // var sakerna står (enheter): brödrost och grill till vänster, brickan till höger
 // (brödrost och grill står en aning längre åt vänster än förr för att ge plats åt brickan)
-export const K = { toaster: [-1, 1], grill: [-1, 8.5], fryer: [-4.5, 15], tower: [24, 17], tray: [4.7, 30, 1, 15], plate: [13, 8, 8, 5.8], burger: [13, 8], basket: [19.5, 3.5], cup: [24.5, 11.5], dessert: [26.5, 6.5] };
+export const K = { toaster: [-1, 1], grill: [-1, 8.5], salt: [3.0, 6.4], fryer: [-4.5, 15], crate: [1.3, 15.7], tower: [24, 17], tray: [4.7, 30, 1, 15], plate: [13, 8, 8, 5.8], burger: [13, 8], basket: [19.5, 3.5], cup: [24.5, 11.5], dessert: [26.5, 6.5] };
 // brickans ovansida ligger strax under arbetsytan (tallriken är nedsänkt lika mycket) – allt annat står på den
 export const TRAY_Z = -0.3;
 export const TRAY_ID = 900;   // brickans egen träff-id: i 3D klickar man på den färdiga brickan för att ta den
@@ -21,6 +21,9 @@ export const TRAY_ID = 900;   // brickans egen träff-id: i 3D klickar man på d
 export const LIFT_DZ = 26;
 // delarna på brickan som egna föremål (3D: ta, bär, kasta): var de står och hur stora de är (enheter)
 export const TRAY_PARTS = { tray: { at: [(K.tray[0] + K.tray[1]) / 2, (K.tray[2] + K.tray[3]) / 2, TRAY_Z - 0.35], half: [(K.tray[1] - K.tray[0]) / 2, (K.tray[3] - K.tray[2]) / 2] }, burger: { at: [K.plate[0], K.plate[1], TRAY_Z], r: K.plate[2] }, pommes: { at: [K.basket[0], K.basket[1], TRAY_Z], r: 2.6 }, dryck: { at: [K.cup[0], K.cup[1], TRAY_Z], r: 1.8 }, dessert: { at: [K.dessert[0], K.dessert[1], TRAY_Z], r: 2.2 } };
+// Tillagningen tar tid (sekunder i köket): en sida av biffen bryns på SIDE, pommesen friteras på FRY. Ligger
+// det kvar längre än BURN / FRY_BURN blir det bränt – det märker gästen.
+export const COOK = { SIDE: 5, BURN: 17, FRY: 6, FRY_BURN: 19 };
 // tillbehör som friteras och drycker som tappas upp ur maskinen (flaskor och burkar tas ur kylen under)
 export const isFried = (p) => ['fries', 'nuggets', 'ringbasket'].includes(p?.look?.shape);
 export const isPoured = (p) => p?.look?.shape === 'cup' && !p.look.bottle && !p.look.can && !p.look.box;
@@ -99,6 +102,7 @@ export function drawMeal(R, meal, { eaten = 0 } = {}) {
 // var måltidens fot ligger (enheter): brickans mitt, eller tallrikens om den serverades utan bricka
 export const mealAnchor = (meal) => (meal?.tray ? TRAY_PARTS.tray.at : [K.plate[0], K.plate[1], TRAY_Z]);
 
+const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const CACHE = new WeakMap();
 export function resetRig(order) { CACHE.delete(order); }
 export function rigFor(order) {
@@ -144,18 +148,75 @@ function makeRig(order) {
   }
 
   // ---------- Handgrepp ----------
+  // Punkterna i ett handgrepp görs i ordning (pointReady). Stekbordet: lägg på biffen, vänd den när undersidan
+  // fått färg. Fritösen: lägg råvaran i korgen, sänk ner korgen i oljan, lyft upp den när det är gyllene.
+  // Saltet: klicka på salt- och pepparkaret bredvid stekbordet, eller på biffen (alts).
+  const PATTY = [K.grill[0] + 2.75, K.grill[1] + 3, 1.6], BASKET = [K.fryer[0] + 1.35, K.fryer[1] + 3.2, 3.4], HANDLE = [K.fryer[0] + 1.35, K.fryer[1] + 5.6, 3.2];
   const A = [{ id: 'rosta', name: 'Rosta brödet', icon: '🍞', requires: [], points: [[K.toaster[0] + 2, K.toaster[1] + 2, 2.4]] }];
   const firstBiff = layers.find((l) => l.it.cat === 'biff');
   if (firstBiff) {
-    A.push({ id: 'grill', name: 'Stek biffen (lägg på, vänd)', icon: '🔥', requires: [], points: [[K.grill[0] + 1.6, K.grill[1] + 2.0, 1.15], [K.grill[0] + 4.0, K.grill[1] + 4.0, 1.15]] });
-    A.push({ id: 'salt', name: 'Salta och peppra', icon: '🧂', requires: ['act:grill'], points: [[K.grill[0] + 2.75, K.grill[1] + 3, 1.9]] });
+    A.push({ id: 'grill', name: 'Stek biffen på båda sidor (lägg på, vänd)', icon: '🔥', requires: [], points: [PATTY, PATTY] });
+    A.push({ id: 'salt', name: 'Salta och peppra', icon: '🧂', requires: ['act:grill'], points: [[K.salt[0] + 0.65, K.salt[1] + 0.3, 1.3]], alts: [[PATTY]] });
   }
-  if (fried) A.push({ id: 'fritera', name: 'Fritera (sänk ner korgen, lyft upp)', icon: '🍟', requires: [], points: [[K.fryer[0] + 1.2, K.fryer[1] + 2.3, 2.9], [K.fryer[0] + 3.3, K.fryer[1] + 2.3, 2.3]] });
+  if (fried) A.push({ id: 'fritera', name: 'Fritera (lägg i korgen, sänk ner, lyft upp)', icon: '🍟', requires: [], points: [BASKET, HANDLE, HANDLE] });
   if (poured) A.push({ id: 'tappa', name: 'Tappa upp drycken', icon: '🥤', requires: [], points: [[K.tower[0] + 2.2, K.tower[1] + 3.2, 3.0]] });
   const ACTION = Object.fromEntries(A.map((a) => [a.id, a]));
   const actSet = (b, id) => b.acts.get(id) || new Set();
   const actCount = (b, id) => actSet(b, id).size;
   const actDone = (b, id) => !!ACTION[id] && actCount(b, id) >= ACTION[id].points.length;
+
+  // ---------- Tillagningen: hur brynt och hur friterat ----------
+  // Tiderna kommer ur handgreppens tidsstämplar (b.actAt, sekunder i köket) och när biffen lades på burgaren
+  // (b.placedAt). Äldre byggen och handgrepp utan tid räknas som färdiga.
+  const fbSlot = () => S.find((s) => s.cat === 'biff');
+  function cookInfo(b) {
+    const now = b.time || 0, at = b.actAt || {}, g = at.grill || {}, f = at.fritera || {}, gs = actSet(b, 'grill'), fs = actSet(b, 'fritera');
+    const on = gs.has(0), flipped = gs.has(1), fb = fbSlot(), taken = fb ? b.placedAt?.[fb.id] : undefined;
+    const secA = !on ? 0 : g[0] === undefined ? COOK.SIDE : (flipped ? (g[1] ?? now) : now) - g[0];
+    const secB = !flipped ? 0 : g[1] === undefined ? COOK.SIDE : (taken ?? now) - g[1];
+    const loaded = fs.has(0), down = fs.has(1), up = fs.has(2);
+    const secF = !down ? 0 : f[1] === undefined ? COOK.FRY : (up ? (f[2] ?? now) : now) - f[1];
+    return {
+      grill: { on, flipped, a: secA / COOK.SIDE, b: secB / COOK.SIDE, burnt: secA > COOK.BURN || secB > COOK.BURN, cooking: on && !(fb && b.placed[fb.id]), tick: Math.floor(now * 2) },
+      fry: { loaded, down, up, prog: secF / COOK.FRY, burnt: secF > COOK.FRY_BURN, cooking: down && !up, tick: Math.floor(now * 2) },
+    };
+  }
+  // vilket steg i ett handgrepp som går att göra just nu
+  function pointReady(a, i, b) {
+    const set = actSet(b, a.id), c = cookInfo(b);
+    for (let k = 0; k < i; k++) if (!set.has(k)) return false;
+    if (a.id === 'grill' && i === 1) return c.grill.a >= 1;
+    if (a.id === 'fritera' && i === 2) return c.fry.prog >= 1;
+    return true;
+  }
+  // ritas om när något ändras på stekbordet eller i fritösen (brynt i femtedelar, bubblor och fräs i halvsekunder)
+  const step5 = (x) => Math.floor(Math.min(3.4, x) * 5);
+  function cookSig(b) { const c = cookInfo(b); return `${step5(c.grill.a)}|${step5(c.grill.b)}|${step5(c.fry.prog)}|${c.grill.cooking || c.fry.cooking ? c.grill.tick : 0}`; }
+  // vad som står i hjälprutan medan man väntar
+  function actHint(a, b) {
+    const c = cookInfo(b), set = actSet(b, a.id), pct = (x) => Math.round(Math.min(1, x) * 100);
+    if (a.id === 'grill') {
+      if (!set.has(0)) return 'Lägg biffen på <b>stekbordet</b> – släpp den på stekytan (eller tryck på 🔥).';
+      if (!set.has(1)) return c.grill.a < 1 ? `Undersidan bryns … <b>${pct(c.grill.a)} %</b>. Vänta tills den fått färg.` : '<b>Vänd biffen nu!</b> Tryck på den.';
+    }
+    if (a.id === 'salt') return c.grill.b < 1 ? `Andra sidan bryns … <b>${pct(c.grill.b)} %</b>. Krydda under tiden: tryck på <b>salt- och pepparkaret</b>.` : 'Tryck på <b>salt- och pepparkaret</b> (eller på biffen) för att krydda.';
+    if (a.id === 'fritera') {
+      if (!set.has(0)) return `Lägg ${sidePart ? esc(sidePart.name.toLowerCase()) : 'råvaran'} i <b>fritöskorgen</b> – ta den ur backen bredvid fritösen eller ur lådan och släpp den i korgen.`;
+      if (!set.has(1)) return '<b>Sänk ner korgen</b> i oljan – tryck på handtaget.';
+      return c.fry.prog < 1 ? `Det fräser i oljan … <b>${pct(c.fry.prog)} %</b>. Vänta tills det är gyllene.` : '<b>Lyft korgen nu!</b> Tryck på handtaget.';
+    }
+    return null;
+  }
+  // varför ett klick på en station inte gör något (proffsläget ger annars inget besked)
+  function whyNot(a, b) {
+    const miss = missingReq(a.requires, b); if (miss) return miss;
+    const c = cookInfo(b), set = actSet(b, a.id);
+    if (a.id === 'grill' && set.has(0) && !set.has(1) && c.grill.a < 1) return 'Vänta – undersidan har inte fått färg än.';
+    if (a.id === 'fritera' && set.has(1) && !set.has(2) && c.fry.prog < 1) return 'Vänta – det är inte gyllene än.';
+    return null;
+  }
+  // anmärkningar på det som blev bränt
+  function cookWarnings(b) { const c = cookInfo(b), out = []; if (firstBiff && c.grill.burnt) out.push('Biffen blev bränd.'); if (fried && c.fry.burnt) out.push('Det friterade blev bränt.'); return out; }
 
   // ---------- Ordning i hjälpen ----------
   const STEPS = ['act:rosta', 'slot:l0', 'act:grill', 'act:salt', ...S.filter((s) => s.k !== undefined && s.k > 0).map((s) => 'slot:' + s.id), 'act:fritera', 'slot:pommes', 'act:tappa', 'slot:dryck', 'slot:dessert']
@@ -163,7 +224,7 @@ function makeRig(order) {
 
   // ---------- Regler ----------
   const has = (b, req) => (req.startsWith('act:') ? actDone(b, req.slice(4)) : !!b.placed[req]);
-  const NEED_MSG = { 'act:rosta': 'Rosta brödet i brödrosten först!', 'act:grill': 'Stek biffen på grillen först – lägg på och vänd.', 'act:salt': 'Salta och peppra biffen på grillen först.', 'act:fritera': 'Fritera först – sänk ner korgen i fritösen och lyft upp den.', 'act:tappa': 'Tappa upp drycken vid dryckesmaskinen först.' };
+  const NEED_MSG = { 'act:rosta': 'Rosta brödet i brödrosten först!', 'act:grill': 'Stek biffen på stekbordet först – lägg på den och vänd när undersidan fått färg.', 'act:salt': 'Salta och peppra biffen först – tryck på salt- och pepparkaret.', 'act:fritera': 'Fritera först – sänk ner korgen i fritösen och lyft upp den.', 'act:tappa': 'Tappa upp drycken vid dryckesmaskinen först.' };
   function missingReq(reqs, b) {
     rig.lastB = b;
     for (const r of reqs) if (!has(b, r)) return NEED_MSG[r] || `${SLOT[r]?.name || r} måste ligga på först.`;
@@ -181,8 +242,10 @@ function makeRig(order) {
     if (S[0] && actDone(b, 'rosta') && !b.placed.l0) out.push({ id: 'rosta', part: partOf('rosta', S[0], 'brod'), at: [K.toaster[0] + 2, K.toaster[1] + 2, 2.4], name: 'brödet', from: 'brödrosten' });
     const fb = S.find((s) => s.cat === 'biff');
     // biffen tas först när den är kryddad – saltet har samma klickyta på grillen
-    if (fb && actDone(b, 'grill') && (!ACTION.salt || actDone(b, 'salt')) && !b.placed[fb.id]) out.push({ id: 'grill', part: partOf('grill', fb, 'biff'), at: [K.grill[0] + 2.75, K.grill[1] + 3, 1.4], name: 'biffen', from: 'grillen' });
-    if (fried && actDone(b, 'fritera') && !b.placed.pommes) out.push({ id: 'fritera', part: DB.part[st.fritera] || sidePart, at: [K.fryer[0] + 3.3, K.fryer[1] + 2.3, 2.6], name: 'pommesen', from: 'fritöskorgen' });
+    if (fb && actDone(b, 'grill') && cookInfo(b).grill.b >= 1 && (!ACTION.salt || actDone(b, 'salt')) && !b.placed[fb.id]) out.push({ id: 'grill', part: partOf('grill', fb, 'biff'), at: PATTY, name: 'biffen', from: 'stekbordet' });
+    if (fried && actDone(b, 'fritera') && !b.placed.pommes) out.push({ id: 'fritera', part: DB.part[st.fritera] || sidePart, at: [BASKET[0], BASKET[1], 4.2], name: sidePart.name.toLowerCase(), from: 'fritöskorgen' });
+    // råvaran till fritösen ligger i backen bredvid: ta den med handen och släpp den i korgen
+    if (fried && sidePart && !actSet(b, 'fritera').has(0) && !b.placed.pommes) out.push({ id: 'back', part: sidePart, at: [K.crate[0] + 1.5, K.crate[1] + 1.6, 1.9], name: sidePart.look?.shape === 'fries' ? 'potatis' : sidePart.name.toLowerCase(), from: 'backen vid fritösen' });
     if (poured && actDone(b, 'tappa') && !b.placed.dryck) out.push({ id: 'tappa', part: DB.part[st.tappa] || drinkPart, at: [K.tower[0] + 2.2, K.tower[1] + 3.2, 2.2], name: 'muggen', from: 'dryckesmaskinen' });
     return out.filter((p) => p.part);
   };
@@ -193,6 +256,7 @@ function makeRig(order) {
     if (b.placed[slot.id]) return { ok: false, msg: 'Det ligger redan något där.' };
     const miss = missingReq(slot.requires, b);
     if (miss) return { ok: false, msg: miss };
+    if (slot === fbSlot() && cookInfo(b).grill.b < 1) return { ok: false, msg: 'Biffen är inte klar – låt den få färg på båda sidor.' };
     if (slot.top && b.placed.l0 && part.id !== b.placed.l0.id) return { ok: false, msg: `Toppbrödet ska vara samma sort som underbrödet (${b.placed.l0.name.toLowerCase()}).` };
     if (part.cat === 'dryck' && slot.id !== 'dryck') return { ok: false, msg: 'Drycken ställs på brickan, inte i burgaren.' };
     return { ok: true };
@@ -271,8 +335,11 @@ function makeRig(order) {
     drawToaster(R, K.toaster[0], K.toaster[1], 0, actDone(b, 'rosta') && !b.placed.l0);
     const fb = firstBiff ? S.find((s) => s.cat === 'biff') : null;
     const pattyPart = fb ? (b.placed[fb.id] || DB.part[b.station?.grill] || fb.part || DB.parts.find((p) => p.cat === 'biff')) : null;
-    drawGrill(R, K.grill[0], K.grill[1], 0, pattyPart, fb && !b.placed[fb.id] ? actCount(b, 'grill') : 0);
-    drawFryer(R, K.fryer[0], K.fryer[1], 0, era, b.placed.pommes ? 0 : actCount(b, 'fritera'), fried);
+    const ck = cookInfo(b);
+    drawGrill(R, K.grill[0], K.grill[1], 0, pattyPart, fb && !b.placed[fb.id] ? ck.grill : null, era);
+    if (firstBiff) drawShakers(R, K.salt[0], K.salt[1], 0);
+    drawFryer(R, K.fryer[0], K.fryer[1], 0, era, b.placed.pommes ? {} : ck.fry, fried, sidePart);
+    if (fried) drawCrate(R, K.crate[0], K.crate[1], 0, sidePart);
     drawDrinkTower(R, K.tower[0], K.tower[1], 0, era, poured && actDone(b, 'tappa') && !b.placed.dryck, drinkPart);
     // brickan lyfts mjukt (ease in) när den bärs ut
     drawTrayScene(R, b, { dz: t * t * LIFT_DZ, marks: true });
@@ -282,7 +349,7 @@ function makeRig(order) {
   Object.assign(rig, {
     VIEW, MAX_K, CONN, connectorIcon, order, year: order.year, layers, r, cu, cv, TRAY_ID,
     SLOTS: S, SLOT, ACTIONS: A, ACTION, CABLES, CABLE, STEPS, PORTS,
-    actSet, actCount, actDone, missingReq, slotsFor, dropAction, pickups, canPlace, canRemove, onRemove, wattNeed, actionReady,
+    actSet, actCount, actDone, missingReq, slotsFor, dropAction, pickups, pointReady, cookInfo, cookSig, actHint, whyNot, cookWarnings, canPlace, canRemove, onRemove, wattNeed, actionReady,
     portPos, portType, availablePorts, portLabel, portBusy, cableConn, cableNeeded, cableReady, cableOk, cableFrom, canConnect,
     SCREW_OF, screwStatus, standCheck, fact, drawScene, drawTrayScene, drawCables,
   });

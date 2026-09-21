@@ -32,17 +32,21 @@ export function applyBuildOp(shop, order, op) {
   const b = (order.build ||= newBuild());
   const L = rigOf(shop, order);
   const d = (b.desk ||= { plugs: {}, psuOn: false, attempts: {}, success: false });
+  // kökets klocka: ett handgrepp från en medspelare kan vara stämplat senare än vår egen klocka – följ med, annars ser
+  // tillagningen olika ut hos er (tiden går bara framåt)
+  if (op.at !== undefined && op.at > (b.time || 0)) b.time = op.at;
   switch (op.t) {
     case 'mode': if (b.help === null) b.help = !!op.help; break;
     case 'place': {
       const part = shop.part[op.part];
-      if (part && !b.placed[op.slot]) b.placed[op.slot] = part;
+      if (part && !b.placed[op.slot]) { b.placed[op.slot] = part; if (op.at !== undefined) (b.placedAt ||= {})[op.slot] = op.at; }
       break;
     }
     case 'remove': {
       const slot = L.SLOT?.[op.slot];
       if (!b.placed[op.slot]) break;
       delete b.placed[op.slot];
+      if (b.placedAt) delete b.placedAt[op.slot];
       if (slot && L.onRemove) L.onRemove(slot, b);
       break;
     }
@@ -51,6 +55,7 @@ export function applyBuildOp(shop, order, op) {
       set.add(op.i);
       b.acts.set(op.id, set);
       if (op.part) (b.station ||= {})[op.id] = op.part;
+      if (op.at !== undefined) ((b.actAt ||= {})[op.id] ||= {})[op.i] = op.at;   // när det gjordes (tillagning som tar tid)
       break;
     }
     case 'cable': if (!b.cables.has(op.id)) b.cables.set(op.id, op.port); break;
@@ -73,6 +78,7 @@ export function serializeBuild(b) {
     acts: [...b.acts].map(([k, s]) => [k, [...s]]),
     cables: [...b.cables],
     station: { ...(b.station || {}) },
+    actAt: JSON.parse(JSON.stringify(b.actAt || {})), placedAt: { ...(b.placedAt || {}) },
     errors: b.errors, time: b.time, help: b.help, phase: b.phase,
     desk: b.desk ? { plugs: { ...b.desk.plugs }, psuOn: b.desk.psuOn, attempts: { ...b.desk.attempts }, success: b.desk.success } : null,
   };
@@ -84,6 +90,7 @@ export function deserializeBuild(data, shop) {
   b.acts = new Map((data.acts || []).map(([k, a]) => [k, new Set(a)]));
   b.cables = new Map(data.cables || []);
   b.station = { ...(data.station || {}) };
+  b.actAt = JSON.parse(JSON.stringify(data.actAt || {})); b.placedAt = { ...(data.placedAt || {}) };
   Object.assign(b, { errors: data.errors || 0, time: data.time || 0, help: data.help ?? null, phase: data.phase || 'build' });
   if (data.desk) b.desk = { plugs: { ...data.desk.plugs }, psuOn: !!data.desk.psuOn, attempts: { ...data.desk.attempts }, success: !!data.desk.success };
   return b;

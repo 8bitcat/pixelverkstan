@@ -100,12 +100,14 @@ export function renderGuide(view) {
   const el = $('#build-guide');
   let html = '', kind = 'info';
   const m = view.msg;
-  if (m && (view.t - m.t < 7 || m.kind !== 'info' || !view.help)) { html = m.html; kind = m.kind; }
+  // (m.live: besked som räknas om varje gång – t.ex. hur brynt biffen är just nu)
+  if (m && (view.t - m.t < 7 || m.kind !== 'info' || !view.help)) { html = (m.live && m.live()) || m.html; kind = m.kind; }
   else if (view.help) { html = view.hintText() || ''; }
   const key = kind + html;
   if (key === view.guideKey) return;
   view.guideKey = key;
-  const face = { info: '🧑‍🔧', fact: '📘', err: '⚠️', good: '🎉' }[kind] || '🧑‍🔧';
+  const me = view.T?.guideFace || '🧑‍🔧';   // verksamhetens egen figur i hjälprutan (kocken i hamburgerbaren)
+  const face = { info: me, fact: '📘', err: '⚠️', good: '🎉' }[kind] || me;
   el.innerHTML = html ? `<div class="guide ${kind}"><span class="face">${face}</span><span>${html}</span></div>` : '';
   el.querySelectorAll('[data-act]').forEach((btn) => (btn.onclick = () => view.guideAction(btn.dataset.act)));
 }

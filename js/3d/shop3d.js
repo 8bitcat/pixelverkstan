@@ -238,8 +238,19 @@ export class Shop3D {
         R.box(0, 6, 0, 6, 0, 0.5, () => 0xc8a060, 1);                        // ogenomskinligt
         R.box(1, 5, 1, 5, 0.5, 2, () => 0xe4eef2, 2, { alpha: 0.5 });        // glas
       });
-      if (this.renderer.compileAsync) await this.renderer.compileAsync(this.scene, this.camera);
-      else this.renderer.compile(this.scene, this.camera);
+      // Hela scenens material kompileras i bakgrunden (även det som står utanför bild: gäster, kläder, bänken).
+      // Inte med three:s compileAsync – den väntar i en timer på VARJE material, och städas ett av dem bort under
+      // väntan (en tallrik, en buren bricka) kraschar kontrollen och löftet blir aldrig klart. Här är väntan vår egen:
+      // bortstädade material hoppas över och en tidsgräns gör att provlådorna alltid städas bort.
+      const mats = this.renderer.compile(this.scene, this.camera) || new Set();
+      await new Promise((done) => {
+        const t0 = performance.now(), props = this.renderer.properties;
+        const check = () => {
+          for (const m of [...mats]) { const prog = props.get(m).currentProgram; if (!prog || !prog.isReady || prog.isReady()) mats.delete(m); }
+          if (!mats.size || performance.now() - t0 > 8000) done(); else setTimeout(check, 30);
+        };
+        check();
+      });
       // en bildruta till en liten buffert (syns inte): då kompileras även skuggkartans och djuppassets
       // program för bänkens material – de står annars för större delen av frysningen
       const rt = new THREE.WebGLRenderTarget(8, 8), prev = this.renderer.getRenderTarget();

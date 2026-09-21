@@ -239,7 +239,7 @@ export class BuildView {
       if (pu) return `Ta <b>${esc(s.label)}</b> från ${esc(pu.from)} och lägg på <b>${esc(this.L.SLOT[s.id].name.toLowerCase())}</b>.`;
       return `Dra <b>${esc(s.label)}</b> till <b>${esc(this.L.SLOT[s.id].name.toLowerCase())}</b> (gul markering).`;
     }
-    if (s.kind === 'act') { const a = this.L.ACTION[s.id]; return `Tryck på ${a.icon} för att <b>${esc(a.name.toLowerCase())}</b>.`; }
+    if (s.kind === 'act') { const a = this.L.ACTION[s.id]; return this.L.actHint?.(a, this.b) || `Tryck på ${a.icon} för att <b>${esc(a.name.toLowerCase())}</b>.`; }
     if (s.kind === 'cable') { const c = this.L.CABLE[s.id]; return `Dra kabeln <b>${esc(c.name)}</b> till uttaget <b>${esc(c.wants.map(this.L.portLabel).join(' / '))}</b>.`; }
     return this.gl && this.hooks.carryOut && this.T.doneHint3d ? this.T.doneHint3d : this.T.doneHint;
   }
@@ -249,7 +249,7 @@ export class BuildView {
     const b = this.b, res = this.L.canPlace(slot, entry.part, b);
     if (!res.ok) return this.fail(res.msg);
     if (entry.choice && this.act('choose', { orderId: this.order.id, id: entry.part.id }) === false) return false;
-    this.op({ t: 'place', slot: slot.id, part: entry.part.id });
+    this.op({ t: 'place', slot: slot.id, part: entry.part.id, at: this.b.time });
     this.selected = null; this.dirty = true; this.cablesDirty = true;
     this.flash = { slot, t: 0.6 };
     this.say(`<b>${esc(this.shop.cats[entry.part.cat].name)}:</b> ${esc(this.L.fact(entry.part.cat, entry.part))}`, 'fact');
@@ -268,14 +268,15 @@ export class BuildView {
     this.refresh();
   }
   doAction(a, i, part = null) {
-    this.op({ t: 'act', id: a.id, i, ...(part ? { part: part.id } : {}) });
+    this.op({ t: 'act', id: a.id, i, at: this.b.time, ...(part ? { part: part.id } : {}) });
     // skruvdragaren tar alla skruvar i samma moment
     if (a.icon === '🪛' && this.game.fit?.items?.skruvdragare) for (let j = 0; j < a.points.length; j++) if (j !== i) this.op({ t: 'act', id: a.id, i: j });
     const set = this.L.actSet(this.b, a.id);
     this.dirty = true;
     this.toolAnim = { pt: a.points[i], t: 0, icon: a.icon };
     if (this.L.actDone(this.b, a.id)) this.say(`<b>${esc(a.name)}:</b> ${esc(this.L.fact(a.id))}`, 'fact');
-    else this.say(`${a.icon} ${esc(a.name)}: ${set.size}/${a.points.length}`, 'info');
+    // tillagning som tar tid: beskedet lever och visar hur långt det kommit ("Undersidan bryns … 60 %" → "Vänd biffen nu!")
+    else this.say(`${a.icon} ${esc(a.name)}: ${set.size}/${a.points.length}`, 'info', this.L.actHint ? () => (this.L.actDone(this.b, a.id) ? null : this.L.actHint(a, this.b)) : null);
     this.refresh();
   }
   connect(entry, key) {
@@ -329,7 +330,7 @@ export class BuildView {
     this.hooks.onDone(this.order, { stars, time: b.time, errors: b.errors, help: b.help, warnings: result.warnings || [] });
   }
 
-  say(html, kind = 'info') { this.msg = { html, kind, t: this.t }; this.guideKey = null; U.renderGuide(this); }
+  say(html, kind = 'info', live = null) { this.msg = { html, kind, t: this.t, live }; this.guideKey = null; U.renderGuide(this); }
   guideAction(act) {
     if (act === 'remove' && this.pending?.slot) this.remove(this.pending.slot);
     if (act === 'unplug' && this.pending?.cable) this.unplug(this.pending.cable);
@@ -348,8 +349,11 @@ export class BuildView {
       const done = this.L.actSet(this.b, a.id);
       a.points.forEach((p, i) => {
         if (done.has(i)) return;
-        const [x, y] = D.proj(this, ...p), d = Math.hypot(x - pt[0], y - pt[1]);
-        if (d < bd) { bd = d; best = { a, i }; }
+        if (this.L.pointReady && !this.L.pointReady(a, i, this.b)) return;   // stegen görs i ordning, och somligt tar tid
+        for (const q of [p, ...(a.alts?.[i] || [])]) {   // (alts: samma steg går att göra på fler ställen)
+          const [x, y] = D.proj(this, ...q), d = Math.hypot(x - pt[0], y - pt[1]);
+          if (d < bd) { bd = d; best = { a, i }; }
+        }
       });
     }
     return best;
@@ -417,6 +421,14 @@ export class BuildView {
     if (this.phase === 'desk') return this.finale.onPointerDown(pt);
     const act = this.actionAt(pt);
     if (act) return this.doAction(act.a, act.i);
+    // ett klick på en station som inte är redo ska ge besked (i proffsläget syns inga markeringar)
+    if (this.L.whyNot) for (const a of this.L.ACTIONS) {
+      if (this.L.actDone(this.b, a.id)) continue;
+      const near = a.points.some((p, i) => [p, ...(a.alts?.[i] || [])].some((q) => { const [x, y] = D.proj(this, ...q); return Math.hypot(x - pt[0], y - pt[1]) < 30; }));
+      if (!near) continue;
+      const why = this.L.whyNot(a, this.b);
+      if (why) return this.say(esc(why), 'info', () => (this.L.actDone(this.b, a.id) ? null : this.L.whyNot(a, this.b) ? esc(this.L.whyNot(a, this.b)) : this.L.actHint?.(a, this.b)));
+    }
     for (const [id, key] of this.b.cables) {
       const [x, y] = D.proj(this, ...this.L.portPos(key, this.b));
       if (Math.hypot(x - pt[0], y - pt[1]) < 12) {
@@ -518,6 +530,8 @@ export class BuildView {
     if (this.toolAnim) { this.toolAnim.t += dt; if (this.toolAnim.t > 0.45) this.toolAnim = null; }
     if (this.plugAnim) { this.plugAnim.t += dt * 3; this.cablesDirty = true; if (this.plugAnim.t >= 1) { this.plugAnim = null; } }
     if (!this.cam) this.resize();
+    // tillagning som tar tid: rita om när biffen fått mer färg eller det bubblar i fritösen
+    if (this.L.cookSig) { const sig = this.L.cookSig(this.b); if (sig !== this.cookSigSeen) { this.cookSigSeen = sig; this.dirty = true; } }
     if (this.dirty || (!this.gl && this.renderDue && this.t >= this.renderDue)) this.render();
     if (this.cablesDirty) { if (this.gl) this.gl.cables(this); else this.L.drawCables(this.cableCtx, this.R, this.b, { plug: this.plugAnim }); this.cablesDirty = false; }
     this.draw(ctx);
@@ -747,7 +761,8 @@ export class BuildView {
         const done = this.L.actSet(this.b, a.id);
         let first = true;
         a.points.forEach((p, i) => {
-          if (done.has(i)) return;
+          if (done.has(i) || !first) return;
+          if (this.L.pointReady && !this.L.pointReady(a, i, this.b)) return;
           const [x, y] = D.proj(this, ...p);
           const isNext = next?.kind === 'act' && next.id === a.id;
           D.drawHotspot(ctx, x, y, this.t, first ? a.icon : '', first && isNext ? a.name : '', !first || a.points.length > 1);

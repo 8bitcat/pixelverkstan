@@ -5,6 +5,7 @@
 // trayEntries/steps/nextStep/hintText/emptyText/guideAction/pressPower).
 import { Raster } from '../../core/raster.js';
 import { portrait, SHOPKEEPER } from '../../core/people.js';
+import { rigFor } from './rig.js';
 
 const DV = { w: 872, h: 504, k: 16, hz: 13, ox: 400, oy: 80 };
 const SLIDE = 0.9;     // sekunder för tallriken att glida till luckan
@@ -15,7 +16,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 export function judge(order, extra = []) {
   const b = order.build || { time: 0, errors: 0 };
   const target = 40 + 12 * order.items.length;
-  const warnings = [...extra];
+  const warnings = [...extra, ...(order.items ? rigFor(order).cookWarnings?.(b) || [] : [])];
   if (b.time > target * 1.6) warnings.push('Det tog sin tid – pommesen hann bli ljumma.');
   if (b.errors >= 4) warnings.push('Lite kladdigt på tallriken.');
   const verdict = warnings.length ? (extra.length ? extra[0] : 'Gott! Men nästa gång lite snabbare.') : ['Mums! Precis som jag ville ha den!', 'Perfekt burgare. Den kommer jag tillbaka för!', 'Wow – kolla vilken burgare!', 'Exakt så här ska den smaka.'][order.id % 4];

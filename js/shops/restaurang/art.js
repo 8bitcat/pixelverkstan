@@ -391,16 +391,57 @@ export function drawToaster(R, u0, v0, id, on) {
   }, id, { noEdges: true });
   if (on) for (const x of [u0 + 1, u0 + 3]) R.box(x - 0.35, x + 0.35, v0 + 0.6, v0 + 3.4, 2.2, 3.0, (f) => (f === 'top' ? 0xd9a55d : 0xb8823f), id, { noEdges: true });
 }
-export function drawGrill(R, u0, v0, id, patty, state) {
-  const iron = 0x2a2b2e;
-  R.box(u0, u0 + 5.5, v0, v0 + 6, 0, 0.9, (f, x, y, W, Hh) => {
-    if (f === 'top') { if (x < 0.25 || x > W - 0.25 || y < 0.25 || y > Hh - 0.25) return 0x4a4c50; return ((y * 2) % 1) < 0.28 ? 0x111214 : (hash(x * 4 | 0, y * 4 | 0) > 0.9 ? 0x3a3b3e : iron); }
-    return 0x4a4c50;
+// Stekbordet: rostfri bänkmodell med slät stekyta, stänkskydd längs de två bortre sidorna, två vred med
+// kontrollampor på fronten och fettlåda. Biffen släpps på ytan och vänds: `cook` = { on, flipped, a, b }
+// där a/b är hur brynta sidorna är (0 rå … 1 klar … över 3 bränd). Ovansidan visar den sida som ligger upp,
+// kanten mörknar nerifrån medan undersidan steks, och det fräser medan det pågår.
+export const RAW = 0xd9807a, BURNT = 0x2a1a14;
+export function cookedColor(part, t) {
+  const col = H(part?.look?.color || '#7a3a26');
+  if (t <= 1) return mix(mix(col, RAW, 0.6), col, Math.max(0, Math.min(1, t)));
+  return mix(col, BURNT, Math.max(0, Math.min(1, (t - 1.6) / 1.6)));
+}
+export function drawGrill(R, u0, v0, id, patty, cook = null, era = null) {
+  const steel = era?.steel ?? 0xc8ccd6, plate = 0x3a3c40;
+  const st = typeof cook === 'number' ? { on: cook > 0, flipped: cook > 1, a: cook > 1 ? 1 : 0, b: 0, tick: 0 } : (cook || { on: false });
+  // kroppen med frontpanelen (mot betraktaren): två vred, lampor och fettlådan
+  R.box(u0, u0 + 5.5, v0, v0 + 6, 0, 1.0, (f, x, y, W, Hh) => {
+    if (f === 'top') return x < 0.12 || y < 0.12 || x > W - 0.12 || y > Hh - 0.12 ? shade(steel, 0.8) : steel;
+    if (f === 'left') {
+      for (const kx of [1.3, 3.7]) {
+        if (Math.hypot(x - kx, y - 0.5) < 0.28) return Math.hypot(x - kx, y - 0.5) < 0.1 ? 0xd8dce0 : 0x1e1f22;   // vred
+        if (Math.abs(x - (kx + 0.62)) < 0.09 && Math.abs(y - 0.36) < 0.09) return st.on ? 0x45e06a : 0x2a6a3a;   // grön lampa
+        if (Math.abs(x - (kx + 0.62)) < 0.09 && Math.abs(y - 0.64) < 0.09) return st.on ? 0xffa030 : 0x7a4a1a;   // orange lampa
+      }
+      if (y > 0.78 && y < 0.92 && x > 2.2 && x < 3.3) return 0x2a2d36;   // fettlådans springa
+    }
+    return y < 0.1 ? shade(steel, 1.15) : shade(steel, 0.93 - y * 0.04);
   }, id, { noEdges: true });
-  if (patty && state > 0) {
-    const L = patty.look || {}, raw = state < 2, col = raw ? mix(H(L.color), 0xe08080, 0.55) : H(L.color), dark = H(L.dark || shade(col, 0.6));
-    disc(R, u0 + 2.75, v0 + 3, 0.9, 0.9 + layerHeight(patty), burgerRadius(patty) * 0.95, (f, x, y, W, Hh) => (f === 'top' ? (!raw && ((x + y) % 1.1) < 0.18 ? shade(dark, 0.7) : hash(x * 3 | 0, y * 3 | 0) > 0.9 ? dark : col) : shade(col, 0.9)), id);
-    if (!raw) for (let i = 0; i < 3; i++) R.box(u0 + 1.5 + i * 1.2, u0 + 1.7 + i * 1.2, v0 + 2.6, v0 + 2.8, 1.8 + i * 0.4, 2.4 + i * 0.4, () => 0xd8dce0, id, { alpha: 0.35, noEdges: true });   // ånga
+  // stekytan (slät, mörk) med fettränna fram
+  R.box(u0 + 0.3, u0 + 5.2, v0 + 0.3, v0 + 5.4, 1.0, 1.15, (f, x, y, W, Hh) => (f === 'top' ? (hash(x * 3 | 0, y * 3 | 0) > 0.93 ? shade(plate, 1.25) : ((x + y) % 2.2) < 0.12 ? shade(plate, 1.12) : plate) : shade(plate, 0.8)), id, { noEdges: true });
+  R.box(u0 + 0.3, u0 + 5.2, v0 + 5.4, v0 + 5.75, 1.0, 1.05, () => shade(steel, 0.7), id, { noEdges: true });
+  // stänkskydd längs de bortre sidorna
+  const guard = (f, x, y) => (y < 0.1 ? shade(steel, 1.15) : f === 'top' ? shade(steel, 1.05) : shade(steel, 0.9));
+  R.box(u0, u0 + 5.5, v0, v0 + 0.25, 1.0, 2.3, guard, id, { noEdges: true });
+  R.box(u0, u0 + 0.25, v0 + 0.25, v0 + 5.4, 1.0, 2.3, guard, id, { noEdges: true });
+  if (!patty || !st.on) return;
+  // biffen: ovansidan är den sida som ligger upp – B tills den vänds, sedan A
+  const L = patty.look || {}, up = st.flipped ? st.a : 0, down = st.flipped ? st.b : st.a;
+  const cu = u0 + 2.75, cv = v0 + 3, z0 = 1.15, h = layerHeight(patty), r = burgerRadius(patty) * 0.95;
+  const topCol = cookedColor(patty, up), lowCol = cookedColor(patty, down), sear = shade(H(L.dark || shade(H(L.color || '#7a3a26'), 0.6)), 0.75);
+  disc(R, cu, cv, z0, z0 + h, r, (f, x, y, W, Hh) => {
+    if (f === 'top') return up >= 0.5 && ((x + y) % 1.1) < 0.2 ? mix(topCol, sear, Math.min(1, up)) : hash(x * 3 | 0, y * 3 | 0) > 0.9 ? shade(topCol, 0.8) : topCol;
+    return y > Hh * 0.5 ? shade(lowCol, 0.9) : shade(topCol, 0.92);   // kanten: undre halvan följer undersidan
+  }, id);
+  // det fräser och ryker medan en sida steks
+  if (down < 1.6) for (let i = 0; i < 4; i++) { const k = (i * 7 + (st.tick || 0) * 3) % 11, x = cu - r * 0.7 + (k / 11) * r * 1.4, y = cv - r * 0.5 + ((k * 5) % 7) / 7 * r; R.box(x, x + 0.2, y, y + 0.2, z0 + h + 0.2 + (k % 3) * 0.35, z0 + h + 0.7 + (k % 3) * 0.35, () => 0xe8ecf0, id, { alpha: 0.4, noEdges: true }); }
+  else for (let i = 0; i < 5; i++) { const k = (i * 5 + (st.tick || 0)) % 9; R.box(cu - 1 + k * 0.25, cu - 0.75 + k * 0.25, cv - 0.6 + (k % 4) * 0.35, cv - 0.35 + (k % 4) * 0.35, z0 + h + 0.3 + i * 0.4, z0 + h + 0.9 + i * 0.4, () => 0x5a5a5e, id, { alpha: 0.5, noEdges: true }); }   // bränt: mörk rök
+}
+// salt- och pepparkaret bredvid stekbordet
+export function drawShakers(R, u, v, id = 0) {
+  for (const [du, body, cap] of [[0, 0xf4f1ea, 0xc8ccd0], [0.75, 0x2a2d36, 0xc8ccd0]]) {
+    R.box(u + du, u + du + 0.55, v, v + 0.55, 0, 0.95, (f, x, y) => (f === 'top' ? cap : y < 0.2 ? cap : body), id, { noEdges: true });
+    R.box(u + du + 0.12, u + du + 0.43, v + 0.12, v + 0.43, 0.95, 1.1, (f) => (f === 'top' ? shade(cap, 0.85) : cap), id, { noEdges: true });
   }
 }
 
@@ -436,34 +477,65 @@ export function iconCanvas(part, W = 64, H = 54) {
 }
 
 // ---------- Köksstationerna: fritös och dryckesmaskin (epokens stil) ----------
-// fritös: rostfri låda med två oljekar; korgen hänger på kroken (state 0), ligger i oljan (1)
-// eller är upplyft med gyllene pommes (2)
-export function drawFryer(R, u0, v0, id, era, state = 0, fries = true) {
-  const steel = era?.steel ?? 0xc8ccd6, trim = era?.trim ?? 0xc92a2a;
-  R.box(u0, u0 + 4.5, v0, v0 + 4.5, 0, 2.2, (f, x, y, W, Hh) => {
+// Fritösen: dubbel bänkmodell i rostfritt – två oljekar med varsin trådkorg med svart handtag, kontrollåda med
+// vred och lampor baktill och två tappkranar på fronten. Vänstra korgen är den man arbetar med:
+// `st` = { loaded, down, up, prog, tick } – tom och upplyft, laddad med blek råvara, nere i den bubblande oljan
+// (råvaran gulnar med prog 0…1, mörknar över 2), och upplyft igen med det färdiga.
+export function friedColor(t) { const raw = 0xf2e6b8, gold = 0xf0b840, dark = 0x4a2a14; return t <= 1 ? mix(raw, gold, Math.max(0, t)) : mix(gold, dark, Math.max(0, Math.min(1, (t - 1.8) / 1.4))); }
+export function drawFryer(R, u0, v0, id, era, state = 0, fries = true, part = null) {
+  const steel = era?.steel ?? 0xc8ccd6;
+  const st = typeof state === 'number' ? { loaded: state > 0, down: state === 1, up: state > 1, prog: state > 1 ? 1 : 0, tick: 0 } : (state || {});
+  const W0 = 5, D0 = 4.6, vats = [[0.45, 2.25], [2.75, 4.55]];
+  R.box(u0, u0 + W0, v0, v0 + D0, 0, 2.4, (f, x, y, W, Hh) => {
     if (f === 'top') {
-      const inVat = (x > 0.5 && x < 2.0 && y > 0.6 && y < 3.9) || (x > 2.5 && x < 4.0 && y > 0.6 && y < 3.9);
-      if (inVat) return hash(x * 4 | 0, y * 4 | 0) > 0.85 ? 0xe8b850 : 0xd8a040;   // olja
-      return x < 0.15 || y < 0.15 || x > W - 0.15 || y > Hh - 0.15 ? shade(steel, 0.8) : steel;
+      for (const [a, b] of vats) if (x > a && x < b && y > 1.15 && y < Hh - 0.35) { const bub = st.down && a < 1 && hash((x * 5 | 0) + (st.tick || 0) * 3, y * 5 | 0) > 0.72; return bub ? 0xfff2c0 : hash(x * 4 | 0, y * 4 | 0) > 0.86 ? 0xe8b850 : 0xd29a38; }
+      return x < 0.12 || y < 0.12 || x > W - 0.12 || y > Hh - 0.12 ? shade(steel, 0.8) : steel;
     }
-    if (f === 'left' && y > 1.6 && y < 2.0 && x > 0.4 && x < 4.1) return trim;   // reglagelist
-    if (f === 'left' && y > 1.7 && y < 1.9 && ((x > 0.8 && x < 1.1) || (x > 1.6 && x < 1.9))) return 0x2a2d36;
-    return y < 0.12 ? shade(steel, 1.15) : shade(steel, 0.92 - y * 0.03);
+    if (f === 'left') { if (y > 0.35 && y < 0.5 && x > 0.3 && x < W - 0.3) return shade(steel, 0.75); }
+    return y < 0.1 ? shade(steel, 1.15) : shade(steel, 0.93 - y * 0.03);
   }, id, { noEdges: true });
-  // korgen
-  const bu = u0 + 0.6, bv = v0 + 0.8;
-  const basket = (z0, golden) => {
-    R.box(bu, bu + 1.3, bv, bv + 3.0, z0, z0 + 0.8, (f, x, y, W, Hh) => {
-      if (f === 'top') return golden && !(x < 0.15 || y < 0.15 || x > W - 0.15 || y > Hh - 0.15) ? (hash(x * 5 | 0, y * 5 | 0) > 0.5 ? 0xf0c050 : 0xe8b040) : ((x * 4 | 0) % 2 === (y * 4 | 0) % 2 ? 0x8a8f9c : -1);
-      return ((x * 4 | 0) + (y * 4 | 0)) % 2 ? 0x8a8f9c : 0x6a6f7a;
+  // tappkranarna på fronten
+  for (const kx of [1.35, 3.65]) { R.box(u0 + kx - 0.18, u0 + kx + 0.18, v0 + D0, v0 + D0 + 0.4, 0.45, 0.8, () => 0x8a8f9c, id, { noEdges: true }); R.box(u0 + kx - 0.3, u0 + kx + 0.3, v0 + D0 + 0.4, v0 + D0 + 0.5, 0.55, 0.7, () => 0xc92a2a, id, { noEdges: true }); }
+  // kontrollådan baktill: två vred och lampor mot betraktaren
+  R.box(u0, u0 + W0, v0, v0 + 0.95, 2.4, 3.5, (f, x, y, W, Hh) => {
+    if (f === 'left') for (const kx of [1.35, 3.65]) {
+      if (Math.hypot(x - kx, y - 0.55) < 0.26) return Math.hypot(x - kx, y - 0.55) < 0.09 ? 0xd8dce0 : 0x1e1f22;
+      if (Math.abs(x - (kx + 0.6)) < 0.09 && Math.abs(y - 0.4) < 0.09) return st.down && kx < 2 ? 0xffa030 : 0x7a4a1a;
+      if (Math.abs(x - (kx + 0.6)) < 0.09 && Math.abs(y - 0.7) < 0.09) return 0x45e06a;
+    }
+    return f === 'top' ? steel : y < 0.1 ? shade(steel, 1.15) : shade(steel, 0.9);
+  }, id, { noEdges: true });
+  // korgarna: trådnät med svart handtag som sticker ut mot betraktaren
+  const basket = (bu, bv, z0) => {
+    R.box(bu, bu + 1.5, bv, bv + 2.9, z0, z0 + 0.9, (f, x, y, W, Hh) => {
+      if (f === 'top') return x < 0.14 || y < 0.14 || x > W - 0.14 || y > Hh - 0.14 ? 0x9aa0aa : -1;
+      return ((x * 5 | 0) + (y * 5 | 0)) % 2 ? 0x9aa0aa : 0x6a6f7a;
     }, id, { noEdges: true });
-    // handtag
-    R.box(bu + 0.55, bu + 0.75, bv + 3.0, bv + 4.4, z0 + 0.6, z0 + 0.75, () => 0x2a2d36, id, { noEdges: true });
+    R.box(bu + 0.62, bu + 0.88, bv + 2.9, bv + 3.6, z0 + 0.75, z0 + 0.9, () => 0x8a8f9c, id, { noEdges: true });
+    R.box(bu + 0.58, bu + 0.92, bv + 3.6, bv + 4.7, z0 + 0.7, z0 + 0.98, () => 0x1e1f22, id, { noEdges: true });
   };
-  if (!fries) return;
-  if (state === 0) basket(2.6, false);          // hänger på kroken ovanför oljan
-  else if (state === 1) { basket(1.6, false); for (let i = 0; i < 5; i++) R.box(bu + 0.2 + i * 0.22, bu + 0.32 + i * 0.22, bv + 0.4 + (i % 3) * 0.8, bv + 0.52 + (i % 3) * 0.8, 2.2, 2.32, () => 0xfff0c0, id, { noEdges: true }); }   // bubblor
-  else basket(2.8, true);                       // upplyft med gyllene pommes
+  basket(u0 + 2.9, v0 + 1.2, 3.0);   // högra korgen hänger alltid tom
+  if (!fries) { basket(u0 + 0.6, v0 + 1.2, 3.0); return; }
+  const bu = u0 + 0.6, bv = v0 + 1.2, z0 = st.down && !st.up ? 1.75 : 3.0;
+  // råvaran i korgen: stavar (pommes) eller bitar (nuggets, lökringar), i färg efter hur länge de friterats
+  if (st.loaded) {
+    const col = friedColor(st.prog || 0), shape = part?.look?.shape || 'fries', n = shape === 'fries' ? 12 : 7;
+    for (let k = 0; k < n; k++) {
+      const x = bu + 0.2 + (k % 4) * 0.3 + hash(k, 3) * 0.08, y = bv + 0.25 + Math.floor(k / 4) * 0.8 + hash(k, 5) * 0.3;
+      const c = hash(k, 9) > 0.6 ? shade(col, 0.88) : col;
+      if (shape === 'fries') R.box(x, x + 0.2, y, y + 0.2, z0 + 0.15, z0 + 1.0 + hash(k, 7) * 0.7, (f) => (f === 'top' ? shade(c, 1.1) : c), id, { noEdges: true });
+      else R.box(x, x + 0.45, y, y + 0.45, z0 + 0.15, z0 + 0.6 + hash(k, 7) * 0.4, (f) => (f === 'top' ? shade(c, 1.1) : c), id, { noEdges: true });
+    }
+  }
+  basket(bu, bv, z0);
+}
+// backen med råvaran till fritösen: potatis till pommesen, annars en fryskartong
+export function drawCrate(R, u0, v0, id, part = null) {
+  const wood = 0xb8894a, fries = !part || part.look?.shape === 'fries';
+  if (fries) {
+    R.box(u0, u0 + 3, v0, v0 + 3.2, 0, 1.3, (f, x, y, W, Hh) => (f === 'top' ? (x < 0.2 || y < 0.2 || x > W - 0.2 || y > Hh - 0.2 ? shade(wood, 0.8) : 0x5a4028) : ((y * 3 | 0) % 2 ? shade(wood, 0.85) : wood)), id, { noEdges: true });
+    for (let k = 0; k < 9; k++) { const x = u0 + 0.6 + (k % 3) * 0.85 + hash(k, 1) * 0.2, y = v0 + 0.65 + Math.floor(k / 3) * 0.9 + hash(k, 2) * 0.2, c = hash(k, 4) > 0.5 ? 0xc9a063 : 0xb8894f; disc(R, x, y, 1.0, 1.45 + hash(k, 6) * 0.25, 0.42, (f, px, py) => (f === 'top' ? (hash(px * 6 | 0, py * 6 | 0) > 0.85 ? shade(c, 0.75) : c) : shade(c, 0.85)), id); }
+  } else R.box(u0, u0 + 3, v0, v0 + 3.2, 0, 1.6, (f, x, y, W, Hh) => (f === 'top' ? (Math.abs(y - Hh / 2) < 0.15 ? 0xd8c8a0 : 0x3a78d8) : y > 0.5 && y < 1.1 && x > 0.4 && x < W - 0.4 ? 0xf4f1ea : 0x2c5fb0), id, { noEdges: true });
 }
 // dryckesmaskin: torn med tre kranar, droppbricka och (när man tappat upp) en fylld mugg under
 export function drawDrinkTower(R, u0, v0, id, era, filled = false, drink = null) {

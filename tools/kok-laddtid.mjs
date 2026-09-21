@@ -39,8 +39,11 @@ async function openKitchen(label) {
     c.phase = 'queue'; c.x = 453; c.y = 176; c._path = []; c._tkey = 'q0'; c.moving = false; c.patience = 9999;
     const order = g.accept(c);
     order.guided = true;   // hoppa över lägesvalet (det är spelarens eget klick)
-    window.__lt.length = 0; window.__prof = {};
     const R = PV.view3d?.renderer, lista = () => R ? R.info.programs.map((x) => x.name + '|' + (x.cacheKey || '')) : [];
+    // gästens 3D-figur har egna shaders (kläder, hår) som kompileras första gången just den figuren syns. Det hör
+    // inte till köket: låt figuren ritas klart innan mätningen börjar (tills inga nya program kommit på 1,5 s).
+    if (R) { let n = lista().length, still = performance.now(); const stop = performance.now() + 30000; while (performance.now() - still < 1500 && performance.now() < stop) { await new Promise((r) => setTimeout(r, 100)); if (lista().length !== n) { n = lista().length; still = performance.now(); } } }
+    window.__lt.length = 0; window.__prof = {};
     const progFöre = lista();
     const t0 = performance.now();
     PV.openBuild(order);
@@ -50,12 +53,18 @@ async function openKitchen(label) {
     const tKlar = Math.round(performance.now() - t0);
     await new Promise((r) => setTimeout(r, 1200));
     const nya = lista().filter((x) => !progFöre.includes(x));
-    return { öppna: tOpen, ritad: tKlar, långa: window.__lt.map((x) => x.ms), prof: window.__prof, bänk: PV.view3d?.bench?.stats || null, gl: !!PV.build.gl, nyaProgram: nya };
+    // vilka föremål använder de nya programmen? (namn uppåt i trädet – så syns det om det är köket eller en figur)
+    const vems = {};
+    if (R && nya.length) {
+      const keys = new Set(R.info.programs.filter((x) => nya.includes(x.name + '|' + (x.cacheKey || ''))).map((x) => x.cacheKey));
+      PV.view3d.scene.traverse((o) => { for (const m of [].concat(o.material || [])) { const pr = R.properties.get(m).currentProgram; if (pr && keys.has(pr.cacheKey)) { let n = o, path = []; while (n && path.length < 4) { if (n.name) path.push(n.name); n = n.parent; } const k = (m.type || '') + ' ' + (path.join(' < ') || o.type); vems[k] = (vems[k] || 0) + 1; } } });
+    }
+    return { öppna: tOpen, ritad: tKlar, långa: window.__lt.map((x) => x.ms), prof: window.__prof, bänk: PV.view3d?.bench?.stats || null, gl: !!PV.build.gl, nyaProgram: nya, vems };
   });
   const lt = t.långa.reduce((a, b) => a + b, 0);
   console.log(`${label}: ritad efter ${t.ritad} ms (öppna ${t.öppna} ms) · sidan låst ${lt} ms [${t.långa.join(', ')}]`);
   console.log(`   ${JSON.stringify(t.prof)}${t.bänk ? ' · bänk ' + JSON.stringify(t.bänk) : ''}`);
-  if (t.nyaProgram?.length) t.nyaProgram.forEach((n, i) => console.log(`   nytt program ${i + 1}: ${n}`));
+  if (t.nyaProgram?.length) { t.nyaProgram.forEach((n, i) => console.log(`   nytt program ${i + 1}: ${n.slice(0, 60)}`)); console.log('   används av: ' + JSON.stringify(t.vems)); }
   await page.click('#build-back');
   await page.waitForFunction(() => document.body.dataset.screen === 'shop', null, { timeout: 30000 });
   await page.evaluate(() => { const g = PV.game; g.orders.length = 0; g.customers.length = 0; });
